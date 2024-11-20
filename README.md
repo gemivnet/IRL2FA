@@ -56,7 +56,3 @@ Attribution must be given to the original creator
 No commercial use permitted
 No derivatives or adaptations allowed
 No selling of kits or assembled units
-
-## Contributing
-
-We welcome contributions! See CONTRIBUTING.md for guidelines.
