@@ -1,51 +1,30 @@
-# Contributing to IRL2FA
+# IRL2FA Contribution Policy
 
 Thank you for considering contributing to IRL2FA. Open source contributions are vital for security validation and long-term device sustainability.
 
-## Core Principles
+This project is open source with the intent to allow security research into the device and long-term maintenance in the case that the original maintainer abandons the project.
 
-1. **Security First**: All contributions must maintain or enhance device security.
+## Contribution Policy
+Due to the license under which this is published, the project does not accept contributions at this time. The codebase is provided as-is under CC BY-NC-ND 4.0.
 
-2. **Ownership & Rights**: By submitting a contribution, you agree that:
-   - All contributions become the exclusive property of the repository maintainer
-   - All commercial and non-commercial rights transfer to the maintainer
-   - The maintainer has full discretion over contribution acceptance
-   - Your work can be used in any way, including commercial applications
-   - The maintainer receives unlimited rights to use, modify, relicense, or monetize your contribution
-   - Your contribution falls under the project's CC BY-NC-ND 4.0 license for distribution
+## Permitted Usage
+You are free to:
+- Study and review the code for security research
+- Fork and modify the code for personal use
+- Use the software as provided, subject to CC BY-NC-ND 4.0 restrictions
 
-## Pull Request Requirements
+## Restrictions
+- No commercial use
+- No distribution of modified versions
+- No derivative works may be shared publicly
+- Attribution required for any use
 
-1. **Acknowledgment**: Include this statement in your PR:
-   ```
-   I have read and agree to the Contributing Guidelines, including the complete transfer of ownership and commercial rights to the maintainer.
-   ```
+## Support and Feedback
+If you have issues or feature requests, please submit them under the Issues tab.
 
-2. **Compliance**: PRs must pass all automated checks in the template.
-   - Non-compliant PRs will be closed without comment
-   - Review the PR template thoroughly before submission
+## License Terms
+This project is licensed under Creative Commons Attribution-NonCommercial-NoDerivatives 4.0 International (CC BY-NC-ND 4.0).
 
-## Development Guidelines
+You must give appropriate credit, provide a link to the license, and indicate if changes were made. You may do so in any reasonable manner, but not in any way that suggests the licensor endorses you or your use.
 
-1. **Security**
-   - Document security implications of changes
-   - Include test cases for security-critical features
-   - Follow secure coding practices
-
-2. **Code Quality**
-   - Follow existing code style
-   - Include comments for complex logic
-   - Add tests for new features
-
-3. **Documentation**
-   - Update relevant documentation
-   - Explain user-facing changes
-   - Document any new dependencies
-
-## Questions?
-
-Open an issue for clarification before starting significant work.
-
-## License
-
-All contributions are subject to CC BY-NC-ND 4.0 license terms and become property of the maintainer for all uses, including commercial.
+Full license text: https://creativecommons.org/licenses/by-nc-nd/4.0/legalcode
