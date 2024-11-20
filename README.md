@@ -44,16 +44,18 @@ Available as a DIY kit containing:
 
 ## License
 
-This work is licensed under the Creative Commons Attribution-NonCommercial 4.0 International License (CC BY-NC 4.0).
-
+This work is licensed under the Creative Commons Attribution-NonCommercial-NoDerivatives 4.0 International License (CC BY-NC-ND 4.0).
 You are free to:
-- Share and adapt the material
-- Build your own units for personal use
+
+Share the material in its original form
+Build your own units for personal use
 
 Under the following terms:
-- Attribution must be given to the original creator
-- No commercial use permitted
-- No selling of kits or assembled units
+
+Attribution must be given to the original creator
+No commercial use permitted
+No derivatives or adaptations allowed
+No selling of kits or assembled units
 
 ## Contributing
 
