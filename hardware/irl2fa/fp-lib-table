@@ -1,0 +1,4 @@
+(fp_lib_table
+  (version 7)
+  (lib (name "irl2fa")(type "KiCad")(uri "${KIPRJMOD}/footprints/irl2fa.pretty")(options "")(descr ""))
+)
