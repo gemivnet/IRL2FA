@@ -1,6 +1,6 @@
 # IRL2FA - Air-Gapped Real-World 2-Factor Authenticator
 
-IRL2FA is a compact physical device designed to verify the authenticity of digital communications in an increasingly AI-dominated world. Its primary purpose is to prevent AI impersonation fraud in personal communications, while also serving as a standalone 2FA (Two-Factor Authentication) device for those who prefer not have continuious access to their phones.
+IRL2FA is a compact physical device designed to verify the authenticity of digital communications in an increasingly AI-dominated world. Its primary purpose is to prevent AI impersonation fraud in personal communications, while also serving as a standalone 2FA (Two-Factor Authentication) device for those who prefer not to have continuous access to their phones.
 
 ## Theory of Operation
 
