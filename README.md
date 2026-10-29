@@ -80,7 +80,7 @@ It behaves like the hardware, not just like the firmware:
 | Clock | Micro Crystal RV-3032-C7, temperature-compensated ±2.5 ppm |
 | Input | Alps SKRHABE010 5-way switch, the only control |
 | Pairing | 940 nm side-looking IR LED and phototransistor on the top edge |
-| Power | CR2450 coin cell. **About 3.7 years typical, 2.1 years worst case** at 20 uses a day ([calculation](docs/power-calculations.md)) |
+| Power | CR2450 coin cell. **About 2.2 years typical, 1.3 years worst case** at 20 uses a day, with the awake time and refreshes measured on the emulated firmware ([calculation](docs/power-calculations.md)) |
 | Board | 77 × 31 mm, 2 layers, 0.8 mm, ENIG. JLCPCB can assemble every part except the display |
 | Case | 80.9 × 34.9 × 11.0 mm, 3D-printed in 4 parts, M2 screws |
 

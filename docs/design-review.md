@@ -86,7 +86,7 @@ alone.
 
 **Fix:** the device sleeps and draws nothing on screen until you press the
 joystick. It refreshes only while you are looking at it, and blanks to a
-neutral sleep screen afterwards. Result: about 3.7 years typical (2.1 worst case) on a CR2450 at 20 uses a day
+neutral sleep screen afterwards. Result: about 2.2 years typical (1.3 worst case) on a CR2450 at 20 uses a day, as measured on the emulated firmware
 ([power-calculations.md](power-calculations.md)).
 
 ### 6. Clock drift was not considered
