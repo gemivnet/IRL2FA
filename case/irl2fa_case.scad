@@ -471,18 +471,21 @@ module board_model() {
     color([0.55, 0.56, 0.58]) translate([joy[0], joy[1], 0]) for (c = joystick_collars) cylinder(d = c[0], h = c[1]);
     color([0.92, 0.92, 0.92]) translate([joy[0], joy[1], 0]) rotate(45) linear_extrude(joystick_stem_top)
         offset(r = 0.3) square(joystick_stem_diameter - 0.6, center = true);
-    // battery holder (MYOUNG BS-24-B4AA016: base, two end blocks with lips, side spring) + CR2450
+    // battery clip (MYOUNG MY-2450-01: 0.25 mm plate over the cell, legs to two feet) + CR2450
+    // lying on the PCB's negative pad. Plate 25.5 x 23.2 with its closed end towards the IR
+    // edge (datasheet), not in board.yaml.
     b = M(battery_x, battery_y);
-    hb = [27.2, 16];                                   // holder body (datasheet), not in board.yaml
-    lip = 1.5;                                         // lip thickness over the cell
-    zc = z_pcb_back - (battery_holder_height - lip);   // cell face towards the floor
-    color([0.22, 0.22, 0.24]) translate([b[0], b[1], 0]) {
-        translate([-hb[0] / 2, -hb[1] / 2, z_pcb_back - 0.8]) cube([hb[0], hb[1], 0.8]);
-        for (sx = [-1, 1]) translate([sx > 0 ? hb[0] / 2 - 2.6 : -hb[0] / 2, -hb[1] / 2, z_pcb_back - battery_holder_height])
-            cube([2.6, hb[1], battery_holder_height]);
+    cr = battery_cell_diameter / 2;
+    zc = z_pcb_back - battery_cell_thickness;          // cell face towards the floor
+    color([0.70, 0.71, 0.74]) translate([b[0], b[1], 0]) {
+        translate([0, 0, z_pcb_back - battery_holder_height]) linear_extrude(0.25)
+            polygon([[-3.75, cr + 0.25], [3.75, cr + 0.25], [12.75, cr + 0.25 - 6.9],
+                     [12.75, cr + 0.25 - 23.2], [-12.75, cr + 0.25 - 23.2], [-12.75, cr + 0.25 - 6.9]]);
+        for (sx = [-1, 1]) {
+            translate([sx > 0 ? 12.5 : -12.75, -3.3, z_pcb_back - battery_holder_height]) cube([0.25, 6, battery_holder_height]);
+            translate([sx > 0 ? 12.75 : -17.9, -3.3, z_pcb_back - 0.25]) cube([5.15, 6, 0.25]);
+        }
     }
-    color([0.80, 0.78, 0.60]) translate([b[0], b[1], z_pcb_back - 0.15]) for (sx = [-1, 1])
-        translate([sx * 16.69 - 1.8, -2.25, 0]) cube([3.6, 4.5, 0.15]);
     color([0.78, 0.79, 0.82]) translate([b[0], b[1], zc]) cylinder(d = battery_cell_diameter, h = battery_cell_thickness);
     color([0.6, 0.6, 0.62]) translate([b[0], b[1], zc - 0.01]) linear_extrude(0.02)
         text("CR2450", size = 3, font = "DejaVu Sans:style=Bold", halign = "center", valign = "center");

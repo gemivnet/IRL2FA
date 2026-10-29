@@ -30,7 +30,7 @@
    ],
    "datasheet": "https://datasheet.lcsc.com/datasheet/pdf/053eeebef0364c26ade981172656431e.pdf?productCode=C139794",
    "mpn": "SKRHABE010",
-   "stock": 6785
+   "stock": 6714
   },
   "C15127": {
    "breaks": [
@@ -61,7 +61,7 @@
    ],
    "datasheet": "https://datasheet.lcsc.com/datasheet/pdf/fee353dd1e9e0bc90b295f14f381aa4c.pdf?productCode=C15127",
    "mpn": "AO3401A",
-   "stock": 473205
+   "stock": 460125
   },
   "C15195": {
    "breaks": [
@@ -88,7 +88,7 @@
    ],
    "datasheet": "https://datasheet.lcsc.com/datasheet/pdf/02336ea48ea44ca18c72517dd3cb7b47.pdf?productCode=C15195",
    "mpn": "CL05B103KB5NNNC",
-   "stock": 2411700
+   "stock": 2305900
   },
   "C1525": {
    "breaks": [
@@ -115,7 +115,7 @@
    ],
    "datasheet": "https://datasheet.lcsc.com/datasheet/pdf/02336ea48ea44ca18c72517dd3cb7b47.pdf?productCode=C1525",
    "mpn": "CL05B104KO5NNNC",
-   "stock": 2321900
+   "stock": 2001000
   },
   "C15849": {
    "breaks": [
@@ -146,7 +146,7 @@
    ],
    "datasheet": "https://datasheet.lcsc.com/datasheet/pdf/02336ea48ea44ca18c72517dd3cb7b47.pdf?productCode=C15849",
    "mpn": "CL10A105KB8NNNC",
-   "stock": 318450
+   "stock": 164450
   },
   "C16780": {
    "breaks": [
@@ -177,7 +177,7 @@
    ],
    "datasheet": "https://datasheet.lcsc.com/datasheet/pdf/02336ea48ea44ca18c72517dd3cb7b47.pdf?productCode=C16780",
    "mpn": "CL21A476MQYNNNE",
-   "stock": 306380
+   "stock": 294460
   },
   "C1779": {
    "breaks": [
@@ -208,7 +208,7 @@
    ],
    "datasheet": "https://datasheet.lcsc.com/datasheet/pdf/02336ea48ea44ca18c72517dd3cb7b47.pdf?productCode=C1779",
    "mpn": "CL21A475KAQNNNE",
-   "stock": 337740
+   "stock": 332880
   },
   "C19666": {
    "breaks": [
@@ -239,7 +239,7 @@
    ],
    "datasheet": "https://datasheet.lcsc.com/datasheet/pdf/02336ea48ea44ca18c72517dd3cb7b47.pdf?productCode=C19666",
    "mpn": "CL10A475KO8NNNC",
-   "stock": 496070
+   "stock": 435890
   },
   "C20917": {
    "breaks": [
@@ -270,7 +270,7 @@
    ],
    "datasheet": "https://datasheet.lcsc.com/datasheet/pdf/130876b936da464599428c58fd8de8f6.pdf?productCode=C20917",
    "mpn": "AO3400A",
-   "stock": 619265
+   "stock": 603030
   },
   "C22459164": {
    "breaks": [
@@ -293,7 +293,7 @@
    ],
    "datasheet": "https://datasheet.lcsc.com/datasheet/pdf/1d8e3bb2642efa1578790415a746a5f0.pdf?productCode=C22459164",
    "mpn": "STM32U083KCU6",
-   "stock": 41
+   "stock": 42
   },
   "C25076": {
    "breaks": [
@@ -316,7 +316,7 @@
    ],
    "datasheet": "https://datasheet.lcsc.com/datasheet/pdf/0a975aaa49b7c97f38a963127be4a823.pdf?productCode=C25076",
    "mpn": "0402WGF1000TCE",
-   "stock": 2287600
+   "stock": 2137200
   },
   "C25101": {
    "breaks": [
@@ -343,7 +343,7 @@
    ],
    "datasheet": "https://datasheet.lcsc.com/datasheet/pdf/0a975aaa49b7c97f38a963127be4a823.pdf?productCode=C25101",
    "mpn": "0402WGF220KTCE",
-   "stock": 3600400
+   "stock": 3598000
   },
   "C25741": {
    "breaks": [
@@ -366,7 +366,7 @@
    ],
    "datasheet": "https://datasheet.lcsc.com/datasheet/pdf/0a975aaa49b7c97f38a963127be4a823.pdf?productCode=C25741",
    "mpn": "0402WGF1003TCE",
-   "stock": 2470400
+   "stock": 1708900
   },
   "C25744": {
    "breaks": [
@@ -420,7 +420,7 @@
    ],
    "datasheet": "https://datasheet.lcsc.com/datasheet/pdf/0a975aaa49b7c97f38a963127be4a823.pdf?productCode=C25900",
    "mpn": "0402WGF4701TCE",
-   "stock": 7851800
+   "stock": 7776100
   },
   "C26083": {
    "breaks": [
@@ -447,7 +447,7 @@
    ],
    "datasheet": "https://datasheet.lcsc.com/datasheet/pdf/0a975aaa49b7c97f38a963127be4a823.pdf?productCode=C26083",
    "mpn": "0402WGF1004TCE",
-   "stock": 1182500
+   "stock": 1172700
   },
   "C324726": {
    "breaks": [
@@ -478,7 +478,7 @@
    ],
    "datasheet": "https://datasheet.lcsc.com/datasheet/pdf/4fa13630ce538d3df6cea685e5f75b4e.pdf?productCode=C324726",
    "mpn": "FH34SRJ-24S-0.5SH(50)",
-   "stock": 10105
+   "stock": 10075
   },
   "C469327": {
    "breaks": [
@@ -571,7 +571,7 @@
    ],
    "datasheet": "https://www.microcrystal.com/fileadmin/Media/Products/RTC/Datasheet/RV-3032-C7.pdf",
    "mpn": "RV-3032-C7-32.768kHz-2.5PPM-TA-QC",
-   "stock": 533
+   "stock": 224
   },
   "C52923": {
    "breaks": [
@@ -602,7 +602,7 @@
    ],
    "datasheet": "https://datasheet.lcsc.com/datasheet/pdf/02336ea48ea44ca18c72517dd3cb7b47.pdf?productCode=C52923",
    "mpn": "CL05A105KA5NQNC",
-   "stock": 2502200
+   "stock": 2111000
   },
   "C6604342": {
    "breaks": [
@@ -687,38 +687,38 @@
    ],
    "datasheet": "https://datasheet.lcsc.com/datasheet/pdf/8d647b709d5440b4976f135071ba6493.pdf?productCode=C77336",
    "mpn": "MBR0530",
-   "stock": 51980
+   "stock": 51220
   },
-  "C964809": {
+  "C964845": {
    "breaks": [
     [
-     1,
-     0.5194
-    ],
-    [
-     10,
-     0.4267
+     5,
+     0.1982
     ],
     [
      50,
-     0.3804
+     0.1745
     ],
     [
-     100,
-     0.3456
+     150,
+     0.1643
     ],
     [
-     1000,
-     0.3039
+     850,
+     0.1437
     ],
     [
-     2000,
-     0.2992
+     2550,
+     0.1381
+    ],
+    [
+     5100,
+     0.1347
     ]
    ],
-   "datasheet": "https://datasheet.lcsc.com/datasheet/pdf/c9cb77eac3a2dd701f0eab845ea63528.pdf?productCode=C964809",
-   "mpn": "BS-24-B4AA016",
-   "stock": 586
+   "datasheet": "https://datasheet.lcsc.com/datasheet/pdf/26b02de8ee838f915c56d5652dea3d54.pdf?productCode=C964845",
+   "mpn": "MY-2450-01",
+   "stock": 5355
   }
  }
 }

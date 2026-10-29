@@ -15,7 +15,7 @@ confirmed against a primary source is marked *unverified*.
 | Display | PDi E2213KS0E1 (212×104) | **Good Display GDEY0213B74** (250×122) | Open SSD1680 controller, 0.42 s partial refresh, 1 µA deep sleep. The PDi booster MOSFET has 0 stock. |
 | FPC connector | Molex 503480-2400 | **Hirose FH34SRJ-24S-0.5SH(50)** | Molex 0 stock; Hirose is dual-contact with ~10k in stock |
 | Joystick | TE 2434804-1 | **Alps SKRHABE010** | TE 0 stock (18-21 week lead time) and no published pinout |
-| Battery holder | Renata NL5077-LF (through-hole) | **MYOUNG BS-24-B4AA016** (SMT) | JLC can place it; gold contacts |
+| Battery holder | Renata NL5077-LF (through-hole) | **MYOUNG MY-2450-01** (SMT clip, 5.7 mm) | JLC can place it. 1.8 mm lower than the BS-24-B4AA016 moulded holder used at first, and 9× its stock |
 | Pairing | typed 20-symbol code (2^46) | **IR link + X25519** | see [pairing-protocol.md](pairing-protocol.md) |
 
 ## MCU
@@ -72,9 +72,39 @@ by the 59×29 mm glass, not by the cell. See [power-calculations.md](power-calcu
 
 | Cell | Capacity | Device thickness | Life (normal use, typical / worst) |
 |-|-|-|-|
-| CR2032 | 225 mAh | ~9 mm | ~1.6 / 0.9 years (worst case misses the 1-year goal) |
-| **CR2450** ✔ | 540 mAh usable | ~11 mm | **3.7 / 2.1 years** |
+| CR2032 | 225 mAh | ~9.2 mm | ~1.6 / 0.9 years (worst case misses the 1-year goal) |
+| **CR2450** ✔ | 540 mAh usable | **11.0 mm** (case model) | **3.7 / 2.1 years** |
 | AAA + boost converter | ~1100 mAh | ~15-16 mm | longer, but thicker and needs a boost converter. Alkaline cells leak. |
+
+### Battery holder
+
+The holder sets the device's thickness. The case is the holder height plus
+5.3 mm: 2.8 mm front stack, 0.8 mm board, 0.1 mm keep-out margin, 0.4 mm
+clearance and 1.2 mm floor. The table compares the CR2450 holders a JLCPCB parts
+search for "CR2450" returns, from their MYOUNG drawings. Stock and prices are
+from LCSC on 2026-10-29. The clips are the lowest.
+
+| Holder | Height | Type | LCSC | Stock | Price (50+) | Notes |
+|-|-|-|-|-|-|-|
+| **MYOUNG MY-2450-01** ✔ ("CR2450-W") | **5.70 mm** | sprung plate; the PCB pad is the − contact | [C964845](https://www.lcsc.com/product-detail/C964845.html) | 5355 | $0.17 | Ni-plated phosphor bronze, 36.8 mm over the feet, 23.2 mm deep. The cell slides in from the open end. [Drawing MY-CP-0106](https://datasheet.lcsc.com/datasheet/pdf/26b02de8ee838f915c56d5652dea3d54.pdf?productCode=C964845) |
+| MYOUNG MY-2450-05-J | 5.70 mm | same clip, 30.5 mm legs | [C7525439](https://www.lcsc.com/product-detail/C7525439.html) | 885 | $0.11 (5+) | 5 mm shorter over the feet, but a sixth of the stock |
+| MYOUNG MY-2450-03 ("CR2450-P") | 5.75 mm | shallow clip, 15.4 mm deep | [C2988622](https://www.lcsc.com/product-detail/C2988622.html) | 2965 | $0.29 (30+) | Its plate covers only 15.4 mm of the 24.5 mm cell |
+| MYOUNG BS-24-B4AA016 (first design) | 7.50 mm | moulded base, lips and side spring | [C964809](https://www.lcsc.com/product-detail/C964809.html) | 586 | $0.35 (100+) | Gold contacts, but 1.8 mm taller (13.0 mm case) |
+| MYOUNG BS-24-B4AK014 / B5AM007 / A1AJ004 | 7.6 / 9.85 / 9.2 mm | moulded (A1AJ004 is through-hole) | [C964813](https://www.lcsc.com/product-detail/C964813.html), [C964811](https://www.lcsc.com/product-detail/C964811.html), [C964806](https://www.lcsc.com/product-detail/C964806.html) | 1247 / 255 / 4080 | $0.29-0.42 | All taller than the first holder |
+
+A clip cannot get much lower: the cell is 5.0 mm, the plate 0.25 mm, and its
+tongues need travel. With the clip, the cell's negative face lies on a bare
+12 mm pad, so the board is ordered in **ENIG** (gold) for a lasting contact.
+
+**Rejected: sinking the cell into a board cutout.** A 24.5 mm hole in the 31 mm
+board would leave 3.25 mm strips above and below it for every track between the
+display half and the MCU half. The front of the board is covered by the display
+glass on 0.2 mm adhesive, so the cell cannot come through to the front. The most
+it could save is the 0.8 mm board, less a contact strip across the hole. Both
+contacts would then have to be side or bridge springs, such as the MY-ZJ-126
+side contact ([C5457113](https://www.lcsc.com/product-detail/C5457113.html), 5.0 mm high),
+and LCSC has no bridge part. The 0.8 mm board already takes 0.2 mm off without
+any of that.
 
 ## Joystick
 

@@ -10,7 +10,7 @@ this as a prototype release and please [file a build report](https://github.com/
 
 | File | What it is |
 |-|-|
-| `irl2fa-gerbers-*.zip` | Gerbers and drill files for JLCPCB, PCBWay or similar (2 layers, 1.0 mm) |
+| `irl2fa-gerbers-*.zip` | Gerbers and drill files for JLCPCB, PCBWay or similar (2 layers, 0.8 mm, ENIG) |
 | `irl2fa-bom-jlcpcb.csv`, `irl2fa-cpl-jlcpcb.csv` | JLCPCB assembly BOM and placement (both sides) |
 | `irl2fa-bom.csv`, `irl2fa-ibom.html` | full BOM and interactive BOM for hand assembly |
 | `irl2fa-schematic.pdf`, `irl2fa.step` | schematic and board 3D model |

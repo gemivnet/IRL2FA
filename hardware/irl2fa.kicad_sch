@@ -4903,7 +4903,7 @@
 				(justify left)
 			)
 		)
-		(property "Footprint" "irl2fa:BatteryHolder_MYOUNG_BS-24-B4AA016_CR2450"
+		(property "Footprint" "irl2fa:BatteryHolder_MYOUNG_MY-2450-01_CR2450"
 			(at 205.74 45.72 0)
 			(effects
 				(font
@@ -4912,7 +4912,7 @@
 				(hide yes)
 			)
 		)
-		(property "Datasheet" "https://www.lcsc.com/product-detail/C964809.html"
+		(property "Datasheet" "https://www.lcsc.com/product-detail/C964845.html"
 			(at 205.74 45.72 0)
 			(effects
 				(font
@@ -4921,7 +4921,7 @@
 				(hide yes)
 			)
 		)
-		(property "Description" "CR2450 coin cell holder, SMT"
+		(property "Description" "CR2450 coin cell clip, SMT, 5.7 mm (the PCB pad is the - contact)"
 			(at 205.74 45.72 0)
 			(effects
 				(font
@@ -4930,7 +4930,7 @@
 				(hide yes)
 			)
 		)
-		(property "LCSC" "C964809"
+		(property "LCSC" "C964845"
 			(at 205.74 45.72 0)
 			(effects
 				(font
@@ -4939,7 +4939,7 @@
 				(hide yes)
 			)
 		)
-		(property "MPN" "BS-24-B4AA016"
+		(property "MPN" "MY-2450-01"
 			(at 205.74 45.72 0)
 			(effects
 				(font

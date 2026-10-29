@@ -8,34 +8,34 @@ Unit prices are per board: the "×1 kit" column assumes you buy one board's wort
 
 | Qty | Refs | Part | Manufacturer | MPN | LCSC | Stock | Unit ×1 kit | Unit ×100 | Line ×100 |
 |-|-|-|-|-|-|-|-|-|-|
-| 1 | BT1 | CR2450 | MYOUNG | [BS-24-B4AA016](https://datasheet.lcsc.com/datasheet/pdf/c9cb77eac3a2dd701f0eab845ea63528.pdf?productCode=C964809) | [C964809](https://www.lcsc.com/product-detail/C964809.html) | 586 | $0.5194 | $0.3456 | $0.346 |
-| 2 | C1,C2 | 47u | Samsung | [CL21A476MQYNNNE](https://datasheet.lcsc.com/datasheet/pdf/02336ea48ea44ca18c72517dd3cb7b47.pdf?productCode=C16780) | [C16780](https://www.lcsc.com/product-detail/C16780.html) | 306380 | $0.1027 | $0.0805 | $0.161 |
-| 4 | C3,C4,C8,C9 | 100n | Samsung | [CL05B104KO5NNNC](https://datasheet.lcsc.com/datasheet/pdf/02336ea48ea44ca18c72517dd3cb7b47.pdf?productCode=C1525) | [C1525](https://www.lcsc.com/product-detail/C1525.html) | 2321900 | $0.0032 | $0.0032 | $0.013 |
-| 1 | C5 | 4.7u | Samsung | [CL10A475KO8NNNC](https://datasheet.lcsc.com/datasheet/pdf/02336ea48ea44ca18c72517dd3cb7b47.pdf?productCode=C19666) | [C19666](https://www.lcsc.com/product-detail/C19666.html) | 496070 | $0.0171 | $0.0129 | $0.013 |
-| 1 | C6 | 1u | Samsung | [CL05A105KA5NQNC](https://datasheet.lcsc.com/datasheet/pdf/02336ea48ea44ca18c72517dd3cb7b47.pdf?productCode=C52923) | [C52923](https://www.lcsc.com/product-detail/C52923.html) | 2502200 | $0.0064 | $0.0064 | $0.006 |
-| 1 | C7 | 10n | Samsung | [CL05B103KB5NNNC](https://datasheet.lcsc.com/datasheet/pdf/02336ea48ea44ca18c72517dd3cb7b47.pdf?productCode=C15195) | [C15195](https://www.lcsc.com/product-detail/C15195.html) | 2411700 | $0.004 | $0.004 | $0.004 |
-| 2 | C10,C11 | 4.7u | Samsung | [CL21A475KAQNNNE](https://datasheet.lcsc.com/datasheet/pdf/02336ea48ea44ca18c72517dd3cb7b47.pdf?productCode=C1779) | [C1779](https://www.lcsc.com/product-detail/C1779.html) | 337740 | $0.0346 | $0.0268 | $0.054 |
-| 8 | C12,C13,C14,C15,C16,C17,C18,C19 | 1u | Samsung | [CL10A105KB8NNNC](https://datasheet.lcsc.com/datasheet/pdf/02336ea48ea44ca18c72517dd3cb7b47.pdf?productCode=C15849) | [C15849](https://www.lcsc.com/product-detail/C15849.html) | 318450 | $0.0141 | $0.0109 | $0.087 |
-| 3 | D1,D2,D3 | MBR0530 | JSCJ | [MBR0530](https://datasheet.lcsc.com/datasheet/pdf/8d647b709d5440b4976f135071ba6493.pdf?productCode=C77336) | [C77336](https://www.lcsc.com/product-detail/C77336.html) | 51980 | $0.0394 | $0.0316 | $0.095 |
+| 1 | BT1 | CR2450 | MYOUNG | [MY-2450-01](https://datasheet.lcsc.com/datasheet/pdf/26b02de8ee838f915c56d5652dea3d54.pdf?productCode=C964845) | [C964845](https://www.lcsc.com/product-detail/C964845.html) | 5355 | $0.1982 | $0.1745 | $0.174 |
+| 2 | C1,C2 | 47u | Samsung | [CL21A476MQYNNNE](https://datasheet.lcsc.com/datasheet/pdf/02336ea48ea44ca18c72517dd3cb7b47.pdf?productCode=C16780) | [C16780](https://www.lcsc.com/product-detail/C16780.html) | 294460 | $0.1027 | $0.0805 | $0.161 |
+| 4 | C3,C4,C8,C9 | 100n | Samsung | [CL05B104KO5NNNC](https://datasheet.lcsc.com/datasheet/pdf/02336ea48ea44ca18c72517dd3cb7b47.pdf?productCode=C1525) | [C1525](https://www.lcsc.com/product-detail/C1525.html) | 2001000 | $0.0032 | $0.0032 | $0.013 |
+| 1 | C5 | 4.7u | Samsung | [CL10A475KO8NNNC](https://datasheet.lcsc.com/datasheet/pdf/02336ea48ea44ca18c72517dd3cb7b47.pdf?productCode=C19666) | [C19666](https://www.lcsc.com/product-detail/C19666.html) | 435890 | $0.0171 | $0.0129 | $0.013 |
+| 1 | C6 | 1u | Samsung | [CL05A105KA5NQNC](https://datasheet.lcsc.com/datasheet/pdf/02336ea48ea44ca18c72517dd3cb7b47.pdf?productCode=C52923) | [C52923](https://www.lcsc.com/product-detail/C52923.html) | 2111000 | $0.0064 | $0.0064 | $0.006 |
+| 1 | C7 | 10n | Samsung | [CL05B103KB5NNNC](https://datasheet.lcsc.com/datasheet/pdf/02336ea48ea44ca18c72517dd3cb7b47.pdf?productCode=C15195) | [C15195](https://www.lcsc.com/product-detail/C15195.html) | 2305900 | $0.004 | $0.004 | $0.004 |
+| 2 | C10,C11 | 4.7u | Samsung | [CL21A475KAQNNNE](https://datasheet.lcsc.com/datasheet/pdf/02336ea48ea44ca18c72517dd3cb7b47.pdf?productCode=C1779) | [C1779](https://www.lcsc.com/product-detail/C1779.html) | 332880 | $0.0346 | $0.0268 | $0.054 |
+| 8 | C12,C13,C14,C15,C16,C17,C18,C19 | 1u | Samsung | [CL10A105KB8NNNC](https://datasheet.lcsc.com/datasheet/pdf/02336ea48ea44ca18c72517dd3cb7b47.pdf?productCode=C15849) | [C15849](https://www.lcsc.com/product-detail/C15849.html) | 164450 | $0.0141 | $0.0109 | $0.087 |
+| 3 | D1,D2,D3 | MBR0530 | JSCJ | [MBR0530](https://datasheet.lcsc.com/datasheet/pdf/8d647b709d5440b4976f135071ba6493.pdf?productCode=C77336) | [C77336](https://www.lcsc.com/product-detail/C77336.html) | 51220 | $0.0394 | $0.0316 | $0.095 |
 | 1 | D4 | VSMB2948SL | Vishay | [VSMB2948SL](https://datasheet.lcsc.com/datasheet/pdf/11d69dfec4692ab72b2a062c0e4374d5.pdf?productCode=C6604342) | [C6604342](https://www.lcsc.com/product-detail/C6604342.html) | 176 | $0.4507 | $0.4245 | $0.424 |
-| 1 | J1 | FH34SRJ-24S | Hirose | [FH34SRJ-24S-0.5SH(50)](https://datasheet.lcsc.com/datasheet/pdf/4fa13630ce538d3df6cea685e5f75b4e.pdf?productCode=C324726) | [C324726](https://www.lcsc.com/product-detail/C324726.html) | 10105 | $0.2504 | $0.1962 | $0.196 |
+| 1 | J1 | FH34SRJ-24S | Hirose | [FH34SRJ-24S-0.5SH(50)](https://datasheet.lcsc.com/datasheet/pdf/4fa13630ce538d3df6cea685e5f75b4e.pdf?productCode=C324726) | [C324726](https://www.lcsc.com/product-detail/C324726.html) | 10075 | $0.2504 | $0.1962 | $0.196 |
 | 1 | L1 | 47u | APV | [ANR3015T470M](https://datasheet.lcsc.com/datasheet/pdf/a15e54507aca7b688df779462a1a4487.pdf?productCode=C7427088) | [C7427088](https://www.lcsc.com/product-detail/C7427088.html) | 13780 | $0.0412 | $0.0412 | $0.041 |
-| 2 | Q1,Q2 | AO3401A | AOS | [AO3401A](https://datasheet.lcsc.com/datasheet/pdf/fee353dd1e9e0bc90b295f14f381aa4c.pdf?productCode=C15127) | [C15127](https://www.lcsc.com/product-detail/C15127.html) | 473205 | $0.0969 | $0.0699 | $0.140 |
+| 2 | Q1,Q2 | AO3401A | AOS | [AO3401A](https://datasheet.lcsc.com/datasheet/pdf/fee353dd1e9e0bc90b295f14f381aa4c.pdf?productCode=C15127) | [C15127](https://www.lcsc.com/product-detail/C15127.html) | 460125 | $0.0969 | $0.0699 | $0.140 |
 | 1 | Q3 | Si1308EDL | Vishay | [Si1308EDL-T1-GE3](https://datasheet.lcsc.com/datasheet/pdf/a865757ba512c18824d75705c123f47e.pdf?productCode=C469327) | [C469327](https://www.lcsc.com/product-detail/C469327.html) | 34655 | $0.2724 | $0.2158 | $0.216 |
-| 1 | Q4 | AO3400A | AOS | [AO3400A](https://datasheet.lcsc.com/datasheet/pdf/130876b936da464599428c58fd8de8f6.pdf?productCode=C20917) | [C20917](https://www.lcsc.com/product-detail/C20917.html) | 619265 | $0.0897 | $0.0723 | $0.072 |
+| 1 | Q4 | AO3400A | AOS | [AO3400A](https://datasheet.lcsc.com/datasheet/pdf/130876b936da464599428c58fd8de8f6.pdf?productCode=C20917) | [C20917](https://www.lcsc.com/product-detail/C20917.html) | 603030 | $0.0897 | $0.0723 | $0.072 |
 | 1 | Q5 | VEMT2523SLX01 | Vishay | [VEMT2523SLX01](https://datasheet.lcsc.com/datasheet/pdf/d26101f6a3931a556e377ed787fa1100.pdf?productCode=C511451) | [C511451](https://www.lcsc.com/product-detail/C511451.html) | 1870 | $0.4112 | $0.3273 | $0.327 |
 | 3 | R1,R2,R10 | 10k | UNI-ROYAL | [0402WGF1002TCE](https://datasheet.lcsc.com/datasheet/pdf/0a975aaa49b7c97f38a963127be4a823.pdf?productCode=C25744) | [C25744](https://www.lcsc.com/product-detail/C25744.html) | 0 | $0.0024 | $0.0024 | $0.007 |
-| 2 | R3,R4 | 4.7k | UNI-ROYAL | [0402WGF4701TCE](https://datasheet.lcsc.com/datasheet/pdf/0a975aaa49b7c97f38a963127be4a823.pdf?productCode=C25900) | [C25900](https://www.lcsc.com/product-detail/C25900.html) | 7851800 | $0.002 | $0.002 | $0.004 |
-| 2 | R5,R9 | 100k | UNI-ROYAL | [0402WGF1003TCE](https://datasheet.lcsc.com/datasheet/pdf/0a975aaa49b7c97f38a963127be4a823.pdf?productCode=C25741) | [C25741](https://www.lcsc.com/product-detail/C25741.html) | 2470400 | $0.0013 | $0.0013 | $0.003 |
-| 1 | R6 | 1M | UNI-ROYAL | [0402WGF1004TCE](https://datasheet.lcsc.com/datasheet/pdf/0a975aaa49b7c97f38a963127be4a823.pdf?productCode=C26083) | [C26083](https://www.lcsc.com/product-detail/C26083.html) | 1182500 | $0.0015 | $0.0015 | $0.002 |
-| 1 | R7 | 2.2 | UNI-ROYAL | [0402WGF220KTCE](https://datasheet.lcsc.com/datasheet/pdf/0a975aaa49b7c97f38a963127be4a823.pdf?productCode=C25101) | [C25101](https://www.lcsc.com/product-detail/C25101.html) | 3600400 | $0.0015 | $0.0015 | $0.002 |
-| 1 | R8 | 100 | UNI-ROYAL | [0402WGF1000TCE](https://datasheet.lcsc.com/datasheet/pdf/0a975aaa49b7c97f38a963127be4a823.pdf?productCode=C25076) | [C25076](https://www.lcsc.com/product-detail/C25076.html) | 2287600 | $0.0013 | $0.0013 | $0.001 |
-| 1 | SW1 | SKRHABE010 | Alps Alpine | [SKRHABE010](https://datasheet.lcsc.com/datasheet/pdf/053eeebef0364c26ade981172656431e.pdf?productCode=C139794) | [C139794](https://www.lcsc.com/product-detail/C139794.html) | 6785 | $0.78 | $0.5035 | $0.503 |
-| 1 | U1 | STM32U083KCU6 | STMicroelectronics | [STM32U083KCU6](https://datasheet.lcsc.com/datasheet/pdf/1d8e3bb2642efa1578790415a746a5f0.pdf?productCode=C22459164) | [C22459164](https://www.lcsc.com/product-detail/C22459164.html) | 41 | $6.7991 | $4.706 | $4.706 |
-| 1 | U2 | RV-3032-C7 | Micro Crystal | [RV-3032-C7 32.768kHz 2.5ppm-TA-QC](https://www.microcrystal.com/fileadmin/Media/Products/RTC/Datasheet/RV-3032-C7.pdf) | [C5127802](https://www.lcsc.com/product-detail/C5127802.html) | 533 | $3.4878 | $2.317 | $2.317 |
+| 2 | R3,R4 | 4.7k | UNI-ROYAL | [0402WGF4701TCE](https://datasheet.lcsc.com/datasheet/pdf/0a975aaa49b7c97f38a963127be4a823.pdf?productCode=C25900) | [C25900](https://www.lcsc.com/product-detail/C25900.html) | 7776100 | $0.002 | $0.002 | $0.004 |
+| 2 | R5,R9 | 100k | UNI-ROYAL | [0402WGF1003TCE](https://datasheet.lcsc.com/datasheet/pdf/0a975aaa49b7c97f38a963127be4a823.pdf?productCode=C25741) | [C25741](https://www.lcsc.com/product-detail/C25741.html) | 1708900 | $0.0013 | $0.0013 | $0.003 |
+| 1 | R6 | 1M | UNI-ROYAL | [0402WGF1004TCE](https://datasheet.lcsc.com/datasheet/pdf/0a975aaa49b7c97f38a963127be4a823.pdf?productCode=C26083) | [C26083](https://www.lcsc.com/product-detail/C26083.html) | 1172700 | $0.0015 | $0.0015 | $0.002 |
+| 1 | R7 | 2.2 | UNI-ROYAL | [0402WGF220KTCE](https://datasheet.lcsc.com/datasheet/pdf/0a975aaa49b7c97f38a963127be4a823.pdf?productCode=C25101) | [C25101](https://www.lcsc.com/product-detail/C25101.html) | 3598000 | $0.0015 | $0.0015 | $0.002 |
+| 1 | R8 | 100 | UNI-ROYAL | [0402WGF1000TCE](https://datasheet.lcsc.com/datasheet/pdf/0a975aaa49b7c97f38a963127be4a823.pdf?productCode=C25076) | [C25076](https://www.lcsc.com/product-detail/C25076.html) | 2137200 | $0.0013 | $0.0013 | $0.001 |
+| 1 | SW1 | SKRHABE010 | Alps Alpine | [SKRHABE010](https://datasheet.lcsc.com/datasheet/pdf/053eeebef0364c26ade981172656431e.pdf?productCode=C139794) | [C139794](https://www.lcsc.com/product-detail/C139794.html) | 6714 | $0.78 | $0.5035 | $0.503 |
+| 1 | U1 | STM32U083KCU6 | STMicroelectronics | [STM32U083KCU6](https://datasheet.lcsc.com/datasheet/pdf/1d8e3bb2642efa1578790415a746a5f0.pdf?productCode=C22459164) | [C22459164](https://www.lcsc.com/product-detail/C22459164.html) | 42 | $6.7991 | $4.706 | $4.706 |
+| 1 | U2 | RV-3032-C7 | Micro Crystal | [RV-3032-C7 32.768kHz 2.5ppm-TA-QC](https://www.microcrystal.com/fileadmin/Media/Products/RTC/Datasheet/RV-3032-C7.pdf) | [C5127802](https://www.lcsc.com/product-detail/C5127802.html) | 224 | $3.4878 | $2.317 | $2.317 |
 
-**Electronics, one kit (minimum-order quantities, so you get spares):** $24.21  
-**Electronics per board at 100 boards:** $9.74
+**Electronics, one kit (minimum-order quantities, so you get spares):** $24.68  
+**Electronics per board at 100 boards:** $9.57
 
 Not in the table, but on the board: the Tag-Connect TC2030 pads (J3, no part: the cable presses onto the pads), the test points TP1/TP2 and the mounting holes.
 
@@ -47,13 +47,14 @@ Not in the table, but on the board: the Tag-Connect TC2030 pads (J3, no part: th
 | CR2450 lithium coin cell | 1 | $1.00 | any shop |
 | M2 × 6 mm screws, thread-forming for plastic (or M2 machine screws + heat-set inserts) | 4 | $0.05 | any hardware supplier |
 | Double-sided adhesive for the display, 0.2 mm (e.g. 3M 467MP), ~60 × 30 mm | 1 | $0.30 | any electronics supplier |
-| PETG or PLA filament for the case, ~12 g | 1 | $0.30 | - |
+| PETG or PLA filament for the case, ~11 g | 1 | $0.30 | - |
 
 **Separately bought parts per device:** about $6.75
 
 ## PCB and assembly
 
-- 2-layer, 80 × 34 mm, 1.0 mm thick, any colour. JLCPCB's minimum order is 5 boards, typically about $2-5 for the bare boards plus shipping.
+- 2-layer, 77 × 31 mm, 0.8 mm thick, any colour. JLCPCB's minimum order is 5 boards, typically about $2-5 for the bare boards plus shipping.
+- Choose the **ENIG** surface finish: a bare pad under the coin cell is its negative contact, and gold makes a lasting contact where HASL tin can oxidise.
 - Assembly uses both sides: the joystick is on the front, everything else on the back. JLCPCB's Standard PCBA does both sides. Upload `hardware/fab/irl2fa-gerbers.zip`, `irl2fa-bom-jlcpcb.csv` and `irl2fa-cpl-jlcpcb.csv`.
 - The STM32U083 is often low in LCSC stock. JLCPCB's global sourcing or a consigned part from DigiKey/Mouser works, and the STM32U073KCU6 is pin-compatible (no AES, which the firmware doesn't need).
 - Extended parts carry a one-off JLCPCB setup fee each (about $3 per unique part).

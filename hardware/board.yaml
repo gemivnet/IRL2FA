@@ -4,48 +4,48 @@
 # screen side = KiCad F.Cu; "back" = B.Cu.
 # SPDX-License-Identifier: CERN-OHL-S-2.0
 board:
-  width: 80.0
-  height: 34.0
-  thickness: 1.0
-  corner_radius: 3.0
-  mounting_holes:            # M2, plated, GND
-    - {x: 3.0,  y: 3.0}      # NOTE: inside the corner radius; see pcb-design.md
-    - {x: 77.0, y: 3.0}
-    - {x: 3.0,  y: 31.0}
-    - {x: 77.0, y: 31.0}
+  width: 77.0
+  height: 31.0
+  thickness: 0.8
+  corner_radius: 2.6
+  mounting_holes:            # M2, plated, GND, at the corner-radius centres
+    - {x: 2.6,  y: 2.6}      # pad 4.4: 0.4 mm from the edge; see pcb-design.md
+    - {x: 74.4, y: 2.6}
+    - {x: 2.6,  y: 28.4}
+    - {x: 74.4, y: 28.4}
   mounting_hole_drill: 2.2
 
 display:                     # Good Display GDEY0213B74, front side
   part: GDEY0213B74
-  glass: {x: 6.0, y: 2.4, w: 59.2, h: 29.2, t: 1.0}
-  active: {x: 13.95, y: 5.15, w: 48.55, h: 23.70}  # visible area (7.95 mm from the FPC-side glass edge)
+  glass: {x: 5.3, y: 0.9, w: 59.2, h: 29.2, t: 1.0}   # x: front screw boss (r 2.3) + 0.3 + 0.1
+  active: {x: 13.25, y: 3.65, w: 48.55, h: 23.70}  # visible area (7.95 mm from the FPC-side glass edge)
   fpc_exit: left             # FPC leaves the left short edge, centred
   fpc_width: 12.5
   fpc_length: 14.3          # from the glass edge (GDEY0213B74; the PDi panel's is 15.3)
   adhesive: 0.2
 
-fpc_slot:                    # FPC folds through this slot to the back
-  {x: 2.6, y: 10.0, w: 1.4, h: 14.0}
+fpc_slot:                    # FPC folds through this slot to the back (2.7 mm from the glass edge to its centre)
+  {x: 1.9, y: 8.5, w: 1.4, h: 14.0}
 
 joystick:                    # Alps SKRHABE010, front side, rotated 45 deg
   part: SKRHABE010
-  x: 72.8
-  y: 17.0
+  x: 71.0                    # 1.2 mm from the glass to the body's corner; 0.7 mm from the body corner to the edge
+  y: 15.5
   body: 7.5
   body_height: 1.8
   stem_diameter: 3.0
   stem_top: 5.0              # stem top above the PCB front surface (Alps drawing)
 
 ir:                          # side-looking, back side, aimed through the TOP edge (y = 0)
-  emitter:  {x: 58.0, y: 1.37}     # footprint origin; lens tip flush with the edge
-  detector: {x: 22.0, y: 1.37}     # x mirrors the emitter about the centre line
+  emitter:  {x: 56.5, y: 1.37}     # footprint origin; lens tip flush with the edge
+  detector: {x: 20.5, y: 1.37}     # x mirrors the emitter about the centre line
 
-battery:                     # CR2450 in an SMT holder, back side
-  part: BS-24-B4AA016
-  x: 40.0
-  y: 17.0
+battery:                     # CR2450 in an SMT clip, back side; the cell slides in from the bottom edge
+  part: MY-2450-01
+  x: 38.5
+  y: 16.0
   cell_diameter: 24.5
   cell_thickness: 5.0
-  holder_height: 7.5         # PCB back surface to top of holder (MYOUNG drawing MY-CP-0138)
+  holder_height: 5.7         # PCB back surface to top of the clip (MYOUNG drawing MY-CP-0106)
 
-back_keepout_height: 7.6     # tallest back-side part (battery holder) above the PCB back surface
+back_keepout_height: 5.8     # tallest back-side part (battery clip) above the PCB back surface

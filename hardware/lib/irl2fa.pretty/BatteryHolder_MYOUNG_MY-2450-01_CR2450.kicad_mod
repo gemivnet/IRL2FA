@@ -1,0 +1,218 @@
+(footprint "BatteryHolder_MYOUNG_MY-2450-01_CR2450"
+	(version 20241229)
+	(generator "irl2fa_gen_footprints")
+	(generator_version "1.0")
+	(layer "F.Cu")
+	(descr "MYOUNG MY-2450-01 (CR2450-W) SMT CR2450 clip, nickel-plated C5191 phosphor bronze 0.25 mm (LCSC C964845), drawing MY-CP-0106 rev A/0. Height 5.70 above the PCB. Plate 25.5 x 23.2 with a 7.5 mm closed end and a stop flap; the cell slides in from the open end (+y). Pads 6.15 x 6.00, outer span 36.80, 9.20 from the closed end. Pad 1 = + (both legs), pad 2 = - : a bare 12 mm copper pad under the cell centre (no paste; order ENIG).")
+	(tags "CR2450 coin cell battery clip retainer SMD MYOUNG MY-2450-01 CR2450-W")
+	(property "Reference" "REF**"
+		(at 0 -13.7 0)
+		(layer "F.SilkS")
+		(effects
+			(font
+				(size 1 1)
+				(thickness 0.15)
+			)
+		)
+	)
+	(property "Value" "BatteryHolder_MYOUNG_MY-2450-01_CR2450"
+		(at 0 13.45 0)
+		(layer "F.Fab")
+		(effects
+			(font
+				(size 1 1)
+				(thickness 0.15)
+			)
+		)
+	)
+	(property "Datasheet" "https://www.lcsc.com/datasheet/C964845.pdf"
+		(at 0 0 0)
+		(layer "F.Fab")
+		(hide yes)
+		(effects
+			(font
+				(size 1 1)
+				(thickness 0.15)
+			)
+		)
+	)
+	(property "Description" "MYOUNG MY-2450-01 (CR2450-W) SMT CR2450 clip, nickel-plated C5191 phosphor bronze 0.25 mm (LCSC C964845), drawing MY-CP-0106 rev A/0. Height 5.70 above the PCB. Plate 25.5 x 23.2 with a 7.5 mm closed end and a stop flap; the cell slides in from the open end (+y). Pads 6.15 x 6.00, outer span 36.80, 9.20 from the closed end. Pad 1 = + (both legs), pad 2 = - : a bare 12 mm copper pad under the cell centre (no paste; order ENIG)."
+		(at 0 0 0)
+		(layer "F.Fab")
+		(hide yes)
+		(effects
+			(font
+				(size 1 1)
+				(thickness 0.15)
+			)
+		)
+	)
+	(attr smd)
+	(pad "1" smd rect
+		(at 15.325 -0.3)
+		(size 6.15 6)
+		(layers "F.Cu" "F.Paste" "F.Mask")
+	)
+	(pad "1" smd rect
+		(at -15.325 -0.3)
+		(size 6.15 6)
+		(layers "F.Cu" "F.Paste" "F.Mask")
+	)
+	(pad "2" smd circle
+		(at 0 0)
+		(size 12 12)
+		(layers "F.Cu" "F.Mask")
+	)
+	(fp_poly
+		(pts (xy -3.75 -12.5) (xy 3.75 -12.5) (xy 12.75 -5.6) (xy 12.75 5.7) (xy 12.7072 6.3526) (xy 12.5796 6.9941) (xy 12.3694 7.6134) (xy 12.0801 8.2) (xy 11.7168 8.7438) (xy 11.2855 9.2355) (xy 10.7938 9.6668) (xy 10.25 10.0301) (xy 9.6634 10.3194) (xy 9.0441 10.5296) (xy 8.4026 10.6572) (xy 7.75 10.7) (xy 3.5 10.3) (xy 3.1089 9.7031) (xy 2.6172 9.186) (xy 2.0408 8.7653) (xy 1.3984 8.4547) (xy 0.7107 8.2642) (xy 0 8.2) (xy -0.7107 8.2642) (xy -1.3984 8.4547) (xy -2.0408 8.7653) (xy -2.6172 9.186) (xy -3.1089 9.7031) (xy -3.5 10.3) (xy -7.75 10.7) (xy -8.4026 10.6572) (xy -9.0441 10.5296) (xy -9.6634 10.3194) (xy -10.25 10.0301) (xy -10.7938 9.6668) (xy -11.2855 9.2355) (xy -11.7168 8.7438) (xy -12.0801 8.2) (xy -12.3694 7.6134) (xy -12.5796 6.9941) (xy -12.7072 6.3526) (xy -12.75 5.7) (xy -12.75 -5.6))
+		(stroke
+			(width 0.1)
+			(type solid)
+		)
+		(fill no)
+		(layer "F.Fab")
+	)
+	(fp_circle
+		(center 0 0)
+		(end 12.25 0)
+		(stroke
+			(width 0.1)
+			(type solid)
+		)
+		(fill no)
+		(layer "F.Fab")
+	)
+	(fp_text user "+"
+		(at 15.325 -0.3 0)
+		(layer "F.Fab")
+		(effects
+			(font
+				(size 2 2)
+				(thickness 0.3)
+			)
+		)
+	)
+	(fp_text user "-"
+		(at 0 0 0)
+		(layer "F.Fab")
+		(effects
+			(font
+				(size 2 2)
+				(thickness 0.3)
+			)
+		)
+	)
+	(fp_line
+		(start 0 16.25)
+		(end 0 12.75)
+		(stroke
+			(width 0.1)
+			(type solid)
+		)
+		(layer "F.Fab")
+	)
+	(fp_line
+		(start 0 12.75)
+		(end 0.5 13.616)
+		(stroke
+			(width 0.1)
+			(type solid)
+		)
+		(layer "F.Fab")
+	)
+	(fp_line
+		(start 0 12.75)
+		(end -0.5 13.616)
+		(stroke
+			(width 0.1)
+			(type solid)
+		)
+		(layer "F.Fab")
+	)
+	(fp_line
+		(start -12.86 -3.6)
+		(end -12.86 -5.6)
+		(stroke
+			(width 0.12)
+			(type solid)
+		)
+		(layer "F.SilkS")
+	)
+	(fp_line
+		(start -12.86 -5.6)
+		(end -3.75 -12.61)
+		(stroke
+			(width 0.12)
+			(type solid)
+		)
+		(layer "F.SilkS")
+	)
+	(fp_line
+		(start -3.75 -12.61)
+		(end 3.75 -12.61)
+		(stroke
+			(width 0.12)
+			(type solid)
+		)
+		(layer "F.SilkS")
+	)
+	(fp_line
+		(start 3.75 -12.61)
+		(end 12.86 -5.6)
+		(stroke
+			(width 0.12)
+			(type solid)
+		)
+		(layer "F.SilkS")
+	)
+	(fp_line
+		(start 12.86 -5.6)
+		(end 12.86 -3.6)
+		(stroke
+			(width 0.12)
+			(type solid)
+		)
+		(layer "F.SilkS")
+	)
+	(fp_text user "+"
+		(at 15.325 -4.5 0)
+		(layer "F.SilkS")
+		(effects
+			(font
+				(size 1.5 1.5)
+				(thickness 0.225)
+			)
+		)
+	)
+	(fp_poly
+		(pts (xy 18.65 2.95) (xy 13.88 2.95) (xy 13 3) (xy 13 5.71) (xy 12.96 6.39) (xy 12.82 7.06) (xy 12.6 7.71) (xy 12.3 8.33) (xy 11.92 8.9) (xy 11.46 9.41) (xy 10.95 9.87) (xy 10.38 10.25) (xy 9.76 10.55) (xy 9.11 10.77) (xy 8.44 10.91) (xy 7.75 10.95) (xy 6.51 10.83) (xy 6.25 10.83) (xy 6.06 10.93) (xy 5.87 11.04) (xy 5.67 11.14) (xy 5.48 11.23) (xy 5.28 11.33) (xy 5.08 11.42) (xy 4.88 11.51) (xy 4.68 11.59) (xy 4.48 11.67) (xy 4.28 11.75) (xy 4.07 11.82) (xy 3.86 11.89) (xy 3.79 11.91) (xy 3.65 11.95) (xy 3.54 11.99) (xy 3.45 12.02) (xy 3.24 12.07) (xy 3.16 12.09) (xy 3.02 12.13) (xy 2.81 12.18) (xy 2.6 12.23) (xy 2.6 12.23) (xy 2.39 12.27) (xy 2.17 12.31) (xy 1.96 12.35) (xy 1.86 12.36) (xy 1.74 12.38) (xy 1.52 12.41) (xy 1.31 12.43) (xy 1.09 12.45) (xy 0.97 12.46) (xy 0.87 12.47) (xy 0.65 12.48) (xy 0.44 12.49) (xy 0.22 12.5) (xy 0 12.5) (xy -0.22 12.5) (xy -0.44 12.49) (xy -0.65 12.48) (xy -0.87 12.47) (xy -0.97 12.46) (xy -1.09 12.45) (xy -1.31 12.43) (xy -1.52 12.41) (xy -1.74 12.38) (xy -1.86 12.36) (xy -1.96 12.35) (xy -2.17 12.31) (xy -2.39 12.27) (xy -2.6 12.23) (xy -2.6 12.23) (xy -2.81 12.18) (xy -3.02 12.13) (xy -3.16 12.09) (xy -3.24 12.07) (xy -3.45 12.02) (xy -3.54 11.99) (xy -3.65 11.95) (xy -3.79 11.91) (xy -3.86 11.89) (xy -4.07 11.82) (xy -4.28 11.75) (xy -4.48 11.67) (xy -4.68 11.59) (xy -4.88 11.51) (xy -5.08 11.42) (xy -5.28 11.33) (xy -5.48 11.23) (xy -5.67 11.14) (xy -5.87 11.04) (xy -6.06 10.93) (xy -6.25 10.83) (xy -6.51 10.83) (xy -7.75 10.95) (xy -8.44 10.91) (xy -9.11 10.77) (xy -9.76 10.55) (xy -10.38 10.25) (xy -10.95 9.87) (xy -11.46 9.41) (xy -11.92 8.9) (xy -12.3 8.33) (xy -12.6 7.71) (xy -12.82 7.06) (xy -12.96 6.39) (xy -13 5.71) (xy -13 3) (xy -13.88 2.95) (xy -18.65 2.95) (xy -18.65 -3.55) (xy -13.25 -3.55) (xy -13 -3.73) (xy -13 -5.72) (xy -8.53 -9.15) (xy -8.36 -9.29) (xy -8.2 -9.43) (xy -8.03 -9.58) (xy -7.87 -9.71) (xy -7.7 -9.85) (xy -7.52 -9.98) (xy -7.35 -10.11) (xy -7.17 -10.24) (xy -6.99 -10.36) (xy -6.81 -10.48) (xy -6.63 -10.61) (xy -3.83 -12.75) (xy 3.83 -12.75) (xy 6.63 -10.61) (xy 6.81 -10.48) (xy 6.99 -10.36) (xy 7.17 -10.24) (xy 7.35 -10.11) (xy 7.52 -9.98) (xy 7.7 -9.85) (xy 7.87 -9.71) (xy 8.03 -9.58) (xy 8.2 -9.43) (xy 8.36 -9.29) (xy 8.53 -9.15) (xy 13 -5.72) (xy 13 -3.73) (xy 13.25 -3.55) (xy 18.65 -3.55))
+		(stroke
+			(width 0.05)
+			(type solid)
+		)
+		(fill no)
+		(layer "F.CrtYd")
+	)
+	(fp_text user "${REFERENCE}"
+		(at 0 -6 0)
+		(layer "F.Fab")
+		(effects
+			(font
+				(size 0.5 0.5)
+				(thickness 0.08)
+			)
+		)
+	)
+	(embedded_fonts no)
+	(model "${KIPRJMOD}/lib/irl2fa.3dshapes/BatteryHolder_MYOUNG_MY-2450-01_CR2450.step"
+		(offset
+			(xyz 0 0 0)
+		)
+		(scale
+			(xyz 1 1 1)
+		)
+		(rotate
+			(xyz 0 0 0)
+		)
+	)
+)

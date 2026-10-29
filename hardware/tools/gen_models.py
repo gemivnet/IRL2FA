@@ -16,9 +16,11 @@ import math
 import os
 
 import cadquery as cq
+import yaml
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 OUT = os.path.normpath(os.path.join(HERE, "..", "lib", "irl2fa.3dshapes"))
+BOARD = yaml.safe_load(open(os.path.join(HERE, "..", "board.yaml")))
 
 C = {
     "black": cq.Color(0.08, 0.08, 0.08), "dark": cq.Color(0.2, 0.2, 0.22), "metal": cq.Color(0.75, 0.75, 0.78),
@@ -93,22 +95,30 @@ def fh34():
     save("Hirose_FH34SRJ-24S-0.5SH_1x24-1MP_P0.50mm_Horizontal", parts)
 
 
-# --- c. MYOUNG BS-24-B4AA016 ----------------------------------------------------
-def bs24():
-    bx, by, h = 27.2 / 2, 16.0 / 2, 7.5
-    cell_r = 24.5 / 2
-    floor = box(-bx, bx, -by, by, 0, 0.8)
-    walls = box(-bx, -bx + 2.6, -by, by, 0, h).union(box(bx - 2.6, bx, -by, by, 0, h))
-    walls = walls.cut(cyl_z(0, 0, cell_r + 0.15, 0.8, h + 1))
-    parts = [(floor.union(walls), "white")]
-    for s in (-1, 1):   # end terminals (tabs + upright)
-        parts.append((box(s * bx, s * 18.0, -3.5, 3.5, 0, 0.15), "gold"))
-        parts.append((box(s * (bx - 0.2), s * bx, -3.5, 3.5, 0, 6.5), "gold"))
-    # negative spring on the floor (left), positive spring against the cell edge (right)
-    parts.append((box(-10.5, -4.0, -1.5, 1.5, 0.8, 1.2), "gold"))
-    parts.append((box(cell_r + 0.15, cell_r + 0.4, -2.5, 2.5, 1.2, 5.8), "gold"))
-    parts.append((cyl_z(0, 0, cell_r, 1.0, 6.0), "cell"))   # CR2450 cell, 5.0 thick
-    save("BatteryHolder_MYOUNG_BS-24-B4AA016_CR2450", parts)
+# --- c. MYOUNG MY-2450-01 CR2450 clip ------------------------------------------
+def my2450():
+    """Drawing MY-CP-0106: 0.25 mm plate 5.70 above the PCB, legs to 6.15 x 6.0 feet,
+    stop flap on the closed end, two contact tongues in the 6 mm holes. The cell
+    lies on the PCB's negative pad. Outline shared with the footprint."""
+    from gen_footprints import MY2450, my2450_geometry
+    m, g = MY2450, my2450_geometry()
+    t, h = 0.25, m["height"]
+    hw = m["plate_w"] / 2
+    outline = [(x, -y) for x, y in g["outline"]]
+    plate = cq.Workplane("XY").polyline(outline).close().extrude(t).translate((0, 0, h - t))
+    hole_y = g["y_top"] + 10.0                       # 6 mm holes, 11.0 apart
+    for sx in (-1, 1):
+        plate = plate.cut(cyl_z(sx * 5.5, hole_y, 3.0, h - t - 0.1, h + 0.1))
+    parts = [(plate, "metal")]
+    for sx in (-1, 1):
+        # tongue: pressed down from the hole edge onto the cell's + face
+        parts.append((box(sx * 5.5 - 1.2, sx * 5.5 + 1.2, hole_y - 2.8, hole_y + 1.0, 5.0, h - t), "metal"))
+        py0, py1 = g["pad_y"] - m["pad_h"] / 2, g["pad_y"] + m["pad_h"] / 2
+        parts.append((box(sx * (hw - t), sx * hw, py0, py1, 0, h), "metal"))            # leg
+        parts.append((box(sx * hw, sx * 35.8 / 2, py0, py1, 0, t), "metal"))   # foot, 35.80 over the feet
+    parts.append((box(-m["top_w"] / 2, m["top_w"] / 2, g["y_top"], g["y_top"] + t, h - 3.3, h), "metal"))  # stop
+    parts.append((cyl_z(0, 0, m["cell_r"], 0.035, 5.035), "cell"))   # CR2450 cell, 5.0 thick
+    save("BatteryHolder_MYOUNG_MY-2450-01_CR2450", parts)
 
 
 # --- d. Vishay MiniLED side view -----------------------------------------------
@@ -135,8 +145,9 @@ def epd():
     # FPC: 12.5 wide, 0.3 thick, 14.3 long from the glass edge, centred 8.15+6.25 from the top glass edge
     w, t, L = 12.5, 0.3, 14.3
     yc = -gh / 2 + 8.15 + w / 2
-    pcb_t = 1.0
-    xv = -32.45                      # vertical run centre (inside the 2.6..4.0 board-x slot)
+    pcb_t = BOARD["board"]["thickness"]
+    sl, gl = BOARD["fpc_slot"], BOARD["display"]["glass"]
+    xv = sl["x"] + sl["w"] / 2 - (gl["x"] + gw / 2) - 0.15   # vertical run centre, inside the slot
     R = 0.5                          # bend radius at the FPC centre line
     zt = adh + t / 2                 # top run centre line (on the PCB front, under the glass level)
     zb = -pcb_t - t / 2              # bottom run centre line (against the PCB back)
@@ -152,7 +163,7 @@ def epd():
     bottom = box(x_b, x_b + back_len, yc - w / 2, yc + w / 2, zb - t / 2, zb + t / 2)
     fpc = top.union(q1).union(vert).union(q2).union(bottom)
     print(f"  EPD FPC: {back_len:.2f} mm run on the back after the bend, ends at x={x_b + back_len:.2f} "
-          f"(footprint coords) / board x={x_b + back_len + 6.0 + gw / 2:.2f}")
+          f"(footprint coords) / board x={x_b + back_len + gl["x"] + gw / 2:.2f}")
     save("EPD_GoodDisplay_GDEY0213B74_Outline", [(glass, "glass"), (active, "epd"), (fpc, "fpc")])
 
 
@@ -167,7 +178,7 @@ def c7():
 def main():
     skrh()
     fh34()
-    bs24()
+    my2450()
     sidelooker("LED_Vishay_VSMB2948SL_SideView", "white", "lens_ir")
     sidelooker("PhotoTransistor_Vishay_VEMT2523SLX01_SideView", "white", "black")
     epd()

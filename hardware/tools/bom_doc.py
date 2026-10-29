@@ -16,11 +16,14 @@ import json
 import urllib.request
 from pathlib import Path
 
+import yaml
+
 HW = Path(__file__).resolve().parents[1]
 BOM = HW / "fab" / "irl2fa-bom.csv"
 CACHE = HW / "bom_prices.json"
 DOC = HW.parent / "docs" / "bill-of-materials.md"
 API = "https://wmsc.lcsc.com/ftps/wm/product/detail?productCode={}"
+BOARD = yaml.safe_load((HW / "board.yaml").read_text())["board"]
 
 # Parts bought outside LCSC/JLCPCB (hand-fitted or optional).
 EXTRA = [
@@ -31,7 +34,7 @@ EXTRA = [
      "qty": 4, "unit": 0.05, "where": "any hardware supplier"},
     {"item": "Double-sided adhesive for the display, 0.2 mm (e.g. 3M 467MP), ~60 × 30 mm", "qty": 1,
      "unit": 0.30, "where": "any electronics supplier"},
-    {"item": "PETG or PLA filament for the case, ~12 g", "qty": 1, "unit": 0.30, "where": "-"},
+    {"item": "PETG or PLA filament for the case, ~11 g", "qty": 1, "unit": 0.30, "where": "-"},
 ]
 
 
@@ -110,8 +113,11 @@ def main():
         te += e["qty"] * e["unit"]
     out += ["", f"**Separately bought parts per device:** about ${te:.2f}", "",
             "## PCB and assembly", "",
-            "- 2-layer, 80 × 34 mm, 1.0 mm thick, any colour. JLCPCB's minimum order is 5 boards, "
-            "typically about $2-5 for the bare boards plus shipping.",
+            f"- 2-layer, {BOARD['width']:g} × {BOARD['height']:g} mm, {BOARD['thickness']:g} mm thick, "
+            "any colour. JLCPCB's minimum order is 5 boards, typically about $2-5 for the bare boards "
+            "plus shipping.",
+            "- Choose the **ENIG** surface finish: a bare pad under the coin cell is its negative "
+            "contact, and gold makes a lasting contact where HASL tin can oxidise.",
             "- Assembly uses both sides: the joystick is on the front, everything else on the back. "
             "JLCPCB's Standard PCBA does both sides. Upload `hardware/fab/irl2fa-gerbers.zip`, "
             "`irl2fa-bom-jlcpcb.csv` and `irl2fa-cpl-jlcpcb.csv`.",

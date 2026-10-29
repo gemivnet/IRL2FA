@@ -125,6 +125,32 @@ def add_edge_keepout(board, band=0.45):
         board.Add(z)
 
 
+def add_cell_via_keepout(board, segments=48):
+    """No vias under the coin cell: it lies on the board (the clip presses it
+    onto the negative pad) and slides in over it, so a via whose tenting is
+    imperfect could short its + can. Tracks under solder mask are fine."""
+    bt = design.BOARD["battery"]
+    r = bt["cell_diameter"] / 2 + 0.2
+    z = pcbnew.ZONE(board)
+    z.SetIsRuleArea(True)
+    z.SetDoNotAllowTracks(False)
+    z.SetDoNotAllowVias(True)
+    z.SetDoNotAllowPads(False)
+    z.SetDoNotAllowFootprints(False)
+    z.SetDoNotAllowCopperPour(False)
+    ls = pcbnew.LSET()
+    ls.AddLayer(pcbnew.F_Cu)
+    ls.AddLayer(pcbnew.B_Cu)
+    z.SetLayerSet(ls)
+    z.SetZoneName("no vias under the cell")
+    poly = z.Outline()
+    poly.NewOutline()
+    for i in range(segments):
+        a = 2 * math.pi * i / segments
+        poly.Append(pt(bt["x"] + r * math.cos(a), bt["y"] + r * math.sin(a)))
+    board.Add(z)
+
+
 def add_text(board, text, x, y, layer, size=1.0, mirror=False):
     t = pcbnew.PCB_TEXT(board)
     t.SetText(text)
@@ -222,9 +248,11 @@ def step_place(netlist):
 
     add_outline(board)
     add_edge_keepout(board)
-    add_text(board, "IRL2FA", 40.0, 30.6, pcbnew.B_SilkS, 1.6, mirror=True)
-    add_text(board, "v0.1  irl2fa.com", 40.0, 32.6, pcbnew.B_SilkS, 0.8, mirror=True)
-    add_text(board, "CERN-OHL-S-2.0", 12.0, 31.8, pcbnew.B_SilkS, 0.7, mirror=True)
+    add_cell_via_keepout(board)
+    w, h = B["width"], B["height"]
+    add_text(board, "IRL2FA", w / 2, h - 1.9, pcbnew.B_SilkS, 1.4, mirror=True)
+    add_text(board, "v0.1  irl2fa.com", w / 2, h - 0.75, pcbnew.B_SilkS, 0.7, mirror=True)
+    add_text(board, "CERN-OHL-S-2.0", 11.0, h - 1.1, pcbnew.B_SilkS, 0.7, mirror=True)
     board.Save(str(PCB))
     print("placed", len(board.GetFootprints()), "footprints")
 

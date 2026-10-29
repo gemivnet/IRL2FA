@@ -47,10 +47,11 @@ mcu_pins = {str(p["pin"]): p["net"] for p in PINS["pins"]}
 PARTS = [
     # ---------------- power ----------------
     part("BT1", "Device:Battery_Cell", "CR2450",
-         "irl2fa:BatteryHolder_MYOUNG_BS-24-B4AA016_CR2450",
-         {"1": "VBAT_RAW", "2": "GND"}, "power", "C964809", "BS-24-B4AA016", "MYOUNG",
-         "https://www.lcsc.com/product-detail/C964809.html",
-         "CR2450 coin cell holder, SMT", pcb=("B", 40.0, 17.0, 0)),
+         "irl2fa:BatteryHolder_MYOUNG_MY-2450-01_CR2450",
+         {"1": "VBAT_RAW", "2": "GND"}, "power", "C964845", "MY-2450-01", "MYOUNG",
+         "https://www.lcsc.com/product-detail/C964845.html",
+         "CR2450 coin cell clip, SMT, 5.7 mm (the PCB pad is the - contact)",
+         pcb=("B", BOARD["battery"]["x"], BOARD["battery"]["y"], 0)),
     part("Q1", "Transistor_FET:AO3401A", "AO3401A", "Package_TO_SOT_SMD:SOT-23",
          {"1": "GND", "2": "VBAT", "3": "VBAT_RAW"}, "power", "C15127", "AO3401A", "AOS",
          "https://www.lcsc.com/datasheet/lcsc_datasheet_1811081213_Alpha-Omega-Semicon-AO3401A_C15127.pdf",
@@ -137,7 +138,7 @@ PARTS = [
          "display", None, "GDEY0213B74", "Good Display",
          "https://www.good-display.com/product/391.html",
          "2.13in 250x122 e-paper (SSD1680), fitted by hand", bom=False,
-         pcb=("F", 35.6, 17.0, 0)),
+         pcb=None),   # placed by PLACEMENT below, centred on the glass
     part("L1", "Device:L", "47u", "Inductor_SMD:L_APV_ANR3015",
          {"1": "VEPD", "2": "EPD_SW"}, "display", "C7427088", "ANR3015T470M", "APV",
          desc="47 uH 500 mA booster inductor", pcb=("B", 16.0, 6.0, 0)),
@@ -219,58 +220,63 @@ BLOCK_TITLES = {
 # ---------------------------------------------------------------------------
 # PCB placement (side, x, y, rotation), board coordinates seen from the front.
 # Back side, left to right: FPC connector and panel capacitors, booster (top
-# left, outside the cell's circle), the CR2450 holder in the middle (its body
-# spans x 26.4-53.6, y 9-25; the cell circle r=12.25 around (40, 17)), and
-# the MCU/RTC/SWD on the right. The joystick is the only front-side part.
+# left, outside the cell's circle), the CR2450 clip in the middle (cell circle
+# r=12.25 around (38.5, 16); plate 25.5 wide from y 3.5 to 26.7; legs/pads out
+# to x 20.1 and 56.9), and the MCU/RTC/SWD on the right. The cell slides in
+# from the bottom edge, so the strip x 26-51 below the cell stays empty.
+# The joystick is the only front-side part.
 # rotation None = chosen by gen_pcb.py (see orient_fpc_connector).
+_G = BOARD["display"]["glass"]
 PLACEMENT = {
-    "BT1": ("B", 40.0, 17.0, 0),       # + terminal on the right (front view), next to Q1
-    "Q1": ("B", 58.6, 26.2, 90),
-    "C1": ("B", 60.5, 10.5, 90),
-    "C2": ("B", 61.2, 22.6, 90),
-    "TP1": ("B", 56.5, 31.6, 0),
-    "TP2": ("B", 59.3, 31.6, 0),
-    "U1": ("B", 65.0, 17.0, 90),
-    "C3": ("B", 63.4, 21.4, 0),
-    "C4": ("B", 65.0, 12.6, 0),
-    "C5": ("B", 60.3, 13.9, 90),
-    "C6": ("B", 65.6, 21.4, 0),
-    "C7": ("B", 67.7, 21.4, 0),
-    "C8": ("B", 64.2, 23.0, 0),
-    "R1": ("B", 68.8, 19.4, 90),
-    "J3": ("B", 66.5, 28.0, 0),
-    "U2": ("B", 70.8, 8.6, 0),
-    "C9": ("B", 73.4, 8.6, 90),
-    "R2": ("B", 70.8, 5.7, 0),
-    "R3": ("B", 68.6, 11.2, 0),
-    "R4": ("B", 68.6, 12.6, 0),
-    "SW1": ("F", 72.8, 17.0, 45),
-    "J1": ("B", 13.0, 16.8, None),   # FPC end reaches x ~13.5 (14.3 mm tail): ~0.8 mm insertion margin
-    "Q2": ("B", 18.6, 29.1, 0),
-    "R5": ("B", 21.6, 31.4, 0),
-    "L1": ("B", 25.2, 6.6, 0),
-    "Q3": ("B", 21.4, 6.4, 0),
-    "R6": ("B", 18.6, 6.6, 90),
-    "R7": ("B", 21.4, 9.0, 0),
-    "D1": ("B", 29.6, 6.2, 0),
-    "D2": ("B", 29.0, 2.8, 0),
-    "D3": ("B", 34.0, 2.8, 0),
-    "C10": ("B", 17.6, 4.2, 0),
-    "C11": ("B", 24.4, 11.2, 90),
+    "BT1": ("B", BOARD["battery"]["x"], BOARD["battery"]["y"], 180),   # closed end towards the IR edge
+    "Q1": ("B", 58.0, 25.0, 90),
+    "C1": ("B", 59.2, 9.8, 90),
+    "C2": ("B", 59.6, 21.4, 90),
+    "TP1": ("B", 55.2, 29.5, 0),
+    "TP2": ("B", 57.8, 29.5, 0),
+    "U1": ("B", 64.6, 16.0, 90),
+    "C3": ("B", 63.0, 20.4, 0),
+    "C4": ("B", 64.6, 11.6, 0),
+    "C5": ("B", 59.4, 13.4, 90),
+    "C6": ("B", 65.2, 20.4, 0),
+    "C7": ("B", 67.3, 20.4, 0),
+    "C8": ("B", 63.8, 22.0, 0),
+    "R1": ("B", 68.4, 18.4, 90),
+    "J3": ("B", 66.0, 26.2, 0),
+    "U2": ("B", 69.6, 7.8, 0),
+    "C9": ("B", 72.2, 7.8, 90),
+    "R2": ("B", 69.6, 4.9, 0),
+    "R3": ("B", 67.6, 10.2, 0),
+    "R4": ("B", 67.6, 11.6, 0),
+    "SW1": ("F", BOARD["joystick"]["x"], BOARD["joystick"]["y"], 45),
+    # The 14.3 mm tail ends 7.73 mm right of the glass edge on a 0.8 mm board (gen_models.py
+    # prints it): 0.53 mm past J1's origin, as on the first (1.0 mm) board, ~0.8 mm insertion margin
+    "J1": ("B", _G["x"] + 7.2, _G["y"] + _G["h"] / 2 - 0.2, None),
+    "Q2": ("B", 18.0, 27.4, 0),
+    "R5": ("B", 21.0, 29.6, 0),
+    "L1": ("B", 24.6, 5.8, 0),
+    "Q3": ("B", 20.8, 5.6, 0),
+    "R6": ("B", 18.0, 5.8, 90),
+    "R7": ("B", 20.8, 8.2, 0),
+    "D1": ("B", 28.8, 4.6, 0),
+    "D2": ("B", 28.3, 2.0, 0),
+    "D3": ("B", 33.4, 2.0, 0),
+    "C10": ("B", 16.4, 3.6, 0),
+    "C11": ("B", 23.4, 10.2, 0),
     "D4": ("B", BOARD["ir"]["emitter"]["x"], BOARD["ir"]["emitter"]["y"], 0),
-    "R8": ("B", 54.6, 3.2, 90),
-    "Q4": ("B", 55.4, 6.8, 0),
-    "R9": ("B", 52.6, 6.8, 90),
+    "R8": ("B", 53.4, 2.6, 90),
+    "Q4": ("B", 54.4, 5.8, 0),
+    "R9": ("B", 51.6, 6.4, 90),
     "Q5": ("B", BOARD["ir"]["detector"]["x"], BOARD["ir"]["detector"]["y"], 0),
-    "R10": ("B", 25.4, 2.8, 0),
-    "DS1": ("F", 35.6, 17.0, 0),
+    "R10": ("B", 24.2, 2.6, 0),
+    "DS1": ("F", _G["x"] + _G["w"] / 2, _G["y"] + _G["h"] / 2, 0),
 }
 # Panel capacitors in a column beside J1, leaving a gap level with J1's
 # signal pins (9-14) so those can escape towards the MCU.
-_CAP_Y = {"C12": 9.0, "C13": 10.8, "C14": 12.6,                      # PREVGH, VSH2, VEPD
-          "C15": 19.4, "C16": 21.1, "C17": 22.8, "C18": 24.5, "C19": 26.2}
+_CAP_Y = {"C12": 7.5, "C13": 9.3, "C14": 11.1,                      # PREVGH, VSH2, VEPD
+          "C15": 17.9, "C16": 19.6, "C17": 21.3, "C18": 23.0, "C19": 24.7}
 for _ref, _y in _CAP_Y.items():
-    PLACEMENT[_ref] = ("B", 17.6, _y, 0)
+    PLACEMENT[_ref] = ("B", 16.9, _y, 0)
 for _p in PARTS:
     if _p["ref"] in PLACEMENT:
         _p["pcb"] = PLACEMENT[_p["ref"]]

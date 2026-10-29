@@ -164,6 +164,9 @@ def thickness_at(mesh, origin, direction) -> float:
 
 
 # --------------------------------------------------------------------------- tests
+_ACTIVE = board()["display"]["active"]
+
+
 def test_board_dims_up_to_date():
     r = subprocess.run([sys.executable, str(CASE / "tools" / "gen_dims.py"), "--check"],
                        capture_output=True, text=True)
@@ -207,7 +210,9 @@ def test_printed_parts_do_not_overlap():
     ("back", [("-y", 10), ("-y", 22), ("-y", 40), ("-y", 58), ("-y", 70), ("+y", 10), ("+y", 18), ("+y", 62), ("+y", 70),
               ("+x", 17), ("+x", 10), ("-x", 17), ("-x", 24)]),
     # front skin around the window and its walls
-    ("front", [("-z", (8, 10)), ("-z", (8, 24)), ("-z", (40, 3.5)), ("-z", (40, 30.5)), ("-z", (67.5, 8))]),
+    # (above and below the window: 1.3 mm outside the active area, clear of the bezel chamfer)
+    ("front", [("-z", (8, 10)), ("-z", (8, 24)), ("-z", (40, _ACTIVE["y"] - 1.3)),
+               ("-z", (40, _ACTIVE["y"] + _ACTIVE["h"] + 1.3)), ("-z", (67.5, 8))]),
     ("front", [("-y", 20), ("-y", 40), ("-y", 60), ("+y", 20), ("+y", 40), ("+y", 60), ("+x", 17), ("-x", 17)]),
     ("door", [("z", (40, 17)), ("z", (34, 12)), ("z", (46, 22))]),
 ])

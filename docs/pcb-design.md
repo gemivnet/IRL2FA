@@ -7,7 +7,7 @@
 
 | | |
 |-|-|
-| Size | 80 × 34 mm, corner radius 3 mm, 1.0 mm FR-4 |
+| Size | 77 × 31 mm, corner radius 2.6 mm, 0.8 mm FR-4, ENIG finish (the cell's negative contact is a bare pad) |
 | Layers | 2, with a ground pour on both |
 | Rules | 0.15 mm signal / 0.4 mm power tracks, 0.15 mm clearance, 0.6/0.3 mm vias. Within JLCPCB's standard 2-layer process (board minimum set to their 0.1 mm capability) |
 | Assembly | both sides: the joystick on the front, everything else on the back |
@@ -17,24 +17,25 @@
 
 **Front (screen side).**
 
-- The 59.2 × 29.2 mm e-paper glass sits on the left, stuck to the board with 0.2 mm adhesive. Front copper under it is ground pour only.
-- The Alps joystick is on the right, rotated 45° because its contacts sit at the body's corners.
+- The 59.2 × 29.2 mm e-paper glass sits on the left, stuck to the board with 0.2 mm adhesive. Front copper under it is ground pour plus the signal tracks that cross between the two halves of the back.
+- The glass is 0.9 mm from the top and bottom edges and 5.3 mm from the left edge: the case's left screw bosses (r 2.3 mm) sit beside it with 0.4 mm to spare.
+- The Alps joystick is on the right, rotated 45° because its contacts sit at the body's corners. Its corner is 1.2 mm from the glass and 0.7 mm from the board edge. Its courtyard follows the body and pads (a cross, not a bounding box), which is what lets it sit that close to the glass.
 - `hardware/pins.yaml` maps the four contacts to up, down, left and right.
 
 **Back, left to right.**
 
 - **The display's flex cable** comes through a 1.4 × 14 mm slot just left of the glass. It plugs into the Hirose FH34 connector (J1), which opens towards the slot. The panel's pin 1 is at the top, so after the 180° fold it is still at the top, and `gen_pcb.py` checks that the connector's pin 1 is too.
 - **The e-paper booster** sits in the top-left corner: L1, Q3, D1-D3, C10, C11, R6, R7. The panel's decoupling capacitors (C12-C19) are in a column beside J1. The column has a gap level with J1's signal pins, so they can escape towards the MCU.
-- **The CR2450 holder** is in the middle. Its courtyard follows the real outline (terminal tabs, body and cell circle), so the corners the round cell leaves free can hold parts.
+- **The CR2450 clip** (MYOUNG MY-2450-01, 5.7 mm high) is in the middle. The cell lies flat on the board: its negative face sits on a bare 12 mm copper pad (BT1 pad 2, GND), and the clip's sprung plate presses its positive face and is soldered down at both sides. The closed end of the clip points at the IR edge. The cell slides in from the bottom edge, so the strip below the cell holds no parts, only silkscreen. A rule area keeps vias out from under the cell: its can slides over the board, and a via with imperfect tenting could short it. Tracks under solder mask are allowed. The courtyard follows the clip plate, the cell circle and the feet, so the corners the round cell leaves free can hold parts.
 - **On the right:**
   - the MCU (U1) with its decoupling
   - the RTC (U2)
   - the reverse-battery FET (Q1) and bulk capacitors (C1, C2)
   - the Tag-Connect TC2030 programming pads (J3)
   - the test points TP1 (VBAT) and TP2 (GND), for measuring sleep current with a meter in series with the cell
-- **IR emitter and detector.** Both are side-looking and sit on the back at the **top edge**: the emitter (D4) at x = 58 mm and the detector (Q5) at x = 22 mm. Two devices held top edge to top edge, one turned 180°, line up the emitter of one with the detector of the other. The lens tips are flush with the board edge.
+- **IR emitter and detector.** Both are side-looking and sit on the back at the **top edge**: the emitter (D4) at x = 56.5 mm and the detector (Q5) at x = 20.5 mm, mirrored about the centre line. Two devices held top edge to top edge, one turned 180°, line up the emitter of one with the detector of the other. The lens tips are flush with the board edge.
 
-**Mounting.** Four M2 plated holes, tied to ground, at the corner radius centres.
+**Mounting.** Four M2 plated holes, tied to ground, at the corner radius centres (2.6 mm in from each edge, so the 4.4 mm pads keep 0.4 mm of board around them).
 
 ## How the board was made, and how to change it
 
@@ -72,4 +73,5 @@ These are modelled or taken from datasheets but not yet measured:
 2. **IR range and speed.** The plan is 4800 baud over 2-5 cm, set by the phototransistor's 20-40 µs edges.
 3. **Sleep current.** The budget is about 1.2 µA typical; measure at TP1/TP2.
 4. **Joystick direction mapping** after the 45° rotation. If it's wrong, fix it in `pins.yaml` and regenerate `pins.h`.
-5. **Fit of the FPC fold.** The 14.3 mm tail reaches about x = 13.5 mm on the back; J1 sits at x = 13 so the end seats with ~0.8 mm to spare. The datasheet tolerance is ±0.3 mm.
+5. **Fit of the FPC fold.** The 14.3 mm tail wraps round the 0.8 mm board and reaches about x = 13.0 mm on the back; J1 sits at x = 12.5, the same offset as on the 1.0 mm board, so the end seats with ~0.8 mm to spare. The datasheet tolerance is ±0.3 mm.
+6. **Coin-cell contact.** The cell's negative face rests on a bare ENIG pad. Check that the clip holds the cell firmly, and that inserting it (sliding in from the bottom edge) does not scrape the solder mask.

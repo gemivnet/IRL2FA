@@ -12,11 +12,11 @@ pairing, and a lanyard eye.
 
 | Item | Value |
 |---|---|
-| Outer body (W x H x T) | **83.9 x 37.9 x 13.0 mm** |
-| With lanyard tab | 88.6 x 42.6 mm |
-| Joystick cap above the front face | 3.15 mm (16.15 mm total at the cap) |
+| Outer body (W x H x T) | **80.9 x 34.9 x 11.0 mm** (was 83.9 x 37.9 x 13.0 before the 5.7 mm clip and 0.8 mm board) |
+| With lanyard tab | 85.7 x 39.7 mm |
+| Joystick cap above the front face | 3.15 mm (14.15 mm total at the cap) |
 | Printed parts | front shell, back shell, battery door, joystick cap |
-| Material | PETG (preferred) or PLA, about 13 g (10.5 cm³) |
+| Material | PETG (preferred) or PLA, about 11 g (8.6 cm³) |
 | Licence | CC-BY-SA-4.0 (`case/LICENSE`) |
 
 Files:
@@ -45,12 +45,16 @@ tell you whether the case still fits.
 |---|---|---|
 | Front face | +2.8 | glass top + `part_clearance` + `top_thickness` |
 | Glass top | +1.2 | adhesive 0.2 + glass 1.0 |
-| Parting line / PCB back | -1.0 | board thickness |
-| Back cavity floor | -9.0 | PCB back - `back_keepout_height` (7.6) - 0.4 |
-| Back face | -10.2 | - `floor_thickness` |
+| Parting line / PCB back | -0.8 | board thickness (0.8 mm) |
+| Back cavity floor | -7.0 | PCB back - `back_keepout_height` (5.8) - 0.4 |
+| Back face | -8.2 | - `floor_thickness` |
 
-The 7.5 mm CR2450 holder sets the thickness. Everything else is as thin as the
-1.2 mm skins allow.
+The 5.7 mm CR2450 clip sets the thickness: the 5.0 mm cell plus the clip's
+0.25 mm sprung plate and its tongues. The first design used a 7.5 mm moulded
+holder (MYOUNG BS-24-B4AA016) on a 1.0 mm board, for a 13.0 mm case. Everything
+else is as thin as the 1.2 mm skins and 0.4 mm part clearances allow. See
+[hardware-options.md](hardware-options.md#battery-holder) for why the cell does
+not sink into the board instead.
 
 **Two shells, one parting line at the PCB back plane.** The back shell is a tub
 with a 1 mm alignment lip on the inner half of its wall; the front shell has the
@@ -99,7 +103,7 @@ black PETGs pass 850-940 nm; check yours with a phone camera) and the edge is
 fully closed.
 
 **Battery door: slide, not bayonet.** A bayonet needs lugs and ramps *behind* the
-floor, which would add about 1.5 mm of thickness, or space beside the holder that
+floor, which would add about 1.5 mm of thickness, or space beside the clip that
 does not exist. A slide door works within the 1.2 mm floor. It has 45 deg dovetail
 rails on both sides and a dovetailed leading edge, and it prints flat with no
 overhang beyond 45 deg. It carries its own section of the bottom wall, so the
@@ -107,13 +111,14 @@ case has no 30 mm bridge over the slot. A sprung detent (relief slots behind eac
 rail and a 0.45 mm bump on the case rail) holds it closed. Four grip grooves let
 you slide it open with a thumb; a coin also works.
 
-The MYOUNG BS-24-B4AA016 holder (checked against its STEP model) has lips over
-both ends at 6.0-7.5 mm and a side spring at one end. The cell is removed by
-pushing it into the spring and lifting the other edge. The door opening is the cell plus
-1.5 mm on each side (27.5 mm), from 1 mm above the cell's top edge to the bottom
-of the case. With the door out, the cell tips straight out through the floor. The
-cell can also be pushed out along the board through the opening in the bottom
-wall.
+The MYOUNG MY-2450-01 clip is a sprung plate over the cell with a stop at its
+closed end, which points at the IR edge. The cell lies on a bare copper pad (its
+negative contact) and slides in and out along the board through the clip's open
+end, which faces the bottom edge. The door opening is the cell plus 1.5 mm on each
+side (27.5 mm), from 1 mm above the cell's top edge to the bottom of the case, and
+the door carries the matching section of the bottom wall. With the door out, the
+bottom wall is open over the full cell width, so the cell slides straight out. The
+door's wall section then stops the cell sliding out of the clip in use.
 
 **Lanyard.** A 4 mm-thick rounded tab at the bottom-left corner with a chamfered
 Ø4 mm eye (`lanyard_corner = "right"` moves it). It belongs to the back shell,
@@ -173,13 +178,13 @@ Print the front shell in the colour you want people to see. A contrasting cap
    down while supporting the board from behind, until the cap stops on the stem
    top.
 6. **Battery:** slide the door off towards the bottom edge (grip grooves, thumb
-   pressure). Insert the CR2450 with its positive (marked) side facing you, away
-   from the PCB. Push one edge in under the holder's spring end first, then press
-   the other edge down past its lip. Slide the door back on until it clicks.
+   pressure). Hold the CR2450 with its positive (marked) side facing you, away
+   from the PCB, and slide it flat along the board through the bottom opening,
+   under the clip, until it stops against the clip's closed end. Slide the door
+   back on until it clicks.
 
-To change the cell, slide the door off. Push the cell towards the holder's spring
-end and lift its free edge with a fingernail, or push it out through the bottom
-opening.
+To change the cell, slide the door off. Put a fingernail in the notch at the
+clip's open end and slide the cell out through the bottom opening.
 
 ## Changing parameters
 

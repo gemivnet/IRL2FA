@@ -18,6 +18,8 @@ import math
 import os
 import re
 
+import yaml
+
 HERE = os.path.dirname(os.path.abspath(__file__))
 OUT = os.path.normpath(os.path.join(HERE, "..", "lib", "irl2fa.pretty"))
 MODEL_DIR = "${KIPRJMOD}/lib/irl2fa.3dshapes"
@@ -212,9 +214,17 @@ def skrh():
     # pin-1 marker: short bar left of pad 1
     fp.line("F.SilkS", -px - pw / 2 - 0.2, -py - 0.5, -px - pw / 2 - 0.2, -py + 0.5)
 
-    xc = max(bx, px + pw / 2) + CRT_CLEAR
-    yc = max(by, my + mh / 2) + CRT_CLEAR
-    fp.courtyard_rect(-xc, -yc, xc, yc)
+    # Courtyard follows body + signal pads + frame tabs (a cross, not their
+    # bounding box): rotated 45 deg on the board, the bounding box's corners
+    # would reach 1.3 mm further towards the display glass than any copper.
+    xb, yb = bx + CRT_CLEAR, by + CRT_CLEAR                  # body
+    xp, yp = px + pw / 2 + CRT_CLEAR, py + ph / 2 + CRT_CLEAR  # signal pads (|y| <= yp < yb)
+    xm, ym = 1.0 + CRT_CLEAR, my + mh / 2 + CRT_CLEAR        # frame tabs
+    pts = [(-xm, -ym), (xm, -ym), (xm, -yb), (xb, -yb), (xb, -yp), (xp, -yp), (xp, yp), (xb, yp),
+           (xb, yb), (xm, yb), (xm, ym), (-xm, ym), (-xm, yb), (-xb, yb), (-xb, yp), (-xp, yp),
+           (-xp, -yp), (-xb, -yp), (-xb, -yb), (-xm, -yb)]
+    fp.poly("F.CrtYd", [(crt(x), crt(y)) for x, y in pts])
+    yc = ym
     fp.ref_at, fp.val_at = (0, -yc - 0.8), (0, yc + 0.8)
     fp.write()
 
@@ -270,63 +280,161 @@ def fh34():
 
 
 # ---------------------------------------------------------------------------
-# c. MYOUNG BS-24-B4AA016 CR2450 holder
+# c. MYOUNG MY-2450-01 CR2450 clip (the PCB pad is the negative contact)
 # ---------------------------------------------------------------------------
-def bs24():
+# Drawing MY-CP-0106 rev A/0 (LCSC C964845). Origin at the CELL centre, y down;
+# the closed end (with the stop flap) at -y, the open end the cell slides in
+# through at +y. The plate is 25.5 wide, 23.2 deep and 5.70 above the PCB.
+MY2450 = dict(
+    depth=23.2, plate_w=25.5, top_w=7.5, chamfer_dy=6.9, side_end=18.2,  # from the closed end
+    pad_w=6.15, pad_h=6.0, pad_span=36.8, pad_top=9.2,                     # PCB layout diagram
+    stop_t=0.25, height=5.7, cell_r=24.5 / 2,
+    neg_pad_d=12.0,       # negative contact pad: well inside the cell's negative cap
+)
+
+
+def my2450_geometry():
+    """Plate outline (footprint coordinates) and pad centres derived from the drawing."""
+    m = MY2450
+    y_top = -(m["cell_r"] + m["stop_t"])           # cell edge touches the stop flap
+    y_bot = y_top + m["depth"]
+    pad_y = y_top + m["pad_top"] + m["pad_h"] / 2
+    pad_x = m["pad_span"] / 2 - m["pad_w"] / 2
+    hw, tw = m["plate_w"] / 2, m["top_w"] / 2
+    y_ch = y_top + m["chamfer_dy"]
+    y_side = y_top + m["side_end"]
+    # lobes: quarter-ish arcs from the sides to the bottom, centred on (lx, y_side)
+    lx, lr = hw - (y_bot - y_side), y_bot - y_side
+    # finger notch between the lobes: concave arc through (0, y_bot - 2.5)
+    nx, ny_apex = 3.5, y_bot - 2.5
+    ny_end = y_bot - 0.4
+    nc = (nx ** 2 + ny_end ** 2 - ny_apex ** 2) / (2 * (ny_end - ny_apex))   # notch circle centre y
+    nr = nc - ny_apex
+    pts = [(-tw, y_top), (tw, y_top), (hw, y_ch), (hw, y_side)]
+    for i in range(1, 13):                                         # right lobe, side -> bottom
+        a = math.radians(90 * i / 12)
+        pts.append((lx + lr * math.cos(a), y_side + lr * math.sin(a)))
+    a0 = math.atan2(ny_end - nc, nx)
+    for i in range(0, 13):                                         # notch, right -> left
+        a = a0 - (math.pi + 2 * a0) * i / 12                       # through the apex at -90 deg
+        pts.append((nr * math.cos(a), nc + nr * math.sin(a)))
+    pts.append((-lx, y_bot))
+    for i in range(11, -1, -1):                                    # left lobe, bottom -> side
+        a = math.radians(90 * i / 12)
+        pts.append((-lx - lr * math.cos(a), y_side + lr * math.sin(a)))
+    pts.append((-hw, y_ch))
+    return dict(y_top=y_top, y_bot=y_bot, pad_x=pad_x, pad_y=pad_y, outline=pts)
+
+
+def _star_union(shapes, corners=(), step_deg=1.0):
+    """Boundary of a union of shapes that is star-shaped about the origin.
+    Each shape is a function ray(angle) -> max radius along that ray (or 0).
+    Rays are cast every step_deg and through every corner given, so the
+    polygon passes exactly through pad and plate corners."""
+    n = int(round(360 / step_deg))
+    angles = {round(2 * math.pi * i / n, 9) for i in range(n)}
+    angles |= {round(math.atan2(y, x) % (2 * math.pi), 9) for x, y in corners}
+    pts = []
+    for a in sorted(angles):
+        r = max(s(a) for s in shapes)
+        pts.append((r * math.cos(a), r * math.sin(a)))
+    out = []                     # drop points on straight runs
+    for i, p in enumerate(pts):
+        a, c = pts[i - 1], pts[(i + 1) % len(pts)]
+        cross = (p[0] - a[0]) * (c[1] - a[1]) - (p[1] - a[1]) * (c[0] - a[0])
+        if abs(cross) / (math.hypot(c[0] - a[0], c[1] - a[1]) or 1) > 1e-6:
+            out.append(p)
+    return out
+
+
+def _ray_poly(poly):
+    """Furthest crossing of a ray from the origin with a polygon's edges."""
+    def f(a):
+        dx, dy = math.cos(a), math.sin(a)
+        best = 0.0
+        for (x1, y1), (x2, y2) in zip(poly, poly[1:] + poly[:1]):
+            ex, ey = x2 - x1, y2 - y1
+            den = dx * ey - dy * ex
+            if abs(den) < 1e-12:
+                continue
+            t = (x1 * ey - y1 * ex) / den
+            u = (x1 * dy - y1 * dx) / den
+            if t > 0 and -1e-9 <= u <= 1 + 1e-9:
+                best = max(best, t)
+        return best
+    return f
+
+
+def _offset_poly(poly, d):
+    """Outward offset of a simple polygon (vertex normals; fine for gentle shapes)."""
+    n = len(poly)
+    area = sum(poly[i][0] * poly[(i + 1) % n][1] - poly[(i + 1) % n][0] * poly[i][1] for i in range(n))
+    s = 1 if area > 0 else -1     # y-down screen coords: area sign tells the winding
+    out = []
+    for i in range(n):
+        (x0, y0), (x1, y1), (x2, y2) = poly[i - 1], poly[i], poly[(i + 1) % n]
+        n1 = (-(y1 - y0), x1 - x0)
+        n2 = (-(y2 - y1), x2 - x1)
+        l1, l2 = math.hypot(*n1) or 1, math.hypot(*n2) or 1
+        nx, ny = n1[0] / l1 + n2[0] / l2, n1[1] / l1 + n2[1] / l2
+        ln = math.hypot(nx, ny) or 1
+        cosh = (n1[0] * n2[0] + n1[1] * n2[1]) / (l1 * l2)
+        k = d / max(math.sqrt((1 + cosh) / 2), 0.3)
+        out.append((x1 - s * nx / ln * k, y1 - s * ny / ln * k))
+    return out
+
+
+def my2450():
+    m = MY2450
+    g = my2450_geometry()
     fp = Footprint(
-        "BatteryHolder_MYOUNG_BS-24-B4AA016_CR2450",
-        "MYOUNG BS-24-B4AA016 (BS-2450-2 Au) SMT CR2450 holder, open frame, gold contacts (LCSC C964809), "
-        "drawing MY-CP-0138 rev A/0. Pads 3.62x4.50, outer span 37.00, inner span 29.75. Pad 1 = + (right), "
-        "pad 2 = - (left); both contacts are end terminals, the holder has no PCB-side contact pad "
-        "(the - spring presses the cell's bottom face from the holder floor). Body 27.2x16.0, 36.0 over the "
-        "terminals, height 7.50 above the PCB. The 24.5 mm cell overhangs the body by 4.25 mm on each long side.",
-        "CR2450 coin cell battery holder SMD MYOUNG BS-24",
+        "BatteryHolder_MYOUNG_MY-2450-01_CR2450",
+        "MYOUNG MY-2450-01 (CR2450-W) SMT CR2450 clip, nickel-plated C5191 phosphor bronze 0.25 mm "
+        "(LCSC C964845), drawing MY-CP-0106 rev A/0. Height 5.70 above the PCB. Plate 25.5 x 23.2 with a "
+        "7.5 mm closed end and a stop flap; the cell slides in from the open end (+y). Pads 6.15 x 6.00, "
+        "outer span 36.80, 9.20 from the closed end. Pad 1 = + (both legs), pad 2 = - : a bare 12 mm "
+        "copper pad under the cell centre (no paste; order ENIG).",
+        "CR2450 coin cell battery clip retainer SMD MYOUNG MY-2450-01 CR2450-W",
         "smd",
-        "https://www.lcsc.com/datasheet/C964809.pdf")
-    pw, ph = (37.0 - 29.75) / 2, 4.5
-    px = (37.0 + 29.75) / 4
-    fp.smd("1", px, 0, pw, ph, "rect")
-    fp.smd("2", -px, 0, pw, ph, "rect")
+        "https://www.lcsc.com/datasheet/C964845.pdf")
+    px, py = g["pad_x"], g["pad_y"]
+    fp.smd("1", px, py, m["pad_w"], m["pad_h"], "rect")
+    fp.smd("1", -px, py, m["pad_w"], m["pad_h"], "rect")
+    d = m["neg_pad_d"]
+    fp.items.append(
+        f'\t(pad "2" smd circle\n\t\t(at 0 0)\n\t\t(size {f(d)} {f(d)})\n'
+        f'\t\t(layers "F.Cu" "F.Mask")\n\t)')
 
-    bx, by = 27.2 / 2, 16.0 / 2
-    fp.rect("F.Fab", -bx, -by, bx, by)
-    fp.circle("F.Fab", 0, 0, 24.5 / 2)
-    fp.rect("F.Fab", -18.0, -3.5, -bx, 3.5)      # terminal tabs (7.0 wide)
-    fp.rect("F.Fab", bx, -3.5, 18.0, 3.5)
-    fp.text("F.Fab", "+", 11.0, 0, 2.0)
-    fp.text("F.Fab", "-", -11.0, 0, 2.0)
+    # fab: plate, cell, pads, insertion direction
+    fp.poly("F.Fab", g["outline"])
+    fp.circle("F.Fab", 0, 0, m["cell_r"])
+    fp.text("F.Fab", "+", px, py, 2.0)
+    fp.text("F.Fab", "-", 0, 0, 2.0)
+    fp.arrow("F.Fab", 0, m["cell_r"] + 4, 0, m["cell_r"] + 0.5, head=1.0)
 
-    # silk: body outline + the cell overhang arcs
-    sx, sy = bx + 0.11, by + 0.11
-    fp.rect("F.SilkS", -sx, -sy, sx, sy)
-    r = 24.5 / 2 + 0.11
-    a = math.degrees(math.asin(sy / r))
-    fp.arc("F.SilkS", 0, 0, r, -180 + a, -a)     # top overhang
-    fp.arc("F.SilkS", 0, 0, r, a, 180 - a)       # bottom overhang
-    fp.text("F.SilkS", "+", px, -ph / 2 - 1.2, 1.5)
-    fp.text("F.SilkS", "-", -px, -ph / 2 - 1.2, 1.5)
+    # silk: the closed end and the plate sides, clear of the pads
+    pts = g["outline"]
+    sy0 = py - m["pad_h"] / 2 - 0.3
+    hw, tw, o = m["plate_w"] / 2 + 0.11, m["top_w"] / 2, 0.11
+    y_ch = g["y_top"] + m["chamfer_dy"]
+    fp.poly_line("F.SilkS", [(-hw, sy0), (-hw, y_ch), (-tw, g["y_top"] - o), (tw, g["y_top"] - o),
+                             (hw, y_ch), (hw, sy0)])
+    fp.text("F.SilkS", "+", px, py - m["pad_h"] / 2 - 1.2, 1.5)
 
-    # Courtyard follows the real outline (terminal tabs + body + cell circle)
-    # rather than its bounding box, so small parts can use the corners the
-    # round cell leaves free.
-    xc = px + pw / 2 + CRT_CLEAR
-    yc = 24.5 / 2 + CRT_CLEAR
-    tx, ty = xc, 3.5 + CRT_CLEAR
-    rx, ry = bx + CRT_CLEAR, by + CRT_CLEAR
-    ax = math.sqrt(yc ** 2 - ry ** 2)
-    a0 = math.degrees(math.atan2(ry, ax))
-
-    def arc_pts(start, end, n=24):
-        return [(crt(yc * math.cos(math.radians(start + (end - start) * i / n))),
-                 crt(yc * math.sin(math.radians(start + (end - start) * i / n)))) for i in range(n + 1)]
-
-    pts = [(tx, -ty), (rx, -ty), (rx, -ry)]
-    pts += arc_pts(-a0, -180 + a0)            # over the top, right to left
-    pts += [(-rx, -ry), (-rx, -ty), (-tx, -ty), (-tx, ty), (-rx, ty), (-rx, ry)]
-    pts += arc_pts(180 - a0, a0)              # under the bottom, left to right
-    pts += [(rx, ry), (rx, ty), (tx, ty)]
-    fp.poly("F.CrtYd", [(crt(x), crt(y)) for x, y in pts])
-    fp.ref_at, fp.val_at = (0, -yc - 0.9), (0, yc + 0.9)
+    # courtyard: union of plate, cell and pads, grown by CRT_CLEAR
+    plate = _offset_poly(pts, CRT_CLEAR)
+    cell = lambda a: m["cell_r"] + CRT_CLEAR
+    pads, corners = [], list(plate)
+    for sx in (-1, 1):
+        x0, x1 = sorted((sx * (px - m["pad_w"] / 2 - CRT_CLEAR), sx * (px + m["pad_w"] / 2 + CRT_CLEAR)))
+        y0, y1 = py - m["pad_h"] / 2 - CRT_CLEAR, py + m["pad_h"] / 2 + CRT_CLEAR
+        rect = [(x0, y0), (x1, y0), (x1, y1), (x0, y1)]
+        pads.append(_ray_poly(rect))
+        corners += rect
+    crt_pts = _star_union([_ray_poly(plate), cell] + pads, corners)
+    fp.poly("F.CrtYd", [(crt(x), crt(y)) for x, y in crt_pts])
+    fp.ref_at, fp.val_at = (0, g["y_top"] - 1.2), (0, m["cell_r"] + 1.2)
+    fp.fab_ref_at = (0, -6)
     fp.write()
 
 
@@ -398,9 +506,11 @@ def epd():
     aa_y0 = -gh / 2 + (gh - aa_h) / 2            # 0.5+1.45+0.40+0.40 = 2.75 bottom; ~2.745 top
     fpc_y0 = -gh / 2 + 8.15                      # FPC 12.5 wide, 8.15 from the top glass edge
     fpc_w = 12.5
-    # Slot from hardware/board.yaml, relative to the glass (glass x 6.0, y 2.4; slot x 2.6 w 1.4, y 10 h 14)
-    gx, gy = 6.0 + gw / 2, 2.4 + gh / 2           # glass centre in board coords
-    sx0, sw, sy0, sh = 2.6 - gx, 1.4, 10.0 - gy, 14.0
+    # Slot from hardware/board.yaml, relative to the glass centre
+    bd = yaml.safe_load(open(os.path.join(HERE, "..", "board.yaml")))
+    g, sl = bd["display"]["glass"], bd["fpc_slot"]
+    gx, gy = g["x"] + gw / 2, g["y"] + gh / 2     # glass centre in board coords
+    sx0, sw, sy0, sh = sl["x"] - gx, sl["w"], sl["y"] - gy, sl["h"]
     scx, r = sx0 + sw / 2, sw / 2
 
     fp = Footprint(
@@ -445,7 +555,7 @@ def epd():
 def main():
     skrh()
     fh34()
-    bs24()
+    my2450()
     sidelooker("LED_Vishay_VSMB2948SL_SideView", "VSMB2948SL", "940 nm IR emitter", "K", "A",
                "https://www.vishay.com/docs/83498/vsmb2948sl.pdf", "LCSC C6604342")
     sidelooker("PhotoTransistor_Vishay_VEMT2523SLX01_SideView", "VEMT2523SLX01", "NPN phototransistor detector",

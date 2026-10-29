@@ -75,8 +75,8 @@ The firmware's portable core is compiled to WebAssembly and runs two devices sid
 | Input | Alps SKRHABE010 5-way switch, the only control |
 | Pairing | 940 nm side-looking IR LED and phototransistor on the top edge |
 | Power | CR2450 coin cell. **About 3.7 years typical, 2.1 years worst case** at 20 uses a day ([calculation](docs/power-calculations.md)) |
-| Board | 80 × 34 mm, 2 layers, 1.0 mm. JLCPCB can assemble every part except the display |
-| Case | 84 × 38 × 13 mm, 3D-printed in 4 parts, M2 screws |
+| Board | 77 × 31 mm, 2 layers, 0.8 mm, ENIG. JLCPCB can assemble every part except the display |
+| Case | 80.9 × 34.9 × 11.0 mm, 3D-printed in 4 parts, M2 screws |
 
 <p align="center">
   <img src="docs/images/pcb/pcb-front.png" alt="PCB front" width="420" />
@@ -92,7 +92,7 @@ You need a PCB, a display, a coin cell, a printed case and four screws. Everythi
 
 1. **Order the assembled board.**
    - At [JLCPCB](https://jlcpcb.com), upload [`hardware/fab/irl2fa-gerbers.zip`](hardware/fab/irl2fa-gerbers.zip).
-   - Choose 1.0 mm thickness and PCB Assembly on **both sides**.
+   - Choose 0.8 mm thickness, the **ENIG** surface finish (a bare pad is the coin cell's negative contact) and PCB Assembly on **both sides**.
    - Add [`irl2fa-bom-jlcpcb.csv`](hardware/fab/irl2fa-bom-jlcpcb.csv) and [`irl2fa-cpl-jlcpcb.csv`](hardware/fab/irl2fa-cpl-jlcpcb.csv).
    - Every part has an LCSC number. The [BOM](docs/bill-of-materials.md) lists prices, stock and alternatives.
    - To solder it yourself, use the [interactive BOM](https://irl2fa.com/ibom.html).
@@ -105,7 +105,7 @@ You need a PCB, a display, a coin cell, a printed case and four screws. Everythi
    - Flash it through a Tag-Connect TC2030-NL cable and any ST-Link: [firmware/port/stm32u0/README.md](firmware/port/stm32u0/README.md).
 5. **Assemble.**
    - Stick the display to the front of the board.
-   - Fold its flex cable through the slot into the connector on the back, insert the CR2450, and screw the case together.
+   - Fold its flex cable through the slot into the connector on the back, slide the CR2450 under its clip from the bottom edge, and screw the case together.
    - Set the time: the device asks on first start.
 
 Built one? Please [file a build report](https://github.com/gemivnet/IRL2FA/issues/new?template=build_report.yml).
