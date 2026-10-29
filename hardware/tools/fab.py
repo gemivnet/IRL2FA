@@ -98,7 +98,7 @@ def generate(out):
         full.append([r["Qty"], r["Refs"], r["Value"], r["Manufacturer"], r["MPN"], r["LCSC"], fp])
     write_csv(out / "irl2fa-bom-jlcpcb.csv", ["Comment", "Designator", "Footprint", "LCSC Part #"], jlc)
     write_csv(out / "irl2fa-bom.csv",
-              ["Qty", "References", "Value", "Manufacturer", "MPN", "LCSC", "Footprint"], full)
+              ["Quantity", "References", "Description", "Manufacturer", "MPN", "LCSC", "Footprint"], full)
 
     # Placement (JLCPCB format). Board-only and excluded parts are skipped by kicad-cli.
     tmp = out / "_pos.csv"

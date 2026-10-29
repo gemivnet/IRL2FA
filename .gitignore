@@ -441,3 +441,4 @@ sim/dist/
 # fabrication outputs are committed on purpose
 !hardware/fab/**
 hardware/build/
+__pycache__/

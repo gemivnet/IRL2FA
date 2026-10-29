@@ -1,0 +1,23 @@
+name: Build report
+description: You built an IRL2FA. Tell us how it went (good or bad) so the next person has it easier.
+labels: [build-report]
+body:
+  - type: input
+    id: rev
+    attributes:
+      label: Board revision and where it was made
+      placeholder: "v0.1, JLCPCB PCBA"
+  - type: textarea
+    id: parts
+    attributes:
+      label: Parts you had to substitute, and where you bought the display
+  - type: textarea
+    id: bringup
+    attributes:
+      label: Bring-up
+      description: Did it flash, show the screen the right way up, keep time, pair over IR? Measured sleep current if you have it (TP1/TP2).
+  - type: textarea
+    id: case
+    attributes:
+      label: Case printing notes
+      description: Printer, material, any tolerance changes.

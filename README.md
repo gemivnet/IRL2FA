@@ -1,61 +1,172 @@
-> **Status (2026-10): redesign in progress.** The hardware is moving to an STM32U0, IR pairing and a fully open part library; firmware, a browser simulator, PCB and case files are landing in this repo.
+[![firmware](https://github.com/gemivnet/IRL2FA/actions/workflows/firmware.yml/badge.svg)](https://github.com/gemivnet/IRL2FA/actions/workflows/firmware.yml)
+[![hardware](https://github.com/gemivnet/IRL2FA/actions/workflows/hardware.yml/badge.svg)](https://github.com/gemivnet/IRL2FA/actions/workflows/hardware.yml)
+[![simulator](https://github.com/gemivnet/IRL2FA/actions/workflows/sim.yml/badge.svg)](https://github.com/gemivnet/IRL2FA/actions/workflows/sim.yml)
+[![case](https://github.com/gemivnet/IRL2FA/actions/workflows/case.yml/badge.svg)](https://github.com/gemivnet/IRL2FA/actions/workflows/case.yml)
+![License](https://img.shields.io/badge/license-AGPL--3.0%20%7C%20CERN--OHL--S--2.0%20%7C%20CC--BY--SA--4.0-blue)
+![Last Commit](https://img.shields.io/github/last-commit/gemivnet/IRL2FA)
 
-# IRL2FA - Air-Gapped Real-World 2-Factor Authenticator
+# IRL2FA
 
-IRL2FA is a compact physical device designed to verify the authenticity of digital communications in an increasingly AI-dominated world. Its primary purpose is to prevent AI impersonation fraud in personal communications, while also serving as a standalone 2FA (Two-Factor Authentication) device for those who prefer not to have continuous access to their phones.
+**An air-gapped key fob that proves the person on the other end is who they say they are, and keeps your 2FA codes off your phone.**
 
-## Theory of Operation
+AI can now clone a voice from a few seconds of audio and write messages in anyone's style. "It's me, I lost my phone, can you send…" is no longer something you can judge by ear. IRL2FA gives two people a shared secret they set up **once, in person**. From then on, each device shows two words that change every 15 seconds: the word you **say** and the word you should **hear** back. If the reply matches, the other person is holding the device you paired with face to face.
 
-IRL2FA represents a practical solution to the growing challenge of AI impersonation, providing a physical anchor of trust in our increasingly digital world. While no security system is perfect, this air-gapped approach offers a strong foundation for verified personal communications.
+It is also a standard **TOTP authenticator** (the 6-digit codes from Google Authenticator and similar apps) for up to 512 accounts. It has no USB data port, no radio and no network. The only control is a 5-way joystick.
 
-### Contact Pairing Process
+<p align="center">
+  <img src="docs/images/case/case-assembly.png" alt="IRL2FA in its 3D-printed case" width="640" />
+</p>
 
-When two individuals want to establish a trusted connection, they follow this secure pairing process:
+<p align="center">
+  <a href="https://georgemain.com/IRL2FA/"><b>▶ Try it in your browser</b></a> ·
+  <a href="#build-one">Build one</a> ·
+  <a href="docs/pairing-protocol.md">How pairing works</a> ·
+  <a href="https://irl2fa.com">irl2fa.com</a>
+</p>
 
-1. Both parties should be physically present with their IRL2FA devices
-2. Each person activates pairing mode on their device
-3. One person's device generates a random 20-digit sequence
- - Uses arrows and enter keys for input
- - Provides 95 trillion possible combinations
- - Ensures statistical uniqueness of each pairing while providing pairing ease in comparison to alphanumeric strings
-4. The other person enters the exact sequence on their device
-5. Each person enters a name to identify the new contact
-6. The devices establish a synchronized seed for generating verification words
+---
 
-### Authentication Process
+## How it works
 
-Once paired, the devices generate synchronized pairs of verification words every 15 seconds:
+<p align="center">
+  <img src="docs/images/screens/contact.png" alt="Contact words screen" width="375" />
+  <img src="docs/images/screens/code.png" alt="TOTP code screen" width="375" />
+</p>
 
-Each pair consists of two words:
- - A "Give" word: The word you provide to prove your identity
- - A "Receive" word: The word you expect from the other person
+**Pair once, in person.**
 
-Example authentication flow:
+1. Both people choose *Pair with someone* and hold their devices top edge to top edge.
+2. The devices agree a 256-bit key over infrared using X25519, with a commitment scheme that stops a man in the middle.
+3. Both screens show the same six joystick symbols. You compare them, confirm, and name the contact.
 
-1. Your device displays: "Give: Mountain, Receive: Ocean"
-2. When starting a conversation, you send "Mountain"
-3. The other person must respond with "Ocean"
+**Verify any time after.**
 
-If they provide the correct word, you've verified their physical possession of the paired device
+- Open the contact. Say the **SAY** word; they should answer with your **HEAR** word.
+- Words come from HMAC-SHA256 over the current 15-second window, mapped onto the 2048-word BIP-39 list.
+- Nothing is ever transmitted again, so there is nothing to intercept.
 
-### Standard Authenticator Codes
-The IRL2FA device doubles as a standard two-factor authentication (MFA) token generator:
+**TOTP codes.**
 
-- Supports up to 512 separate authentication codes
-- Compatible with standard TOTP (Time-based One-Time Password) protocol
-- Manual entry of authentication secrets instead of QR code scanning requires entering the base32-encoded secret key directly
- - Generates industry-standard 6-digit codes every 30 seconds
- - Works with any service that supports standard TOTP tokens
- - Each code can be labeled for easy identification
+- Add an account by typing the base32 secret most sites show under "can't scan the QR code?".
+- RFC 6238; SHA1/SHA256/SHA512; 6 or 8 digits; 30 or 60 s.
 
-### Security Considerations
+**Secrets at rest.**
 
-The IRL2FA system is built on several security principles:
+- Every record, labels included, is sealed with XChaCha20-Poly1305 in the MCU's read-protected flash.
+- An optional joystick PIN wraps the key with Argon2i. Ten wrong PINs erase the device.
 
- - Physical presence for initial pairing
- - Air-gapped operation prevents remote attacks
- - No digital connections eliminate common attack vectors
- - Time-based word generation prevents replay attacks
- - Large key space (95 trillion combinations) prevents brute force
- - 15-second rotation interval limits attack windows
+The full design is in [docs/pairing-protocol.md](docs/pairing-protocol.md) and [docs/ui-flows.md](docs/ui-flows.md).
 
+## Try the simulator
+
+The firmware's portable core is compiled to WebAssembly and runs two devices side by side in your browser: pair them over a simulated IR link, compare words, add a TOTP secret and check it against your phone.
+
+**[georgemain.com/IRL2FA](https://georgemain.com/IRL2FA/)**
+
+<p align="center"><img src="docs/images/sim/sim-pairing.png" alt="Simulator: two devices pairing" width="760" /></p>
+
+## Hardware
+
+| | |
+|-|-|
+| MCU | STM32U083KCU6: Cortex-M0+, 256 KB flash, 40 KB RAM, TRNG, readout protection |
+| Display | 2.13″ e-paper, 250×122, Good Display GDEY0213B74 (SSD1680) |
+| Clock | Micro Crystal RV-3032-C7, temperature-compensated ±2.5 ppm |
+| Input | Alps SKRHABE010 5-way switch, the only control |
+| Pairing | 940 nm side-looking IR LED and phototransistor on the top edge |
+| Power | CR2450 coin cell. **About 3.7 years typical, 2.1 years worst case** at 20 uses a day ([calculation](docs/power-calculations.md)) |
+| Board | 80 × 34 mm, 2 layers, 1.0 mm. JLCPCB can assemble every part except the display |
+| Case | 84 × 38 × 13 mm, 3D-printed in 4 parts, M2 screws |
+
+<p align="center">
+  <img src="docs/images/pcb/pcb-front.png" alt="PCB front" width="420" />
+  <img src="docs/images/pcb/pcb-back.png" alt="PCB back" width="420" />
+</p>
+
+- Design files: [schematic (PDF)](hardware/fab/irl2fa-schematic.pdf) · [KiCad 9 project](hardware/) · [interactive BOM](https://georgemain.com/IRL2FA/ibom.html) · [3D model (STEP)](hardware/fab/irl2fa.step)
+- Design notes: [PCB design](docs/pcb-design.md) · [pin assignments](docs/pin-assignments.md) · [why these parts](docs/hardware-options.md) · [design review](docs/design-review.md)
+
+## Build one
+
+You need a PCB, a display, a coin cell, a printed case and four screws. Everything to order is committed and kept current by CI.
+
+1. **Order the assembled board.**
+   - At [JLCPCB](https://jlcpcb.com), upload [`hardware/fab/irl2fa-gerbers.zip`](hardware/fab/irl2fa-gerbers.zip).
+   - Choose 1.0 mm thickness and PCB Assembly on **both sides**.
+   - Add [`irl2fa-bom-jlcpcb.csv`](hardware/fab/irl2fa-bom-jlcpcb.csv) and [`irl2fa-cpl-jlcpcb.csv`](hardware/fab/irl2fa-cpl-jlcpcb.csv).
+   - Every part has an LCSC number. The [BOM](docs/bill-of-materials.md) lists prices, stock and alternatives.
+   - To solder it yourself, use the [interactive BOM](https://georgemain.com/IRL2FA/ibom.html).
+2. **Buy the display.** A [Good Display GDEY0213B74](https://www.good-display.com/product/391.html) (about $5), or the GDEM0213B74WT if it has to work below 0 °C.
+3. **Print the case.**
+   - Files: [`case/stl/`](case/stl/) or [`case/3mf/irl2fa-all.3mf`](case/3mf/), in PETG or PLA with no supports.
+   - Settings and assembly: [docs/case-design.md](docs/case-design.md).
+4. **Flash the firmware.**
+   - Get `irl2fa-stm32u083-<version>.bin` from the [latest release](https://github.com/gemivnet/IRL2FA/releases), or build it with `firmware/port/stm32u0/build.sh`.
+   - Flash it through a Tag-Connect TC2030-NL cable and any ST-Link: [firmware/port/stm32u0/README.md](firmware/port/stm32u0/README.md).
+5. **Assemble.**
+   - Stick the display to the front of the board.
+   - Fold its flex cable through the slot into the connector on the back, insert the CR2450, and screw the case together.
+   - Set the time: the device asks on first start.
+
+Built one? Please [file a build report](https://github.com/gemivnet/IRL2FA/issues/new?template=build_report.yml).
+
+> **Status:** v0.1 is a complete, simulated and checked design, but no board has been built yet. The first boards will confirm the panel orientation, the IR range and the real sleep current. Until a build report says otherwise, treat it as a prototype.
+
+## Every change is simulated
+
+The hardware is open to modification, and people order straight from this repository. So every push runs:
+
+- ERC and DRC (with schematic parity)
+- netlist checks against the pin map shared with the firmware
+- SPICE simulations of the coin cell, e-paper booster, power switch, reverse-battery protection and IR driver
+- the battery-life budget
+- a check that the committed Gerbers, BOM and placement files match the KiCad files
+- Gerber sanity checks
+- case-fit tests
+- firmware unit tests (RFC test vectors)
+- the real firmware binary running on an emulated STM32 (Renode), where two virtual devices pair
+
+Details: [docs/hardware-testing.md](docs/hardware-testing.md).
+
+```sh
+make check   # everything CI runs, locally (needs Docker)
+```
+
+## Repository layout
+
+```
+firmware/core/          portable C11: crypto, TOTP, words, pairing, encrypted store, UI
+firmware/port/stm32u0/  the device: HAL, SSD1680 and RV-3032 drivers, startup, linker script
+firmware/renode/        emulated STM32U083 + peripheral models + Robot tests
+firmware/tests/         host unit tests
+sim/                    the browser simulator (WebAssembly)
+hardware/               KiCad 9 project, pins.yaml, board.yaml, SPICE benches, power model, fab outputs
+hardware/lib/           footprints, symbols and 3D models (drawn from datasheets)
+case/                   OpenSCAD case, STL/3MF exports, fit tests
+docs/                   design documents and images
+```
+
+## Why this exists
+
+The original idea (2025): a pocket device that does one thing well, proving that a familiar voice or a familiar account is really the person you know. It has no app, no cloud and no battery to charge every night. The 2026 restart rebuilt the design around what that needs to be safe in practice: a full-strength key exchange instead of a typed code, secrets that never leave the chip, and enough tests that strangers can change it with confidence. See [docs/design-review.md](docs/design-review.md).
+
+**Security notes.**
+
+- A verification word proves possession of a paired device and a clock within about 15 s, nothing more.
+- Someone holding your unlocked device can answer for you, which is what the PIN is for.
+- Keep the device's clock right: TOTP needs it within about 30 s, and the RTC drifts at most about 80 s a year.
+- Report vulnerabilities privately via the Security tab.
+
+## Contributing
+
+Contributions are welcome: firmware, hardware, case, docs, translations of the wordlist. Read [CONTRIBUTING.md](CONTRIBUTING.md) first: `main` must always be orderable, and CI enforces it.
+
+## License
+
+| Part | Licence |
+|-|-|
+| Firmware and simulator | [AGPL-3.0-or-later](LICENSE) |
+| Hardware (schematic, PCB, footprints, models) | [CERN-OHL-S-2.0](hardware/LICENSE) |
+| Case | [CC-BY-SA-4.0](case/LICENSE) |
+
+You may use, modify, build and sell all of it, as long as derivatives stay open under the same terms. Third-party components are listed in [THIRD_PARTY.md](THIRD_PARTY.md).

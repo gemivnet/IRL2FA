@@ -1,0 +1,5 @@
+# Python tools used by the Makefile and the generators (outside Docker).
+pyyaml>=6
+pytest>=8
+pillow>=10
+-r case/requirements.txt

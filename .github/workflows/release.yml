@@ -1,0 +1,42 @@
+# Tag vX.Y.Z -> GitHub release with everything needed to build an IRL2FA.
+# SPDX-License-Identifier: AGPL-3.0-or-later
+name: release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Firmware
+        run: |
+          firmware/port/stm32u0/build.sh
+          mkdir -p out
+          for ext in bin elf hex; do cp firmware/build/stm32u0/irl2fa.$ext out/irl2fa-stm32u083-${GITHUB_REF_NAME}.$ext; done
+          cp firmware/build/stm32u0/size-report.txt out/firmware-size-report.txt
+
+      - name: Hardware (checked, then packaged)
+        run: |
+          docker build -t irl2fa-hw hardware/ci
+          docker run --rm -u "$(id -u):$(id -g)" -e HOME=/tmp -v "$PWD":/w -w /w irl2fa-hw python3 hardware/tools/fab.py --check
+          cp hardware/fab/irl2fa-gerbers.zip out/irl2fa-gerbers-${GITHUB_REF_NAME}.zip
+          cp hardware/fab/irl2fa-bom-jlcpcb.csv hardware/fab/irl2fa-cpl-jlcpcb.csv hardware/fab/irl2fa-bom.csv \
+             hardware/fab/irl2fa-ibom.html hardware/fab/irl2fa-schematic.pdf hardware/fab/irl2fa.step out/
+
+      - name: Case
+        run: |
+          (cd case && zip -r ../out/irl2fa-case-stl-${GITHUB_REF_NAME}.zip stl)
+          cp case/3mf/irl2fa-all.3mf out/
+
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" out/* --title "IRL2FA $GITHUB_REF_NAME" --notes-file docs/release-notes.md --verify-tag

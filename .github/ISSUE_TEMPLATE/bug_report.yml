@@ -1,0 +1,25 @@
+name: Bug report
+description: Something in the firmware, simulator, hardware files or case is wrong
+labels: [bug]
+body:
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options: [Firmware, Simulator, PCB / schematic, Case, Documentation]
+    validations:
+      required: true
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened, and what did you expect?
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      description: For the simulator, include the browser. For hardware, include the board revision (silkscreen) and firmware version (Settings → About).
+  - type: markdown
+    attributes:
+      value: "**Security issues:** please report privately via the Security tab, not here."

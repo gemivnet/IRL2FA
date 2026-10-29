@@ -5,7 +5,7 @@ name: sim
 
 on:
   push:
-    paths: ['firmware/**', 'sim/**', 'hardware/power/**', '.github/workflows/sim.yml']
+    paths: ['firmware/**', 'sim/**', 'hardware/power/**', 'hardware/fab/**', '.github/workflows/sim.yml']
   pull_request:
     paths: ['firmware/**', 'sim/**', 'hardware/power/**', '.github/workflows/sim.yml']
   workflow_dispatch:
@@ -34,7 +34,12 @@ jobs:
           node-version: 24
 
       - name: Simulator tests
-        run: node --test sim/test
+        run: node --test 'sim/test/*.test.mjs'
+
+      - name: Publish the interactive BOM and schematic next to the simulator
+        run: |
+          cp hardware/fab/irl2fa-ibom.html sim/dist/ibom.html
+          cp hardware/fab/irl2fa-schematic.pdf sim/dist/schematic.pdf
 
       - name: Custom domain (only if sim/web/CNAME exists)
         run: |
