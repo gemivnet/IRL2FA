@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import createIRL2FA from './irl2fa.mjs';
 import {
-  BTN, Device, World, DISPLAY_W, DISPLAY_H, DISPLAY_STRIDE,
-  POWER_DEFAULTS, mergePowerModel, fromHardwareModel, chargeMAs, lifeDays, profileAvgMA, profileLifeDays, base32Decode, totpWith,
+  BTN, Device, World, DISPLAY_W, DISPLAY_H, DISPLAY_STRIDE, POWER, irLinkQuality,
+  chargeMAs, lifeDays, drainMAhPerYear, profileLifeYears, cellMv, base32Decode, totpWith,
 } from './irl2fa-device.js';
 
 const $ = (s, root = document) => root.querySelector(s);
@@ -22,9 +22,12 @@ const state = {
   simUtc: Date.now(),
   skew: [0, 0],
   active: 0,
-  model: POWER_DEFAULTS,
-  modelSrc: 'built-in defaults',
-  ir: { frames: 0, delivered: 0, lost: 0, lastAt: -1e9 },
+  profile: 'normal',
+  kase: 'typ',
+  // Charge (µAh) each device's cell has given up to fast-forwarded time.
+  skippedUAh: [0, 0],
+  skippedDays: 0,
+  ir: { lastAt: -1e9 },
   held: [null, null],
 };
 
@@ -34,26 +37,50 @@ let screens = [];
 
 // ------------------------------------------------------------------
 // e-paper rendering
+//
+// The panel shows what the firmware sent it, the way an SSD1680 panel does:
+//  - a full refresh (FULL in the firmware: wake, sleep, and every
+//    FULL_REFRESH_EVERY = 5 partial ones) runs the flashing waveform for the
+//    panel's full refresh time (3 s): the old image inverted, black, white,
+//    black, white, the new image inverted, then the new image. It clears
+//    all ghosting.
+//  - a partial refresh (0.42 s) drives only the pixels that change, with a
+//    short flicker, and leaves a faint residue of what was there: ghosting
+//    builds up over the partial refreshes until the next full one.
+// Times run on the simulation clock, so time-warp speeds them up too.
 
 const PAPER = [0xe6, 0xe2, 0xd5];
 const INK = [0x24, 0x25, 0x22];
 const UP = 4; // offscreen upscale factor before the smooth downscale
+const GHOST_STEP = 0.045; // residue left by one partial update of a pixel
+const GHOST_MAX = 0.22;
+const N_PX = DISPLAY_W * DISPLAY_H;
 
-function fbToCanvas(fb, invert) {
+function px(fb, i) {
+  return fb ? (fb[(i / DISPLAY_W | 0) * DISPLAY_STRIDE + ((i % DISPLAY_W) >> 3)] >> (7 - ((i % DISPLAY_W) & 7))) & 1 : 0;
+}
+
+/** Renders a 1-bpp frame (with ghost residue g in -1..1 per pixel: + is a
+ * dark residue on white, - a light one on black) to an upscaled canvas.
+ * `pick(i)` overrides a pixel: 0 white, 1 black, undefined = the frame. */
+function toCanvas(fb, { invert = false, ghost = null, pick = null } = {}) {
   const small = document.createElement('canvas');
   small.width = DISPLAY_W;
   small.height = DISPLAY_H;
   const sctx = small.getContext('2d');
   const img = sctx.createImageData(DISPLAY_W, DISPLAY_H);
-  const px = img.data;
-  for (let y = 0; y < DISPLAY_H; y++) {
-    for (let x = 0; x < DISPLAY_W; x++) {
-      let black = fb ? (fb[y * DISPLAY_STRIDE + (x >> 3)] >> (7 - (x & 7))) & 1 : 0;
-      if (invert) black ^= 1;
-      const c = black ? INK : PAPER;
-      const o = (y * DISPLAY_W + x) * 4;
-      px[o] = c[0]; px[o + 1] = c[1]; px[o + 2] = c[2]; px[o + 3] = 255;
-    }
+  const d = img.data;
+  for (let i = 0; i < N_PX; i++) {
+    let black = px(fb, i);
+    if (invert) black ^= 1;
+    let k = black; // 0 = paper .. 1 = ink
+    if (pick) { const p = pick(i); if (p !== undefined) k = p; }
+    else if (ghost) { const g = ghost[i]; k = black ? 1 + Math.min(0, g) : Math.max(0, g); }
+    const o = i * 4;
+    d[o] = PAPER[0] + (INK[0] - PAPER[0]) * k;
+    d[o + 1] = PAPER[1] + (INK[1] - PAPER[1]) * k;
+    d[o + 2] = PAPER[2] + (INK[2] - PAPER[2]) * k;
+    d[o + 3] = 255;
   }
   sctx.putImageData(img, 0, 0);
   const big = document.createElement('canvas');
@@ -80,25 +107,58 @@ function makeGrain() {
 }
 const GRAIN = makeGrain();
 
+// Full-refresh waveform phases, as fractions of the refresh time.
+const FULL_PHASES = [
+  [0.10, 'oldInv'], [0.22, 'black'], [0.34, 'white'], [0.46, 'black'], [0.58, 'white'],
+  [0.78, 'newInv'], [1.0, 'settle'],
+];
+
 class Screen {
   constructor(canvas) {
     this.c = canvas;
     this.ctx = canvas.getContext('2d');
-    this.cur = { fb: null, img: fbToCanvas(null, false), inv: null };
-    this.prev = null;
+    this.fb = null;
+    this.ghost = new Float32Array(N_PX);
+    this.partials = 0; // since the last full refresh
+    this.img = toCanvas(null);
     this.anim = null;
     this.dirty = true;
   }
-  show(fb, full) {
-    this.prev = this.cur; // the image currently on the glass
-    this.cur = { fb, img: fbToCanvas(fb, false), inv: null };
-    this.anim = reduceMotion ? null : { full, t0: performance.now() };
+
+  /** The firmware sent a frame. `t` is the simulation clock (ms). */
+  show(fb, full, t) {
+    const prev = this.fb;
+    const prevImg = this.img;
+    if (full) {
+      this.ghost.fill(0);
+      this.partials = 0;
+    } else {
+      // Pixels that change keep a little of their old state.
+      for (let i = 0; i < N_PX; i++) {
+        const a = px(prev, i), b = px(fb, i);
+        if (a !== b) {
+          const g = this.ghost[i] + (a ? GHOST_STEP : -GHOST_STEP);
+          this.ghost[i] = Math.max(-GHOST_MAX, Math.min(GHOST_MAX, g));
+        }
+      }
+      this.partials++;
+    }
+    this.fb = fb;
+    this.img = toCanvas(fb, { ghost: this.ghost });
+    const dur = (full ? POWER.epd.full_refresh_s : POWER.epd.partial_refresh_s) * 1000;
+    if (reduceMotion || !prev) { this.anim = null; }
+    else if (full) {
+      this.anim = { full, t0: t, dur, frames: { oldInv: toCanvas(prev, { invert: true }), newInv: toCanvas(fb, { invert: true }) } };
+    } else {
+      // Mid-update: changed pixels are driven grey, then flick to the new state.
+      const mid = toCanvas(fb, { pick: (i) => (px(prev, i) !== px(fb, i) ? 0.55 : undefined) });
+      this.anim = { full, t0: t, dur, frames: { prevImg, mid } };
+    }
     this.dirty = true;
   }
-  inverted(frame) {
-    if (!frame.inv) frame.inv = fbToCanvas(frame.fb, true);
-    return frame.inv;
-  }
+
+  get busy() { return !!this.anim; }
+
   fit() {
     const r = this.c.getBoundingClientRect();
     const dpr = Math.min(window.devicePixelRatio || 1, 3);
@@ -109,7 +169,8 @@ class Screen {
       this.dirty = true;
     }
   }
-  draw(now) {
+
+  draw(t) {
     this.fit();
     if (!this.dirty && !this.anim) return;
     const { ctx, c } = this;
@@ -119,26 +180,26 @@ class Screen {
     ctx.globalAlpha = 1;
     const fill = (rgb) => { ctx.fillStyle = `rgb(${rgb.join(',')})`; ctx.fillRect(0, 0, W, H); };
     const img = (canvas, a = 1) => { ctx.globalAlpha = a; ctx.drawImage(canvas, 0, 0, W, H); ctx.globalAlpha = 1; };
-    let done = true;
-    if (this.anim && this.prev) {
-      const e = now - this.anim.t0;
-      if (this.anim.full) {
-        // Global refresh: the panel inverts the old image, goes black,
-        // white, shows the new image inverted, then settles.
-        if (e < 110) img(this.inverted(this.prev));
-        else if (e < 220) fill(INK);
-        else if (e < 320) fill(PAPER);
-        else if (e < 430) img(this.inverted(this.cur));
-        else img(this.cur.img);
-        done = e >= 430;
+    const a = this.anim;
+    if (a) {
+      const f = Math.max(0, (t - a.t0) / a.dur);
+      if (f >= 1) { this.anim = null; img(this.img); }
+      else if (a.full) {
+        const phase = FULL_PHASES.find(([end]) => f < end)[1];
+        if (phase === 'oldInv') img(a.frames.oldInv);
+        else if (phase === 'black') fill(INK);
+        else if (phase === 'white') fill(PAPER);
+        else if (phase === 'newInv') img(a.frames.newInv);
+        else { fill(PAPER); img(this.img, (f - 0.78) / 0.22); }
+      } else if (f < 0.45) {
+        img(a.frames.prevImg);
+        img(a.frames.mid, f / 0.45);
       } else {
-        // Fast (partial) refresh: a quick fade with a faint ghost.
-        if (e < 160) { img(this.prev.img); img(this.cur.img, e / 160); }
-        else { img(this.cur.img); img(this.prev.img, Math.max(0, 0.07 * (1 - (e - 160) / 400))); }
-        done = e >= 560;
+        img(a.frames.mid);
+        img(this.img, (f - 0.45) / 0.55);
       }
     } else {
-      img(this.cur.img);
+      img(this.img);
     }
     // Paper grain.
     ctx.globalCompositeOperation = 'multiply';
@@ -146,7 +207,6 @@ class Screen {
     ctx.drawImage(GRAIN, 0, 0, W, H);
     ctx.globalAlpha = 1;
     ctx.globalCompositeOperation = 'source-over';
-    if (done) this.anim = null;
     this.dirty = false;
   }
 }
@@ -264,14 +324,17 @@ function drawBeam(now) {
     }
     const head = age / TRAVEL;
     const stop = p.lost ? 0.5 : 1.0;
+    const rgb = p.corrupted ? '217, 119, 6' : IR_RGB;
     const h = Math.min(head, stop);
     const fade = head > stop ? Math.max(0, 1 - (head - stop) * (p.lost ? 2.5 : 4)) : 1;
     if (fade <= 0) continue;
-    ctx.shadowColor = `rgba(${IR_RGB}, ${0.9 * fade})`;
+    ctx.shadowColor = `rgba(${rgb}, ${0.9 * fade})`;
     ctx.shadowBlur = 12;
     ctx.lineWidth = 3;
-    ctx.strokeStyle = `rgba(${IR_RGB}, ${0.85 * fade})`;
+    ctx.setLineDash(p.corrupted ? [4, 3] : []);
+    ctx.strokeStyle = `rgba(${rgb}, ${0.85 * fade})`;
     strokeRange(ctx, path, h - 0.22, h);
+    ctx.setLineDash([]);
     ctx.shadowBlur = 0;
     const q = pointAt(path, h);
     ctx.fillStyle = `rgba(255, 220, 220, ${fade})`;
@@ -289,15 +352,15 @@ function drawBeam(now) {
   }
 }
 
-function onIr(from, to, bytes, delivered, lost) {
+function onIr(from, to, bytes, delivered, lost, reason) {
   const now = performance.now();
-  state.ir.frames++;
-  if (delivered) state.ir.delivered++;
-  if (lost && world.linked) state.ir.lost++;
   state.ir.lastAt = now;
   // Throttle the animation at high time-warp.
   const last = beam.pulses.findLast?.((p) => p.from === from);
-  if (!last || now - last.t0 > 120) beam.pulses.push({ from, to, t0: now, linked: world.linked, lost: lost && world.linked });
+  const corrupted = reason === 'corrupted';
+  if (!last || now - last.t0 > 120) {
+    beam.pulses.push({ from, to, t0: now, linked: world.linked, lost: world.linked && lost && !corrupted, corrupted });
+  }
   const tx = $('.irwin.tx', units[from]);
   tx.classList.add('lit');
   clearTimeout(tx._t);
@@ -317,9 +380,10 @@ function bootDevice(i) {
   const d = devices[i];
   const s = randomSeed();
   d.reset(s[0], s[1]);
-  d.setBatteryMv(Number($('#mv').value));
+  d.setBatteryMv(cellMv(soc(i)));
+  d._mv = 0;
   d.init(state.simUtc + state.skew[i] * 1000);
-  screens[i].prev = null;
+  screens[i].fb = null;
   screens[i].anim = null;
 }
 
@@ -440,60 +504,106 @@ function setEnergyCell(key, text) {
   if (el && el.textContent !== text) el.textContent = text;
 }
 
+const USABLE_UAH = POWER.battery.usable_mAh * 1000;
+
+/** µAh device i's cell has delivered: what the simulation counted, at the
+ * chosen case's currents, plus fast-forwarded time. */
+function usedUAh(i) {
+  return chargeMAs(devices[i].energy(), state.kase) / 3.6 + state.skippedUAh[i];
+}
+function soc(i) {
+  return devices.length ? Math.max(0, 1 - usedUAh(i) / USABLE_UAH) : 1;
+}
+
 function refreshEnergy() {
-  const m = state.model;
   devices.forEach((d, i) => {
     const e = d.energy();
-    const mAs = chargeMAs(m, e);
+    const mAs = chargeMAs(e, state.kase);
     const total = (e.awakeMs + e.asleepMs) / 1000;
     const avg = total > 0 ? mAs / total : 0;
-    setEnergyCell(`${i}:used`, fmtCharge(mAs / 3.6));
+    const left = soc(i);
+    const leftMAh = left * POWER.battery.usable_mAh;
+    setEnergyCell(`${i}:used`, fmtCharge(usedUAh(i)));
+    const mv = cellMv(left);
+    setEnergyCell(`${i}:mv`, `${(mv / 1000).toFixed(2)} V`);
+    // The firmware reads the cell through VREFINT: feed it the new voltage.
+    if (Math.abs(mv - (d._mv || 0)) >= 10) { d._mv = mv; d.setBatteryMv(mv); }
     setEnergyCell(`${i}:split`, `${fmtDur(e.awakeMs)} / ${fmtDur(e.asleepMs)}`);
     setEnergyCell(`${i}:ref`, `${e.full} / ${e.fast}`);
     setEnergyCell(`${i}:ir`, fmtDur(e.irMs));
     setEnergyCell(`${i}:avg`, total > 1 ? fmtCurrent(avg) : '–');
-    setEnergyCell(`${i}:life`, total > 1 ? fmtLife(lifeDays(m, avg)) : '–');
+    setEnergyCell(`${i}:life`, total > 1 ? fmtLife(lifeDays(avg) * left) : '–');
+    setEnergyCell(`${i}:left`, fmtLife((leftMAh / drainMAhPerYear(state.profile, state.kase)) * 365));
+    const pct = Math.round(left * 1000) / 10;
+    const meter = document.querySelector(`[data-b="${i}:meter"]`);
+    meter.setAttribute('aria-valuenow', String(Math.round(pct)));
+    meter.setAttribute('aria-valuetext', `${pct.toFixed(1)} percent, ${(mv / 1000).toFixed(2)} volts`);
+    meter.classList.toggle('low', left < 0.2 && left > 0.05);
+    meter.classList.toggle('empty', left <= 0.05);
+    document.querySelector(`[data-b="${i}:bar"]`).style.width = `${pct}%`;
+    const t = `${pct.toFixed(pct < 10 ? 1 : 0)} %`;
+    const el = document.querySelector(`[data-b="${i}:soc"]`);
+    if (el.textContent !== t) el.textContent = t;
   });
 }
 
 function showModel() {
-  const m = state.model;
-  $('#profile-name').textContent = `Projection, ${m.profile.name}`;
-  const days = profileLifeDays(m);
-  $('#profile-life').textContent = `${fmtLife(days)}`;
-  $('#profile-life').title = `${days.toFixed(0)} days at ${fmtCurrent(profileAvgMA(m))} average`;
-  $('#model-src').textContent = `Source: ${state.modelSrc}. A “use” is ${m.profile.awake_s_per_use} s awake ` +
-    `with ${m.profile.full_refreshes_per_use} full and ${m.profile.fast_refreshes_per_use} fast refreshes` +
-    (m.profile.pairings_per_year ? `, plus ${m.profile.pairings_per_year} pairings a year` : '') +
-    (m.self_discharge_pct_per_year ? `, and ${m.self_discharge_pct_per_year}%/year self-discharge` : '') + '.';
+  const p = POWER.profiles[state.profile];
+  const c = POWER.cases[state.kase];
+  const years = profileLifeYears(state.profile, state.kase);
+  $('#profile-name').textContent = `A new cell, ${p.uses_per_day} uses a day, ${p.pairings_per_year} pairings a year`;
+  $('#profile-life').textContent = fmtLife(years * 365);
+  $('#profile-life').title = `${(years * 365).toFixed(0)} days (${state.kase === 'typ' ? 'typical' : 'worst-case'} currents)`;
+  const u = POWER.measured.use;
+  $('#model-src').textContent = 'Generated from hardware/power: datasheet currents, and timings measured by running ' +
+    `the real firmware in an emulator. One measured use: ${u.awake_s.toFixed(0)} s awake, ` +
+    `${u.full_refreshes} full and ${u.partial_refreshes} partial refreshes, ${c.use_mAs.toFixed(1)} mA·s.`;
   const list = $('#model-list');
   list.replaceChildren(...[
-    `sleep ${+m.sleep_uA.toFixed(3)} µA`,
-    `awake (MCU) ${m.awake_mA} mA`,
-    `full refresh ${m.full_refresh.mA} mA × ${m.full_refresh.s} s`,
-    `fast refresh ${m.fast_refresh.mA} mA × ${m.fast_refresh.s} s`,
-    `IR on ${m.ir_mA} mA`,
-    `cell ${m.battery} ${m.battery_mAh} mAh usable`,
+    `asleep ${c.sleep_uA} µA`,
+    `awake (MCU, RTC) ${c.awake_mA} mA average`,
+    `full refresh ${POWER.epd.full_refresh_s} s, ${c.full_refresh_mAs} mA·s`,
+    `partial refresh ${POWER.epd.partial_refresh_s} s, ${c.partial_refresh_mAs} mA·s`,
+    `IR on ${c.ir_mA} mA average (LED at its measured duty)`,
+    `pairing ${c.pairing_mAs.toFixed(0)} mA·s`,
+    `cell ${POWER.battery.part}, ${POWER.battery.usable_mAh} mAh usable, ${POWER.battery.self_discharge_pct_per_year} %/year self-discharge`,
   ].map((t) => Object.assign(document.createElement('li'), { textContent: t })));
 }
 
-async function loadModel() {
-  let model = POWER_DEFAULTS;
-  try {
-    const r = await fetch('power-defaults.json', { cache: 'no-cache' });
-    if (r.ok) { model = mergePowerModel(model, await r.json()); state.modelSrc = 'power-defaults.json'; }
-  } catch { /* built-in defaults */ }
-  try {
-    const r = await fetch('power-model.json', { cache: 'no-cache' });
-    if (r.ok) {
-      const hw = await r.json();
-      const conv = fromHardwareModel(hw, model);
-      if (conv) { model = conv; state.modelSrc = 'hardware/power/model.json (typical values)'; }
-      else { model = mergePowerModel(model, hw); state.modelSrc = 'power-model.json'; }
-    }
-  } catch { /* none */ }
-  state.model = model;
-  showModel();
+/** Skips `days` of the chosen usage on both devices. */
+function fastForward(days) {
+  const ms = days * 864e5;
+  const uAh = (drainMAhPerYear(state.profile, state.kase) * 1000 * days) / 365;
+  for (let i = 0; i < 2; i++) {
+    state.skippedUAh[i] = Math.min(USABLE_UAH, state.skippedUAh[i] + uAh);
+    devices[i].skip(ms);
+    devices[i].due = 0;
+  }
+  state.simUtc += ms;
+  state.skippedDays += days;
+  world.advance(0);
+  const p = POWER.profiles[state.profile];
+  $('#ff-note').textContent = `Skipped ${state.skippedDays} days in all at ${p.uses_per_day} uses a day ` +
+    `(${fmtCharge(uAh)} this step).` + (soc(0) <= 0 ? ' The cells are flat.' : '');
+  refreshEnergy();
+  refreshStatus();
+}
+
+function showLink() {
+  const box = $('#linkq');
+  const q = irLinkQuality(world.link);
+  const okReveal = q.frameOk(62); // the longest frame, REVEAL
+  let text, cls;
+  if (!world.linked) { text = 'Link: out of line of sight'; cls = 'dead'; }
+  else {
+    const ber = q.ber < 1e-9 ? 'under 10⁻⁹' : q.ber.toExponential(1);
+    text = `Link: bit error rate ${ber}, ${Math.round(okReveal * 100)} % of frames intact`;
+    cls = okReveal > 0.9 ? '' : okReveal > 0.2 ? 'weak' : 'dead';
+  }
+  box.classList.toggle('weak', cls === 'weak');
+  box.classList.toggle('dead', cls === 'dead');
+  $('#linkq-bar').style.width = `${world.linked ? Math.round(okReveal * 100) : 0}%`;
+  $('#linkq-text').textContent = text;
 }
 
 const pad2 = (n) => String(n).padStart(2, '0');
@@ -510,6 +620,7 @@ function refreshStatus() {
     if (chip.textContent !== text) chip.textContent = text;
     chip.classList.toggle('asleep', d.sleeping);
     $('[data-role="ir"]', units[i]).hidden = !d.irOn();
+    $('[data-role="busy"]', units[i]).hidden = d.busyMs() <= 0;
   });
   const clock = $('#clock');
   const drift = Math.round((state.simUtc - Date.now()) / 1000);
@@ -520,8 +631,11 @@ function refreshStatus() {
   if (clock.innerHTML !== html) clock.innerHTML = html;
   const ago = performance.now() - state.ir.lastAt;
   const irs = $('#irstats');
-  const t = state.ir.frames === 0 ? 'IR idle'
-    : `IR ${ago < 600 ? '●' : '○'} ${state.ir.delivered} frames passed${state.ir.lost ? `, ${state.ir.lost} lost` : ''}`;
+  const st = world.stats;
+  const bad = [st.corrupted && `${st.corrupted} corrupted`, st.dropouts && `${st.dropouts} dropped`,
+    st.collisions && `${st.collisions} collided`].filter(Boolean).join(', ');
+  const t = st.frames === 0 ? 'IR idle'
+    : `IR ${ago < 600 ? '●' : '○'} ${st.delivered} frames passed${bad ? `, ${bad}` : ''}`;
   if (irs.textContent !== t) irs.textContent = t;
 }
 
@@ -567,11 +681,11 @@ async function refreshTotp() {
 
 function setWarp(w) {
   state.warp = w;
-  for (const b of document.querySelectorAll('.seg button')) b.setAttribute('aria-checked', String(Number(b.dataset.warp) === w));
+  for (const b of document.querySelectorAll('[data-warp]')) b.setAttribute('aria-checked', String(Number(b.dataset.warp) === w));
 }
 
 function wirePanels() {
-  for (const b of document.querySelectorAll('.seg button')) b.addEventListener('click', () => setWarp(Number(b.dataset.warp)));
+  for (const b of document.querySelectorAll('[data-warp]')) b.addEventListener('click', () => setWarp(Number(b.dataset.warp)));
   $('#now-btn').addEventListener('click', () => {
     state.simUtc = Date.now();
     devices.forEach((d, i) => { d.setUnixMs(state.simUtc + state.skew[i] * 1000); d.due = 0; });
@@ -580,12 +694,40 @@ function wirePanels() {
   $('#together').addEventListener('change', (e) => {
     world.linked = e.target.checked;
     stage.classList.toggle('together', world.linked);
+    showLink();
   });
-  $('#noisy').addEventListener('change', (e) => { world.noisy = e.target.checked; });
-  $('#mv').addEventListener('input', (e) => {
-    const mv = Number(e.target.value);
-    $('#mv-out').textContent = `${(mv / 1000).toFixed(2)} V`;
-    devices.forEach((d) => d.setBatteryMv(mv));
+  const geo = () => {
+    world.link.distanceCm = Number($('#dist').value);
+    world.link.angleDeg = Number($('#angle').value);
+    $('#dist-out').textContent = `${world.link.distanceCm.toFixed(1)} cm`;
+    $('#angle-out').textContent = `${world.link.angleDeg}°`;
+    showLink();
+  };
+  $('#dist').addEventListener('input', geo);
+  $('#angle').addEventListener('input', geo);
+  geo();
+  const sel = $('#profile');
+  for (const [name, p] of Object.entries(POWER.profiles)) {
+    sel.append(Object.assign(document.createElement('option'), {
+      value: name, textContent: `${name[0].toUpperCase()}${name.slice(1)} (${p.uses_per_day}/day)`, selected: name === state.profile,
+    }));
+  }
+  sel.addEventListener('change', () => { state.profile = sel.value; showModel(); refreshEnergy(); });
+  for (const b of document.querySelectorAll('[data-case]')) {
+    b.addEventListener('click', () => {
+      state.kase = b.dataset.case;
+      for (const o of document.querySelectorAll('[data-case]')) o.setAttribute('aria-checked', String(o === b));
+      showModel();
+      refreshEnergy();
+    });
+  }
+  for (const b of document.querySelectorAll('[data-ff]')) b.addEventListener('click', () => fastForward(Number(b.dataset.ff)));
+  $('#new-cells').addEventListener('click', () => {
+    state.skippedUAh = [0, 0];
+    state.skippedDays = 0;
+    devices.forEach((d) => d.resetEnergy());
+    $('#ff-note').textContent = 'New cells fitted.';
+    refreshEnergy();
   });
   $('#totp-secret').addEventListener('input', refreshTotp);
   const demo = $('#demo-btn');
@@ -605,7 +747,10 @@ function wirePanels() {
   });
   $('#reset-btn').addEventListener('click', () => {
     for (let i = 0; i < 2; i++) { state.held[i] = null; bootDevice(i); }
-    state.ir = { frames: 0, delivered: 0, lost: 0, lastAt: -1e9 };
+    state.ir = { lastAt: -1e9 };
+    for (const k of Object.keys(world.stats)) world.stats[k] = 0;
+    state.skippedUAh = [0, 0];
+    state.skippedDays = 0;
     demo.disabled = false;
     demo.textContent = 'Load demo data';
     world.advance(0);
@@ -632,7 +777,7 @@ function frame(now) {
     world.advance(step);
     state.simUtc += step;
   }
-  for (const s of screens) s.draw(now);
+  for (const s of screens) s.draw(state.simUtc);
   drawBeam(now);
   if (now - lastUi > 200) {
     lastUi = now;
@@ -658,14 +803,14 @@ async function main() {
   }
   screens = units.map((u) => new Screen($('canvas.epd', u)));
   world = new World(devices);
-  world.onRefresh = (d, full) => screens[devices.indexOf(d)].show(d.framebuffer(), full);
+  world.onRefresh = (d, full) => screens[devices.indexOf(d)].show(d.framebuffer(), full, state.simUtc);
   world.onIr = onIr;
   units.forEach((_, i) => wireButtons(i));
   wirePanels();
   for (let i = 0; i < 2; i++) bootDevice(i);
   setActive(0);
   world.advance(0);
-  await loadModel();
+  showModel();
   refreshStatus();
   window.addEventListener('resize', () => screens.forEach((s) => { s.dirty = true; }));
   // For automated checks and the curious: the live simulation.

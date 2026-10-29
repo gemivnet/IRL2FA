@@ -65,8 +65,10 @@ jobs:
         with:
           name: irl2fa-stm32u083
           path: firmware/build/stm32u0
-      - name: Emulation tests (the release image, two devices pairing over IR)
+      - name: Emulation tests (the release image, two devices pairing over IR, measured power profile)
         run: SKIP_BUILD=1 firmware/renode/run.sh
+      - name: Battery budget from the measured profile (drift vs hardware/power/measured.json, >= 1 year)
+        run: python3 hardware/power/power.py --measured firmware/build/renode --check
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
         with:

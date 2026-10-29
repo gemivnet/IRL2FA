@@ -1,5 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
-  <!-- IRL2FA: an 80 x 34 mm device with e-paper and joystick. SPDX-License-Identifier: AGPL-3.0-or-later -->
+  <!-- IRL2FA: a 77 x 31 mm device with e-paper and joystick. SPDX-License-Identifier: AGPL-3.0-or-later -->
   <rect x="2" y="18" width="60" height="26" rx="4" fill="#2b2e33"/>
   <rect x="7" y="22" width="36" height="18" rx="1.5" fill="#e8e4d8"/>
   <rect x="11" y="27" width="16" height="3" fill="#2a2a27"/>

@@ -23,6 +23,7 @@ Load Models
     Execute Command    include @${CURDIR}/models/STM32U0_System.cs
     Execute Command    include @${CURDIR}/models/SSD1680.cs
     Execute Command    include @${CURDIR}/models/RV3032.cs
+    Execute Command    include @${CURDIR}/models/PowerMonitor.cs
     Execute Command    emulation SetGlobalQuantum "0.0001"
 
 Create Device

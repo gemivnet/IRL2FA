@@ -29,7 +29,8 @@ EXPORTS='["_sim_reset","_sim_init","_sim_poll","_sim_wake","_sim_sleeping",
 "_sim_add_totp","_sim_refresh_ui","_sim_count","_sim_totp_code",
 "_sim_record_name","_sim_contact_words","_sim_word","_sim_probe_text",
 "_sim_energy_reset","_sim_energy_awake_ms","_sim_energy_asleep_ms",
-"_sim_energy_ir_ms","_sim_energy_full","_sim_energy_fast","_sim_energy_wakes"]'
+"_sim_energy_ir_ms","_sim_energy_full","_sim_energy_fast","_sim_energy_wakes",
+"_sim_energy_busy_ms","_sim_set_epd_timing","_sim_busy_ms","_sim_skip_ms"]'
 EXPORTS="$(echo "$EXPORTS" | tr -d '\n ')"
 
 EMFLAGS=(
@@ -59,10 +60,9 @@ echo "== $(emcc --version | head -n1)"
 # The static page (and sim/web/CNAME, if one has been chosen, for the
 # GitHub Pages custom domain).
 cp -r "$SIM"/web/. "$DIST"/
-# The lead's power model, if it exists, overrides the defaults.
-if [ -f "$ROOT/hardware/power/model.json" ]; then
-  cp "$ROOT/hardware/power/model.json" "$DIST/power-model.json"
-fi
+# web/power-model.js (the battery panel's model) is generated from
+# hardware/power by `python3 hardware/power/power.py --update`; the tests fail
+# if it is stale.
 touch "$DIST/.nojekyll"
 
 echo "== built:"

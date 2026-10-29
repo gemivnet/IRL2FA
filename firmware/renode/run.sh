@@ -21,4 +21,4 @@ fi
 mkdir -p "$OUT"
 
 docker run --rm -u "$(id -u):$(id -g)" -e HOME=/tmp -v "$REPO:$REPO" -w "$REPO" "$IMAGE" \
-    renode-test --results-dir "$OUT" --show-log "$@" "$HERE/irl2fa.robot"
+    renode-test --results-dir "$OUT" --show-log "$@" "$HERE/irl2fa.robot" "$HERE/power.robot"

@@ -59,6 +59,12 @@ namespace Antmicro.Renode.Peripherals.Miscellaneous
         public bool DeepSleep => deepSleep;
         public bool IsBusy => busy;
         public string LastUpdate { get; private set; } = "none";
+        // Bytes clocked in over SPI while CS# was low (commands, parameters,
+        // RAM data), whatever the panel did with them: the bus traffic.
+        public long SpiBytes { get; private set; }
+        // For the power instrumentation (IRL2FA_PowerMonitor): "on", "off",
+        // "busy:<kind>" with kind reset|swreset|nodisplay|full|partial, "idle".
+        public event Action<string> Activity;
 
         public void Reset()
         {
@@ -77,8 +83,13 @@ namespace Antmicro.Renode.Peripherals.Miscellaneous
             if(number == 3)
             {
                 bool on = !value;
-                if(on && !powered) { powered = true; PowerCycles++; PowerOnReset(); }
-                else if(!on && powered) { powered = false; busyTimer.Enabled = false; busy = false; BUSY.Unset(); }
+                if(on && !powered) { powered = true; PowerCycles++; PowerOnReset(); Activity?.Invoke("on"); }
+                else if(!on && powered)
+                {
+                    if(busy) Activity?.Invoke("idle");
+                    powered = false; busyTimer.Enabled = false; busy = false; BUSY.Unset();
+                    Activity?.Invoke("off");
+                }
             }
             if(!powered && number < 3 && value)
             {
@@ -88,13 +99,14 @@ namespace Antmicro.Renode.Peripherals.Miscellaneous
             if(number == 2 && powered)
             {
                 if(!value) { inReset = true; }
-                else if(!old) { inReset = false; RegisterReset(); StartBusy(1); }
+                else if(!old) { inReset = false; RegisterReset(); StartBusy(1, "reset"); }
             }
             if(number == 1 && value) { haveCommand = false; } // CS# rising ends the transfer
         }
 
         public byte Transmit(byte data)
         {
+            if(!pins[1]) SpiBytes++;
             if(!powered || inReset || pins[1]) { BytesIgnored++; return 0; }
             if(deepSleep) { BytesIgnored++; return 0; }
             if(!pins[0]) Command(data);
@@ -194,7 +206,7 @@ namespace Antmicro.Renode.Peripherals.Miscellaneous
             param = 0;
             switch(c)
             {
-            case 0x12: RegisterReset(); StartBusy(2); break;
+            case 0x12: RegisterReset(); StartBusy(2, "swreset"); break;
             case 0x20: Activate(); break;
             }
         }
@@ -258,14 +270,16 @@ namespace Antmicro.Renode.Peripherals.Miscellaneous
         private void Activate()
         {
             // 0x22 option bit 2 = display; bit 3 selects display mode 2.
-            if((updateOption & 0x04) == 0) { StartBusy(5); pendingDisplay = 0; return; }
+            if((updateOption & 0x04) == 0) { StartBusy(5, "nodisplay"); pendingDisplay = 0; return; }
             bool mode2 = (updateOption & 0x08) != 0;
             pendingDisplay = mode2 ? 2 : 1;
-            StartBusy(mode2 ? PartialRefreshMs : FullRefreshMs);
+            StartBusy(mode2 ? PartialRefreshMs : FullRefreshMs, mode2 ? "partial" : "full");
         }
 
-        private void StartBusy(int ms)
+        private void StartBusy(int ms, string kind)
         {
+            if(busy) Activity?.Invoke("idle");
+            Activity?.Invoke("busy:" + kind);
             busy = true;
             BUSY.Set();
             busyTimer.Enabled = false;
@@ -278,6 +292,7 @@ namespace Antmicro.Renode.Peripherals.Miscellaneous
         {
             busy = false;
             BUSY.Unset();
+            Activity?.Invoke("idle");
             if(pendingDisplay == 0) return;
             var next = new bool[Width * Height];
             bool mismatch = false;

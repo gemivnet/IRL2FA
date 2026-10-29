@@ -15,8 +15,8 @@ if (!existsSync(fileURLToPath(new URL('irl2fa.mjs', dist)))) {
 }
 const { default: createIRL2FA } = await import(new URL('irl2fa.mjs', dist));
 const {
-  BTN, Device, World, FONT, DISPLAY_STRIDE, DISPLAY_H,
-  POWER_DEFAULTS, chargeMAs, profileLifeDays, fromHardwareModel, base32Decode, totpWith,
+  BTN, Device, World, FONT, DISPLAY_STRIDE, DISPLAY_H, POWER, irLinkQuality,
+  chargeMAs, profileLifeYears, cellMv, base32Decode, totpWith,
 } = await import(new URL('irl2fa-device.js', dist));
 
 const CS_LABEL = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789 -_.@+&\'#';
@@ -32,12 +32,22 @@ async function newDevice(name) {
   return d;
 }
 
-async function newWorld() {
+async function newWorld(opts = {}) {
   const a = await newDevice('A');
   const b = await newDevice('B');
-  const w = new World([a, b]);
+  const w = new World([a, b], { random: lcg(7), ...opts });
   w.advance(50);
+  settle(w, a);
+  settle(w, b);
   return { a, b, w };
+}
+
+/** Lets the panel finish the refresh in progress (it takes its real time:
+ * 3 s full, 0.42 s partial) and the firmware see the release. Pressing
+ * again before that would merge the presses, as on the board. */
+function settle(w, d) {
+  w.until(() => d.busyMs() === 0, 10000, 10);
+  w.advance(40);
 }
 
 function press(w, d, btn) {
@@ -45,6 +55,20 @@ function press(w, d, btn) {
   w.advance(30);
   d.setButtons(0);
   w.advance(30);
+  settle(w, d);
+}
+
+/** A deterministic random source for the IR channel. */
+function lcg(seed = 1) {
+  let n = seed >>> 0;
+  return () => ((n = (n * 1103515245 + 12345) >>> 0) / 2 ** 32);
+}
+
+/** Records every refresh each device sends to its panel: 'F' or 'p'. */
+function recordRefreshes(w) {
+  const log = new Map(w.devices.map((d) => [d, []]));
+  w.onRefresh = (d, full) => log.get(d).push(full ? 'F' : 'p');
+  return log;
 }
 
 function presses(w, d, btn, n) {
@@ -83,7 +107,7 @@ function inkIn(f, y0, y1) {
 
 const nodeHmacSha1 = async (key, msg) => new Uint8Array(createHmac('sha1', key).update(msg).digest());
 
-async function pairBoth(w, a, b) {
+function startPairing(w, a, b) {
   for (const d of [a, b]) {
     assert.equal(d.screen(), 'menu');
     presses(w, d, BTN.DOWN, 2); // "Pair with someone"
@@ -91,13 +115,17 @@ async function pairBoth(w, a, b) {
     assert.equal(d.screen(), 'pair');
     assert.ok(d.irOn(), 'IR powered while pairing');
   }
+}
+
+async function pairBoth(w, a, b) {
+  startPairing(w, a, b);
   // Apart, nothing passes.
   w.advance(1500);
   assert.equal(a.screen(), 'pair');
   assert.equal(b.screen(), 'pair');
   // Held together: the commit/reveal exchange completes.
   w.linked = true;
-  assert.ok(w.until(() => a.screen() === 'sas' && b.screen() === 'sas', 10000),
+  assert.ok(w.until(() => a.screen() === 'sas' && b.screen() === 'sas', 60000),
     `both on the SAS screen (a=${a.screen()} b=${b.screen()})`);
   w.advance(100);
 }
@@ -156,10 +184,70 @@ test('two devices pair over IR, compare symbols, and show crosswise words', asyn
 test('pairing survives a noisy link (10% of frames dropped)', async () => {
   const { a, b, w } = await newWorld();
   w.noisy = true;
-  let n = 0;
-  w.random = () => ((n = (n * 1103515245 + 12345) >>> 0) / 2 ** 32);
   await pairBoth(w, a, b);
   assert.ok(regionEqual(a.framebuffer(), b.framebuffer(), TITLE_H + 1, 106));
+});
+
+test('IR link model: clean up close, errors rising with distance and angle', () => {
+  const at = (distanceCm, angleDeg = 0) => irLinkQuality({ distanceCm, angleDeg });
+  assert.ok(at(2).ber < 1e-12 && at(2).frameOk(62) > 0.999, 'held together: clean');
+  assert.ok(at(6).frameOk(62) > 0.99, '6 cm on axis: clean');
+  for (const d of [4, 6, 8, 9, 10, 12]) assert.ok(at(d + 1).ber >= at(d).ber, `BER rises past ${d} cm`);
+  assert.ok(at(9).frameOk(62) < 0.5, '9 cm: most long frames damaged');
+  assert.ok(at(12).frameOk(38) < 0.001, '12 cm: nothing gets through');
+  assert.ok(at(4, 40).ber > at(4, 0).ber, 'off axis is worse');
+  assert.ok(at(4, 60).frameOk(62) < at(4, 30).frameOk(62));
+  assert.ok(at(3, 90).frameOk(38) < 1e-9, 'side by side: no link');
+});
+
+test('pairing at short range succeeds through half-duplex collisions', async () => {
+  const { a, b, w } = await newWorld();
+  startPairing(w, a, b);
+  w.link = { distanceCm: 2, angleDeg: 10 };
+  w.linked = true;
+  const t0 = w.elapsedMs;
+  assert.ok(w.until(() => a.screen() === 'sas' && b.screen() === 'sas', 60000),
+    `both on the SAS screen (a=${a.screen()} b=${b.screen()})`);
+  const s = w.stats;
+  console.log(`  2 cm: paired in ${((w.elapsedMs - t0) / 1000).toFixed(1)} s; ${s.delivered} frames ok, ` +
+    `${s.collisions} collided, ${s.corrupted} corrupted, ${s.dropouts} dropped`);
+  assert.equal(s.corrupted + s.dropouts, 0, 'no bit errors at 2 cm');
+  settle(w, a);
+  settle(w, b);
+  assert.ok(regionEqual(a.framebuffer(), b.framebuffer(), TITLE_H + 1, 106), 'SAS screens match');
+});
+
+test('out of range, pairing keeps retrying and does not complete', async () => {
+  const { a, b, w } = await newWorld();
+  startPairing(w, a, b);
+  w.link = { distanceCm: 14, angleDeg: 0 };
+  w.linked = true;
+  w.advance(20000);
+  const s = w.stats;
+  console.log(`  14 cm: after 20 s ${s.frames} frames sent, ${s.delivered} intact, ` +
+    `${s.corrupted} corrupted, ${s.dropouts} dropped, ${s.collisions} collided`);
+  assert.equal(a.screen(), 'pair');
+  assert.equal(b.screen(), 'pair');
+  assert.ok(a.irOn() && b.irOn(), 'still listening');
+  assert.ok(s.frames > 100, 'both keep retransmitting');
+  const heard = s.frames - s.collisions - s.unheard;
+  assert.ok(s.delivered === 0 && s.corrupted + s.dropouts === heard, 'every frame that reached the other side was lost or damaged');
+  // Bring them together: the same session completes.
+  w.link = { distanceCm: 3, angleDeg: 0 };
+  assert.ok(w.until(() => a.screen() === 'sas' && b.screen() === 'sas', 60000), 'pairs once close');
+});
+
+test('at the edge of range (8 cm), pairing needs retries but completes', async () => {
+  const { a, b, w } = await newWorld();
+  startPairing(w, a, b);
+  w.link = { distanceCm: 8, angleDeg: 0 };
+  w.linked = true;
+  const ok = w.until(() => a.screen() === 'sas' && b.screen() === 'sas', 120000);
+  const s = w.stats;
+  console.log(`  8 cm: ${ok ? 'paired' : 'not paired'} after ${(w.elapsedMs / 1000).toFixed(0)} s; ` +
+    `${s.corrupted} corrupted, ${s.dropouts} dropped, ${s.collisions} collided of ${s.frames}`);
+  assert.ok(s.corrupted + s.dropouts + s.collisions > 0, 'some frames damaged, dropped or collided');
+  assert.ok(ok, 'but it gets there');
 });
 
 test('adding a TOTP code with the joystick shows the RFC 6238 code', async () => {
@@ -193,9 +281,12 @@ test('adding a TOTP code with the joystick shows the RFC 6238 code', async () =>
 test('sleeps when idle and wakes on a press', async () => {
   const { b, w } = await newWorld();
   const full0 = b.refreshes().full;
-  w.advance(61000);
-  assert.ok(b.sleeping, 'asleep after 60 s idle');
+  w.advance(24000);
+  assert.ok(!b.sleeping, 'awake before the 30 s idle timeout');
+  w.advance(8000);
+  assert.ok(b.sleeping, 'asleep after 30 s idle');
   assert.ok(b.refreshes().full > full0, 'sleep screen drawn with a full refresh');
+  w.advance(4000); // the sleep screen's full refresh keeps it awake 3 s
   const before = b.energy();
   w.advance(10000);
   const after = b.energy();
@@ -205,6 +296,7 @@ test('sleeps when idle and wakes on a press', async () => {
   w.advance(30);
   b.setButtons(0);
   w.advance(30);
+  settle(w, b);
   assert.ok(!b.sleeping);
   assert.equal(b.screen(), 'menu');
   // The waking press is not taken as a key: still on the first item.
@@ -241,6 +333,7 @@ test('a PIN set with the joystick is required after wake', async () => {
   w.advance(30);
   a.setButtons(0);
   w.advance(30);
+  settle(w, a);
   assert.equal(a.screen(), 'pin', 'PIN prompt after wake');
   for (const k of [BTN.UP, BTN.UP, BTN.UP, BTN.UP]) press(w, a, k);
   press(w, a, BTN.CENTER);
@@ -253,45 +346,158 @@ test('a PIN set with the joystick is required after wake', async () => {
   assert.ok(a.totpCode(0) >= 0);
 });
 
-test('energy accounting and battery projection', async () => {
+test('energy accounting', async () => {
   const { a, w } = await newWorld();
+  const start = w.elapsedMs;
   a.resetEnergy();
   presses(w, a, BTN.DOWN, 2);
   press(w, a, BTN.CENTER); // pairing: IR on
   w.advance(2000);
   press(w, a, BTN.LEFT);   // cancel: IR off
-  w.advance(70000);        // idle -> sleep
+  w.advance(40000);        // idle -> sleep
   const e = a.energy();
   assert.ok(a.sleeping);
-  assert.ok(e.irMs >= 2000 && e.irMs < 2500, `IR time ${e.irMs}`);
+  assert.ok(e.irMs >= 2000 && e.irMs < 3000, `IR time ${e.irMs}`);
   assert.ok(e.fast > 0 && e.full >= 1);
-  assert.equal(Math.round(e.awakeMs + e.asleepMs), w.elapsedMs - 50);
-  const mAs = chargeMAs(POWER_DEFAULTS, e);
-  assert.ok(mAs > 0);
-  const days = profileLifeDays(POWER_DEFAULTS);
-  assert.ok(days > 300 && days < 3000, `20 uses/day projection ${days.toFixed(0)} days`);
-  console.log(`  20 uses/day: ${days.toFixed(0)} days on ${POWER_DEFAULTS.battery_mAh} mAh`);
+  assert.ok(e.busyMs >= e.full * 3000 + e.fast * 420 - 1, `panel busy ${e.busyMs} ms`);
+  assert.equal(Math.round(e.awakeMs + e.asleepMs), w.elapsedMs - start);
+  assert.ok(chargeMAs(e, 'worst') > chargeMAs(e, 'typ'));
 });
 
-test('battery projection agrees with hardware/power/power.py', (t) => {
+test('a refresh blocks the core; presses during it are latched, as on the board', async () => {
+  const { a, w } = await newWorld();
+  press(w, a, BTN.CENTER);
+  assert.equal(a.screen(), 'codes');
+  // The codes list redraws every 5 s. A press during that refresh is not
+  // lost: the EXTI latch holds it and the core handles it afterwards.
+  assert.ok(w.until(() => a.busyMs() > 0, 6000, 10), 'periodic redraw');
+  const r0 = a.refreshes();
+  a.setButtons(BTN.LEFT);
+  w.advance(30);
+  a.setButtons(0);
+  w.advance(30);
+  assert.deepEqual(a.refreshes(), r0, 'nothing drawn while busy');
+  assert.equal(a.screen(), 'codes', 'not handled yet');
+  settle(w, a);
+  assert.equal(a.screen(), 'menu', 'handled once the panel is idle');
+
+  // But a second press during the refresh that the first one caused is
+  // merged with it: the core never saw the first released. The board does
+  // the same (hal_buttons() in firmware/port/stm32u0/hal_stm32u0.c).
+  a.setButtons(BTN.DOWN);
+  w.advance(30);
+  a.setButtons(0);
+  w.advance(10);
+  assert.ok(a.busyMs() > 300, `partial refresh in progress (${a.busyMs()} ms left)`);
+  a.setButtons(BTN.DOWN);
+  w.advance(30);
+  a.setButtons(0);
+  settle(w, a);
+  press(w, a, BTN.CENTER);
+  assert.equal(a.screen(), 'contacts', 'one row down, not two');
+});
+
+test('refreshes follow the firmware: full on wake and sleep and after every 5 partial ones', async () => {
+  const { a, b, w } = await newWorld();
+  await pairBoth(w, a, b);
+  press(w, a, BTN.CENTER);
+  typeText(w, a, CS_LABEL, 'B');
+  press(w, a, BTN.CENTER);
+  assert.equal(a.screen(), 'contact');
+  const log = recordRefreshes(w);
+  w.advance(45000); // the words redraw every 5 s; then the idle timeout
+  assert.ok(a.sleeping);
+  a.setButtons(BTN.CENTER);
+  w.advance(30);
+  a.setButtons(0);
+  presses(w, a, BTN.DOWN, 7);
+  const seq = log.get(a).join('');
+  console.log(`  refreshes: ${seq}`);
+  assert.ok(!/p{6}/.test(seq), 'never more than 5 partial refreshes in a row');
+  // ... F (sleep screen) F (wake) then 5 partial and a full, FULL_REFRESH_EVERY = 5.
+  assert.ok(seq.includes('FFpppppF'), 'sleep and wake are full; then a full after 5 partial');
+});
+
+test('a scripted use in the simulator matches the emulator measurement', async () => {
+  const { a, b, w } = await newWorld();
+  await pairBoth(w, a, b);
+  press(w, a, BTN.CENTER);
+  typeText(w, a, CS_LABEL, 'A');
+  press(w, a, BTN.CENTER);
+  for (const label of ['A', 'B', 'C']) assert.ok(a.addTotp(label, 'AAAAAAAAAAAAAAAA') >= 0);
+  settle(w, a);
+  press(w, a, BTN.LEFT);
+  press(w, a, BTN.LEFT);
+  w.until(() => a.sleeping, 60000);
+  w.advance(4000);
+  // The same script as firmware/renode/power.robot "a typical use".
+  const tap = (btn, expect) => {
+    press(w, a, btn);
+    w.advance(600);
+    if (expect) assert.equal(a.screen(), expect);
+  };
+  a.resetEnergy();
+  const log = recordRefreshes(w);
+  tap(BTN.CENTER, 'menu');
+  w.advance(1000);
+  tap(BTN.DOWN);
+  tap(BTN.CENTER, 'contacts');
+  tap(BTN.CENTER, 'contact');
+  w.advance(10000);
+  tap(BTN.LEFT, 'contacts');
+  tap(BTN.LEFT, 'menu');
+  tap(BTN.CENTER, 'codes');
+  w.advance(1000);
+  tap(BTN.DOWN);
+  tap(BTN.DOWN);
+  tap(BTN.CENTER, 'code');
+  w.advance(6000);
+  tap(BTN.UP);
+  w.advance(2000);
+  tap(BTN.UP);
+  w.advance(2000);
+  assert.ok(w.until(() => a.sleeping, 60000));
+  w.advance(4000);
+  const e = a.energy();
+  const m = POWER.measured.use;
+  const seq = log.get(a);
+  const full = seq.filter((x) => x === 'F').length, partial = seq.length - full;
+  const mAs = chargeMAs(e, 'typ');
+  console.log(`  sim: ${(e.awakeMs / 1000).toFixed(1)} s awake, ${full} full + ${partial} partial, ${mAs.toFixed(1)} mA·s; ` +
+    `emulator: ${m.awake_s.toFixed(1)} s, ${m.full_refreshes} + ${m.partial_refreshes}, ${POWER.cases.typ.use_mAs} mA·s`);
+  assert.ok(Math.abs(full - m.full_refreshes) <= 1, 'full refreshes');
+  assert.ok(Math.abs(partial - m.partial_refreshes) <= 1, 'partial refreshes');
+  assert.ok(Math.abs(e.awakeMs / 1000 - m.awake_s) <= 0.1 * m.awake_s, 'awake time');
+  assert.ok(Math.abs(mAs - POWER.cases.typ.use_mAs) <= 0.1 * POWER.cases.typ.use_mAs, 'charge per use');
+});
+
+test('battery projection agrees with hardware/power/power.py, and the sim model is current', (t) => {
   const root = new URL('../../', import.meta.url);
-  const modelPath = fileURLToPath(new URL('hardware/power/model.json', root));
-  if (!existsSync(modelPath)) return t.skip('no hardware/power/model.json');
-  const hw = JSON.parse(readFileSync(modelPath, 'utf8'));
-  let out;
+  const script = fileURLToPath(new URL('hardware/power/power.py', root));
+  let out, js;
   try {
-    out = execFileSync('python3', [fileURLToPath(new URL('hardware/power/power.py', root))], { encoding: 'utf8' });
+    out = execFileSync('python3', [script], { encoding: 'utf8' });
+    js = execFileSync('python3', [script, '--sim-js'], { encoding: 'utf8' });
   } catch {
     return t.skip('python3 not available');
   }
-  for (const name of Object.keys(hw.usage_profiles)) {
+  const committed = readFileSync(fileURLToPath(new URL('sim/web/power-model.js', root)), 'utf8');
+  assert.equal(committed, js, 'run: python3 hardware/power/power.py --update');
+  for (const name of Object.keys(POWER.profiles)) {
     const m = new RegExp(`^${name}\\s+typical\\s+([0-9.]+) y\\s+worst\\s+([0-9.]+) y`, 'm').exec(out);
     assert.ok(m, `power.py prints ${name}`);
-    const typ = fromHardwareModel(hw, POWER_DEFAULTS, name, 'typ');
-    const worst = fromHardwareModel(hw, POWER_DEFAULTS, name, 'worst');
-    assert.equal((profileLifeDays(typ) / 365).toFixed(1), m[1], `${name} typical`);
-    assert.equal((profileLifeDays(worst) / 365).toFixed(1), m[2], `${name} worst`);
+    assert.equal(profileLifeYears(name, 'typ').toFixed(1), m[1], `${name} typical`);
+    assert.equal(profileLifeYears(name, 'worst').toFixed(1), m[2], `${name} worst`);
   }
+  assert.ok(profileLifeYears('normal', 'worst') >= POWER.requirement_years);
+  console.log(`  20 uses/day: ${profileLifeYears('normal', 'typ').toFixed(1)} years typical, ` +
+    `${profileLifeYears('normal', 'worst').toFixed(1)} worst case`);
+});
+
+test('cell voltage falls with charge used', () => {
+  assert.equal(cellMv(1), 3050);
+  assert.equal(cellMv(0), 2000);
+  for (let s = 0; s < 1; s += 0.01) assert.ok(cellMv(s + 0.01) >= cellMv(s));
 });
 
 test('reference TOTP matches RFC 6238 test vector', async () => {

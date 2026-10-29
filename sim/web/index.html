@@ -42,7 +42,7 @@
         <div class="unit" data-dev="0">
           <div class="unit-head">
             <h2>Your device</h2>
-            <span class="chips"><span class="chip" data-role="screen">Starting…</span><span class="chip ir" data-role="ir" hidden>IR on</span></span>
+            <span class="chips"><span class="chip" data-role="screen">Starting…</span><span class="chip busy" data-role="busy" hidden>Refreshing</span><span class="chip ir" data-role="ir" hidden>IR on</span></span>
           </div>
           <div class="shell">
             <div class="device" tabindex="0" role="group" aria-roledescription="device"
@@ -77,7 +77,7 @@
         <div class="unit" data-dev="1">
           <div class="unit-head">
             <h2>Their device</h2>
-            <span class="chips"><span class="chip" data-role="screen">Starting…</span><span class="chip ir" data-role="ir" hidden>IR on</span></span>
+            <span class="chips"><span class="chip" data-role="screen">Starting…</span><span class="chip busy" data-role="busy" hidden>Refreshing</span><span class="chip ir" data-role="ir" hidden>IR on</span></span>
           </div>
           <div class="shell">
             <div class="device" tabindex="0" role="group" aria-roledescription="device"
@@ -114,13 +114,22 @@
         <label class="switch big">
           <input type="checkbox" id="together">
           <span class="track" aria-hidden="true"></span>
-          <span>Hold devices together <small>(top edge to top edge, so IR can pass)</small></span>
+          <span>Hold devices together <small>(facing, top edge to top edge)</small></span>
         </label>
-        <label class="switch">
-          <input type="checkbox" id="noisy">
-          <span class="track" aria-hidden="true"></span>
-          <span>Noisy link <small>(drop 10% of frames)</small></span>
-        </label>
+        <div class="geo">
+          <label class="slider">
+            <span>Distance <output id="dist-out">2.0 cm</output></span>
+            <input type="range" id="dist" min="0.5" max="20" step="0.5" value="2" aria-describedby="linkq-text">
+          </label>
+          <label class="slider">
+            <span>Angle <output id="angle-out">0°</output></span>
+            <input type="range" id="angle" min="0" max="70" step="1" value="0" aria-describedby="linkq-text">
+          </label>
+        </div>
+        <div class="linkq" id="linkq">
+          <span class="meter" aria-hidden="true"><span id="linkq-bar"></span></span>
+          <span id="linkq-text">Link: out of line of sight</span>
+        </div>
         <span class="irstats" id="irstats" aria-live="off">IR idle</span>
       </div>
       <p class="hint" id="kbd-hint">Click a device (or Tab to it) and use <kbd>←</kbd> <kbd>↑</kbd> <kbd>→</kbd> <kbd>↓</kbd> and <kbd>Enter</kbd>. Hold a direction to repeat.</p>
@@ -128,7 +137,7 @@
 
     <section class="try" aria-label="Things to try">
       <ol>
-        <li>On <b>both</b> devices choose <b>Pair with someone</b>, then switch on <b>Hold devices together</b>.</li>
+        <li>On <b>both</b> devices choose <b>Pair with someone</b>, then switch on <b>Hold devices together</b>. Slide them apart past about 9 cm and frames start to fail.</li>
         <li>Check the six symbols match on both screens and press the joystick on each.</li>
         <li>Name the contact. Now one device's <b>SAY</b> word is the other's <b>HEAR</b> word.</li>
       </ol>
@@ -142,12 +151,14 @@
           <button type="button" role="radio" aria-checked="true" data-warp="1">Real time</button>
           <button type="button" role="radio" aria-checked="false" data-warp="10">×10</button>
           <button type="button" role="radio" aria-checked="false" data-warp="60">×60</button>
+          <button type="button" role="radio" aria-checked="false" data-warp="3600" aria-label="One hour per second">1 h/s</button>
         </div>
         <button type="button" class="btn ghost" id="now-btn">Back to the real clock</button>
         <p class="small">Both devices share this UTC clock. Use the skew sliders under each device to
           drift one clock by up to a minute: words change every 15 s, and each device also accepts the
           previous word (“or …”), so small skews still verify. While you hold a button the simulation runs
-          in real time.</p>
+          in real time. E-paper refreshes take their real time too: a full refresh flashes for
+          3 s, a partial one 0.42 s, and presses during a refresh are queued as on the device.</p>
       </section>
 
       <section class="panel" aria-labelledby="totp-h">
@@ -172,25 +183,53 @@
 
       <section class="panel" aria-labelledby="bat-h">
         <h3 id="bat-h">Battery</h3>
+        <div class="cells">
+          <div class="cell">
+            <span class="cell-name">Yours</span>
+            <span class="soc" role="meter" aria-label="Your device's battery" aria-valuemin="0" aria-valuemax="100" aria-valuenow="100" data-b="0:meter"><span data-b="0:bar"></span></span>
+            <span class="cell-val" data-b="0:soc">100 %</span>
+          </div>
+          <div class="cell">
+            <span class="cell-name">Theirs</span>
+            <span class="soc" role="meter" aria-label="Their device's battery" aria-valuemin="0" aria-valuemax="100" aria-valuenow="100" data-b="1:meter"><span data-b="1:bar"></span></span>
+            <span class="cell-val" data-b="1:soc">100 %</span>
+          </div>
+        </div>
         <table class="energy" id="energy">
           <thead><tr><th scope="col"></th><th scope="col">Yours</th><th scope="col">Theirs</th></tr></thead>
           <tbody>
             <tr><th scope="row">Used</th><td data-e="0:used">–</td><td data-e="1:used">–</td></tr>
+            <tr><th scope="row">Cell voltage</th><td data-e="0:mv">–</td><td data-e="1:mv">–</td></tr>
             <tr><th scope="row">Awake / asleep</th><td data-e="0:split">–</td><td data-e="1:split">–</td></tr>
-            <tr><th scope="row">Refreshes full / fast</th><td data-e="0:ref">–</td><td data-e="1:ref">–</td></tr>
+            <tr><th scope="row">Refreshes full / partial</th><td data-e="0:ref">–</td><td data-e="1:ref">–</td></tr>
             <tr><th scope="row">IR on</th><td data-e="0:ir">–</td><td data-e="1:ir">–</td></tr>
-            <tr><th scope="row">Average</th><td data-e="0:avg">–</td><td data-e="1:avg">–</td></tr>
-            <tr><th scope="row">Life at this pace</th><td data-e="0:life">–</td><td data-e="1:life">–</td></tr>
+            <tr><th scope="row">Average current</th><td data-e="0:avg">–</td><td data-e="1:avg">–</td></tr>
+            <tr><th scope="row">Life left at this pace</th><td data-e="0:life">–</td><td data-e="1:life">–</td></tr>
+            <tr><th scope="row">Life left, usage below</th><td data-e="0:left">–</td><td data-e="1:left">–</td></tr>
           </tbody>
         </table>
+        <div class="usage">
+          <label class="field"><span>Usage</span>
+            <select id="profile"></select>
+          </label>
+          <div class="seg two" role="radiogroup" aria-label="Currents">
+            <button type="button" role="radio" aria-checked="true" data-case="typ">Typical</button>
+            <button type="button" role="radio" aria-checked="false" data-case="worst">Worst case</button>
+          </div>
+        </div>
         <div class="profile">
-          <span id="profile-name">20 uses/day</span>
+          <span id="profile-name">A new cell</span>
           <strong id="profile-life">–</strong>
         </div>
-        <label class="field inline">
-          <span>Cell voltage <output id="mv-out">3.00 V</output></span>
-          <input type="range" id="mv" min="2300" max="3100" step="10" value="3000" aria-label="Simulated cell voltage">
-        </label>
+        <div class="ff" role="group" aria-label="Fast-forward both devices">
+          <span>Fast-forward</span>
+          <button type="button" class="btn ghost" data-ff="1">+1 day</button>
+          <button type="button" class="btn ghost" data-ff="30">+30 days</button>
+          <button type="button" class="btn ghost" data-ff="365">+1 year</button>
+          <button type="button" class="btn ghost" id="new-cells">New cells</button>
+        </div>
+        <p class="small" id="ff-note" aria-live="polite">Fast-forward skips time at the chosen usage, as if the
+          devices were used and put back to sleep; the clocks jump ahead and the cell voltage the firmware reads drops.</p>
         <details class="small">
           <summary>Power model</summary>
           <p id="model-src"></p>

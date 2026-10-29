@@ -3,7 +3,9 @@
 // lock-step simulated time and carries IR bytes between them.
 // Shared by the page (app.js) and the Node tests (sim/test).
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import POWER from './power-model.js';
 
+export { POWER };
 export const BTN = Object.freeze({ UP: 1, DOWN: 2, LEFT: 4, RIGHT: 8, CENTER: 16 });
 export const DISPLAY_W = 250;
 export const DISPLAY_H = 122;
@@ -22,6 +24,8 @@ export class Device {
     this.ioCap = mod._sim_io_cap();
     this.str = mod._sim_str_buf();
     this.strCap = mod._sim_str_cap();
+    // The panel's BUSY times, from the same model as the battery budget.
+    mod._sim_set_epd_timing(Math.round(POWER.epd.full_refresh_s * 1000), Math.round(POWER.epd.partial_refresh_s * 1000));
   }
 
   static async create(factory, name, moduleOpts = {}) {
@@ -68,6 +72,10 @@ export class Device {
   }
 
   advance(ms) { this.m._sim_advance(ms); }
+  /** ms until the e-paper refresh in progress finishes (0 = idle). */
+  busyMs() { return this.m._sim_busy_ms(); }
+  /** Jumps the clock forward as if asleep the whole time (fast-forward). */
+  skip(ms) { this.m._sim_skip_ms(ms); }
   setUnixMs(ms) { this.m._sim_set_unix_ms(Math.floor(ms)); }
   unix() { return this.m._sim_get_unix(); }
   setBatteryMv(mv) { this.m._sim_set_battery_mv(mv); this.due = 0; }
@@ -106,6 +114,7 @@ export class Device {
       awakeMs: m._sim_energy_awake_ms(),
       asleepMs: m._sim_energy_asleep_ms(),
       irMs: m._sim_energy_ir_ms(),
+      busyMs: m._sim_energy_busy_ms(),
       full: m._sim_energy_full(),
       fast: m._sim_energy_fast(),
       wakes: m._sim_energy_wakes(),
@@ -154,17 +163,71 @@ export class Device {
   }
 }
 
+// ---- IR link model ----
+//
+// The pairing link is a VSMB2948SL LED (±25° half-intensity angle) shining
+// on a VEMT2523SLX01 phototransistor (±35°) across the gap between the two
+// devices' top edges, NRZ at 4800 baud. The model:
+//   received signal  ∝ cos^mTx(θ) · cos^mRx(θ) / d²   (Lambertian lobes with
+//                    the parts' half angles, inverse square in distance)
+//   signal/noise q   = Q0 · (D0 / d)² · gain(θ)
+//   bit error rate   = Q(q), the Gaussian tail (NRZ, decision at mid-level)
+//   frame dropout    = 1 / (1 + e^(4 (q − 1.8))): the receiver missing a
+//                      start edge and losing byte sync for the frame
+// Q0 and D0 are chosen so the link is clean to about 8 cm on axis, marginal
+// at 9-10 cm and dead beyond (docs/research/parts-research-2026-10-29.md
+// §2.3 expects 2-5 cm with margin). They are assumptions until a board is
+// measured. Frames take their real airtime (10 bits per byte), and the link
+// is half duplex: a frame that arrives while the receiving device is itself
+// transmitting is lost (its phototransistor sees its own LED).
+export const IR_LINK = Object.freeze({ Q0: 6, D0_CM: 6, TX_HALF_DEG: 25, RX_HALF_DEG: 35, MIN_CM: 0.5 });
+
+const lobe = (halfDeg) => Math.log(0.5) / Math.log(Math.cos((halfDeg * Math.PI) / 180));
+
+/** Complementary error function (Abramowitz & Stegun 7.1.26, |err| < 1.5e-7). */
+export function erfc(x) {
+  const z = Math.abs(x);
+  const t = 1 / (1 + 0.3275911 * z);
+  const y = t * (0.254829592 + t * (-0.284496736 + t * (1.421413741 + t * (-1.453152027 + t * 1.061405429))));
+  const r = y * Math.exp(-z * z);
+  return x >= 0 ? r : 2 - r;
+}
+
+/** Link quality for two devices `distanceCm` apart (top edge to top edge)
+ * and `angleDeg` off axis: {q, ber, dropout, frameOk(nBytes)}. */
+export function irLinkQuality({ distanceCm, angleDeg = 0 }) {
+  const th = (Math.min(Math.abs(angleDeg), 90) * Math.PI) / 180;
+  const c = Math.cos(th);
+  const gain = c <= 1e-6 ? 0 : c ** lobe(IR_LINK.TX_HALF_DEG) * c ** lobe(IR_LINK.RX_HALF_DEG);
+  const d = Math.max(IR_LINK.MIN_CM, distanceCm);
+  const q = IR_LINK.Q0 * (IR_LINK.D0_CM / d) ** 2 * gain;
+  const ber = Math.min(0.5, 0.5 * erfc(q / Math.SQRT2));
+  const dropout = 1 / (1 + Math.exp(4 * (q - 1.8)));
+  return {
+    q, ber, dropout,
+    /** Probability that a frame of n bytes arrives with no bit error. */
+    frameOk: (n) => (1 - dropout) * (1 - ber) ** (8 * n),
+  };
+}
+
 /** Two (or more) devices sharing simulated time and an IR link. */
 export class World {
-  constructor(devices, { random = Math.random } = {}) {
+  constructor(devices, { random = Math.random, airtime = true } = {}) {
     this.devices = devices;
-    this.linked = false;     // devices held top edge to top edge
-    this.noisy = false;      // drop `dropRate` of frames
+    this.linked = false;     // facing each other, top edge to top edge
+    this.link = { distanceCm: 2, angleDeg: 0 };
+    this.noisy = false;      // additionally drop `dropRate` of frames
     this.dropRate = 0.1;
+    this.airtime = airtime;  // frames take 10 bits/byte at the IR baud rate
+    this.baud = POWER.ir.baud;
     this.random = random;
     this.elapsedMs = 0;
     this.onRefresh = null;   // (device, isFull) => void
-    this.onIr = null;        // (fromIdx, toIdx, bytes, delivered) => void
+    this.onIr = null;        // (fromIdx, toIdx, bytes, delivered, lost, reason) => void
+    this.pending = [];       // frames in flight
+    this.txLog = devices.map(() => []);   // [start, end] of each device's frames
+    this.txUntil = devices.map(() => 0);
+    this.stats = { frames: 0, delivered: 0, corrupted: 0, dropouts: 0, collisions: 0, unheard: 0 };
   }
 
   _poll(d) {
@@ -177,20 +240,61 @@ export class World {
     d.ref = r;
   }
 
-  _transfer() {
+  quality() { return irLinkQuality(this.link); }
+
+  /** Takes what each device has sent and puts it on the air. */
+  _send() {
     const ds = this.devices;
+    const now = this.elapsedMs;
     for (let i = 0; i < ds.length; i++) {
       const bytes = ds[i].irTake();
       if (!bytes.length) continue;
-      for (let j = 0; j < ds.length; j++) {
-        if (j === i) continue;
-        const to = ds[j];
-        const lost = this.noisy && this.random() < this.dropRate;
-        const delivered = this.linked && !to.sleeping && to.irOn() && !lost;
-        if (delivered) to.irRx(bytes);
-        if (this.onIr) this.onIr(i, j, bytes, delivered, lost);
-      }
+      const start = Math.max(now, this.txUntil[i]);
+      const end = this.airtime ? start + (bytes.length * 10 * 1000) / this.baud : start;
+      this.txUntil[i] = end;
+      this.txLog[i].push([start, end]);
+      for (let j = 0; j < ds.length; j++) if (j !== i) this.pending.push({ at: end, start, end, from: i, to: j, bytes });
     }
+  }
+
+  _overlaps(j, start, end) {
+    const log = this.txLog[j];
+    for (const [a, b] of log) if (a < end && b > start) return true;
+    return false;
+  }
+
+  /** Delivers frames whose last bit has arrived. */
+  _deliver() {
+    const now = this.elapsedMs;
+    const due = this.pending.filter((p) => p.at <= now);
+    if (!due.length) return;
+    this.pending = this.pending.filter((p) => p.at > now);
+    const q = this.quality();
+    for (const p of due) {
+      const to = this.devices[p.to];
+      let reason = 'ok';
+      let bytes = p.bytes;
+      if (!this.linked || to.sleeping || !to.irOn()) reason = 'unheard';
+      else if (this.airtime && this._overlaps(p.to, p.start, p.end)) reason = 'collision';
+      else if (this.random() < q.dropout || (this.noisy && this.random() < this.dropRate)) reason = 'dropout';
+      else if (q.ber > 1e-12) {
+        bytes = Uint8Array.from(bytes);
+        let flips = 0;
+        for (let k = 0; k < bytes.length; k++)
+          for (let b = 0; b < 8; b++) if (this.random() < q.ber) { bytes[k] ^= 1 << b; flips++; }
+        if (flips) reason = 'corrupted';
+      }
+      this.stats.frames++;
+      const delivered = reason === 'ok' || reason === 'corrupted';
+      if (delivered) to.irRx(bytes);
+      if (reason === 'ok') this.stats.delivered++;
+      else if (reason === 'corrupted') this.stats.corrupted++;
+      else if (reason === 'dropout') this.stats.dropouts++;
+      else if (reason === 'collision') this.stats.collisions++;
+      else this.stats.unheard++;
+      if (this.onIr) this.onIr(p.from, p.to, p.bytes, reason === 'ok', reason !== 'ok' && reason !== 'unheard', reason);
+    }
+    for (const log of this.txLog) while (log.length && log[0][1] < now - 2000) log.shift();
   }
 
   /** Runs `ms` of simulated time, polling each awake device when it asks. */
@@ -198,10 +302,12 @@ export class World {
     let left = Math.max(0, Math.floor(ms));
     for (let guard = 0; guard < 1e7; guard++) {
       for (const d of this.devices) if (!d.sleeping && d.due <= 0) this._poll(d);
-      this._transfer();
+      this._send();
+      this._deliver();
       if (left <= 0) break;
       let step = left;
       for (const d of this.devices) if (!d.sleeping) step = Math.min(step, Math.max(1, d.due));
+      for (const p of this.pending) step = Math.min(step, Math.max(1, Math.ceil(p.at - this.elapsedMs)));
       for (const d of this.devices) {
         d.advance(step);
         if (!d.sleeping) d.due -= step;
@@ -219,116 +325,69 @@ export class World {
 }
 
 // ---- energy model ----
-
-export const POWER_DEFAULTS = Object.freeze({
-  sleep_uA: 1.1,
-  awake_mA: 0.9,
-  full_refresh: { mA: 3.5, s: 3.0 },
-  fast_refresh: { mA: 3.5, s: 0.6 },
-  ir_mA: 6,
-  battery_mAh: 540,
-  battery: 'CR2450',
-  self_discharge_pct_per_year: 0,
-  profile: {
-    name: '20 uses/day',
-    uses_per_day: 20,
-    awake_s_per_use: 70,
-    full_refreshes_per_use: 2,
-    fast_refreshes_per_use: 6,
-    pairings_per_year: 0,
-    pairing_s: 0,
-  },
-});
-
-/** Merges a power model over the defaults, keeping only known keys with
- * values of the same type so a differently shaped file cannot break the page. */
-export function mergePowerModel(base, extra) {
-  const out = JSON.parse(JSON.stringify(base));
-  if (!extra || typeof extra !== 'object') return out;
-  const walk = (dst, src) => {
-    for (const k of Object.keys(dst)) {
-      if (!(k in src)) continue;
-      if (dst[k] && typeof dst[k] === 'object' && src[k] && typeof src[k] === 'object') walk(dst[k], src[k]);
-      else if (typeof dst[k] === typeof src[k]) dst[k] = src[k];
-    }
-  };
-  walk(out, extra);
-  return out;
-}
-
-/** Converts hardware/power/model.json (the schema hardware/power/power.py
- * reads: per-contributor sleep currents, typ/worst values, usage profiles)
- * into the simulator's flat model, using the typical values and the
- * "normal" profile. Returns null if `hw` is not in that shape. */
-export function fromHardwareModel(hw, base = POWER_DEFAULTS, profileName = 'normal', kase = 'typ') {
-  if (!hw || typeof hw.sleep_uA !== 'object' || !hw.awake || !hw.battery || !hw.usage_profiles) return null;
-  const a = hw.awake;
-  const p = hw.usage_profiles[profileName] || Object.values(hw.usage_profiles)[0];
-  const v = (x) => (typeof x === 'object' && x ? x[kase] : x);
-  const out = JSON.parse(JSON.stringify(base));
-  out.sleep_uA = Object.values(hw.sleep_uA).reduce((s, c) => s + (Number(v(c)) || 0), 0);
-  out.awake_mA = v(a.mcu_mA);
-  out.full_refresh = { mA: v(a.epd_mA), s: a.full_refresh_s };
-  out.fast_refresh = { mA: v(a.epd_mA), s: a.fast_refresh_s };
-  out.ir_mA = v(a.ir_mA);
-  out.battery_mAh = hw.battery.usable_mAh;
-  out.battery = hw.battery.part;
-  out.self_discharge_pct_per_year = hw.battery.self_discharge_pct_per_year || 0;
-  out.profile = {
-    name: `${profileName}, ${p.uses_per_day} uses/day`,
-    uses_per_day: p.uses_per_day,
-    awake_s_per_use: a.awake_s_per_use,
-    full_refreshes_per_use: a.full_refreshes_per_use,
-    fast_refreshes_per_use: a.fast_refreshes_per_use,
-    pairings_per_year: p.pairings_per_year || 0,
-    pairing_s: a.pairing_s || 0,
-  };
-  for (const [k, x] of Object.entries(out)) {
-    if (typeof x === 'number' && !Number.isFinite(x)) return null;
-    if (k === 'full_refresh' || k === 'fast_refresh') if (!Number.isFinite(x.mA) || !Number.isFinite(x.s)) return null;
-  }
-  return out;
-}
+//
+// POWER is generated by hardware/power/power.py from the datasheet currents
+// in hardware/power/model.json and the Renode measurements in
+// hardware/power/measured.json, so the page, the tests and the battery
+// budget cannot disagree. Per case ('typ' | 'worst'):
+//   awake_mA            MCU (running + WFI) and RTC I2C, averaged over the
+//                       measured use's awake time
+//   full/partial_refresh_mAs  one refresh: BUSY time at the panel current
+//                       plus its share of the panel's powered-idle time
+//   ir_mA               LED (at its measured duty) + receiver, per second on
+//   sleep_uA            Stop 2 + RTC + leakage
 
 /** Charge in mA·s for a set of counters ({awakeMs, asleepMs, irMs, full, fast}). */
-export function chargeMAs(model, e) {
+export function chargeMAs(e, kase = 'typ') {
+  const c = POWER.cases[kase];
   return (
-    (e.awakeMs / 1000) * model.awake_mA +
-    (e.asleepMs / 1000) * (model.sleep_uA / 1000) +
-    (e.irMs / 1000) * model.ir_mA +
-    e.full * model.full_refresh.mA * model.full_refresh.s +
-    e.fast * model.fast_refresh.mA * model.fast_refresh.s
+    (e.awakeMs / 1000) * c.awake_mA +
+    (e.asleepMs / 1000) * (c.sleep_uA / 1000) +
+    (e.irMs / 1000) * c.ir_mA +
+    e.full * c.full_refresh_mAs +
+    e.fast * c.partial_refresh_mAs
   );
 }
 
-/** Battery life in days at an average current (mA). */
-export function lifeDays(model, avgMA) {
-  return avgMA > 0 ? model.battery_mAh / avgMA / 24 : Infinity;
-}
-
-/** mAh per year of a usage profile, the same way hardware/power/power.py
- * counts it: sleep current all year, plus each use, plus pairings. */
-export function profileMAhPerYear(model, p = model.profile) {
-  const sleep = (model.sleep_uA / 1000) * 24 * 365;
-  const perUse = chargeMAs(model, {
-    awakeMs: p.awake_s_per_use * 1000, asleepMs: 0, irMs: 0,
-    full: p.full_refreshes_per_use, fast: p.fast_refreshes_per_use,
-  });
-  const use = (perUse * p.uses_per_day * 365) / 3600;
-  const pair = ((model.ir_mA + model.awake_mA) * (p.pairing_s || 0) * (p.pairings_per_year || 0)) / 3600;
+/** mAh per year of a usage profile, as hardware/power/power.py counts it. */
+export function profileMAhPerYear(profile = 'normal', kase = 'typ') {
+  const p = POWER.profiles[profile];
+  const c = POWER.cases[kase];
+  const sleep = (c.sleep_uA / 1000) * 24 * 365;
+  const use = (c.use_mAs * p.uses_per_day * 365) / 3600;
+  const pair = (c.pairing_mAs * p.pairings_per_year) / 3600;
   return sleep + use + pair;
 }
 
-/** Projected battery life of the model's usage profile, in days
- * (self-discharge included). */
-export function profileLifeDays(model, p = model.profile) {
-  const perYear = profileMAhPerYear(model, p) + (model.battery_mAh * (model.self_discharge_pct_per_year || 0)) / 100;
-  return (model.battery_mAh / perYear) * 365;
+/** mAh a year including the cell's self-discharge. */
+export function drainMAhPerYear(profile = 'normal', kase = 'typ') {
+  const b = POWER.battery;
+  return profileMAhPerYear(profile, kase) + (b.usable_mAh * b.self_discharge_pct_per_year) / 100;
 }
 
-/** Average current (mA) of the model's usage profile (without self-discharge). */
-export function profileAvgMA(model, p = model.profile) {
-  return profileMAhPerYear(model, p) / (24 * 365);
+/** Battery life of a fresh cell under a usage profile, in years. */
+export function profileLifeYears(profile = 'normal', kase = 'typ') {
+  return POWER.battery.usable_mAh / drainMAhPerYear(profile, kase);
+}
+
+/** Battery life in days at an average current (mA). */
+export function lifeDays(avgMA) {
+  return avgMA > 0 ? POWER.battery.usable_mAh / avgMA / 24 : Infinity;
+}
+
+/** Approximate CR2450 terminal voltage at light load against state of
+ * charge (0..1), read off the shape of typical lithium coin-cell discharge
+ * curves: flat near 3 V, then a knee in the last ~10 %. */
+export function cellMv(soc) {
+  const pts = [[0, 2000], [0.02, 2400], [0.05, 2600], [0.1, 2750], [0.2, 2850], [0.5, 2920], [0.9, 2980], [1, 3050]];
+  const s = Math.max(0, Math.min(1, soc));
+  for (let k = 1; k < pts.length; k++) {
+    if (s <= pts[k][0]) {
+      const [a, va] = pts[k - 1], [b, vb] = pts[k];
+      return Math.round(va + ((vb - va) * (s - a)) / (b - a));
+    }
+  }
+  return 3050;
 }
 
 // ---- reference TOTP (RFC 6238, SHA-1) for comparing with a phone ----

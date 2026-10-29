@@ -61,6 +61,12 @@ The full design is in [docs/pairing-protocol.md](docs/pairing-protocol.md) and [
 
 The firmware's portable core is compiled to WebAssembly and runs two devices side by side in your browser: pair them over a simulated IR link, compare words, add a TOTP secret and check it against your phone.
 
+It behaves like the hardware, not just like the firmware:
+
+- **E-paper.** A full refresh flashes black and white for 3 s; a partial one takes 0.42 s and leaves faint ghosting that builds up until the firmware's next full refresh (after every 5 partial ones). Presses during a refresh are queued, as on the board.
+- **IR link.** Set the distance and angle between the devices. Bit errors and dropouts rise with distance, frames take their real airtime at 4800 baud, and they collide (the link is half duplex). Beyond about 9 cm pairing keeps retrying and never completes.
+- **Battery.** The panel uses the same power model as the [battery budget](docs/power-calculations.md), generated from `hardware/power`. Fast-forward days or years of use and watch the remaining life and the cell voltage fall.
+
 **[irl2fa.com](https://irl2fa.com/)**
 
 <p align="center"><img src="docs/images/sim/sim-pairing.png" alt="Simulator: two devices pairing" width="760" /></p>
@@ -119,7 +125,7 @@ The hardware is open to modification, and people order straight from this reposi
 - ERC and DRC (with schematic parity)
 - netlist checks against the pin map shared with the firmware
 - SPICE simulations of the coin cell, e-paper booster, power switch, reverse-battery protection and IR driver
-- the battery-life budget
+- the battery-life budget, with the on-times measured by running the real firmware through a scripted use and a pairing in the emulator
 - a check that the committed Gerbers, BOM and placement files match the KiCad files
 - Gerber sanity checks
 - case-fit tests

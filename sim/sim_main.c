@@ -28,14 +28,37 @@ static struct {
     double awake_ms;
     double asleep_ms;
     double ir_ms;
+    double busy_ms;                /* e-paper BUSY (refreshing) */
     uint32_t full_base, fast_base; /* refresh counts at the last energy reset */
     uint32_t wakes;
 } en;
+
+/* ---- e-paper timing and the joystick latch ----
+ * On the board hal_display_show() blocks until the panel drops BUSY (3 s
+ * for a full refresh, 0.42 s for a partial one, hardware/power/model.json),
+ * the core waiting in WFI. The core cannot poll in that time, but a press
+ * is not lost: the EXTI edge latches it (hal_stm32u0.c btn_latched) and it
+ * is reported at the next poll. Two presses of one direction during a
+ * refresh are one press, as on the board. */
+static struct {
+    uint32_t full_ms, fast_ms;
+    uint32_t busy_left;
+    uint8_t buttons, latched;
+} ep = {3000, 420, 0, 0, 0};
 
 /* Shared scratch buffer for moving IR bytes and strings across the JS/WASM
  * boundary without malloc. */
 static uint8_t io_buf[1024];
 static char str_buf[128];
+
+API void sim_set_epd_timing(uint32_t full_ms, uint32_t fast_ms)
+{
+    ep.full_ms = full_ms;
+    ep.fast_ms = fast_ms;
+}
+
+/* ms until the panel finishes the refresh in progress (0 = idle). */
+API uint32_t sim_busy_ms(void) { return ep.busy_left; }
 
 API void sim_energy_reset(void)
 {
@@ -47,6 +70,7 @@ API void sim_energy_reset(void)
 API double sim_energy_awake_ms(void) { return en.awake_ms; }
 API double sim_energy_asleep_ms(void) { return en.asleep_ms; }
 API double sim_energy_ir_ms(void) { return en.ir_ms; }
+API double sim_energy_busy_ms(void) { return en.busy_ms; }
 API uint32_t sim_energy_full(void) { return vhal_refreshes(1) - en.full_base; }
 API uint32_t sim_energy_fast(void) { return vhal_refreshes(0) - en.fast_base; }
 API uint32_t sim_energy_wakes(void) { return en.wakes; }
@@ -56,7 +80,15 @@ API uint32_t sim_energy_wakes(void) { return en.wakes; }
 API void sim_reset(uint32_t seed_lo, uint32_t seed_hi)
 {
     vhal_reset(((uint64_t)seed_hi << 32) | seed_lo);
+    ep.busy_left = 0;
+    ep.buttons = ep.latched = 0;
     sim_energy_reset();
+}
+
+/* Starts BUSY for the refreshes the firmware just sent to the panel. */
+static void count_refreshes(uint32_t full0, uint32_t fast0)
+{
+    ep.busy_left += (vhal_refreshes(1) - full0) * ep.full_ms + (vhal_refreshes(0) - fast0) * ep.fast_ms;
 }
 
 API void sim_init(void) { app_init(); }
@@ -66,11 +98,18 @@ API void sim_init(void) { app_init(); }
 API int32_t sim_poll(void)
 {
     if (vhal_sleeping()) return -1;
+    if (ep.busy_left) return (int32_t)ep.busy_left;
+    uint32_t full0 = vhal_refreshes(1), fast0 = vhal_refreshes(0);
+    vhal_set_buttons(ep.buttons | ep.latched);
+    ep.latched = 0;
     uint32_t r = app_poll();
+    vhal_set_buttons(ep.buttons);
+    count_refreshes(full0, fast0);
     if (r == APP_SLEEP) {
         hal_sleep(app_wake_at());
         return -1;
     }
+    if (ep.busy_left > r) r = ep.busy_left;
     return (int32_t)r;
 }
 
@@ -78,20 +117,38 @@ API void sim_wake(void)
 {
     if (!vhal_sleeping()) return;
     vhal_wake();
+    /* app_wake() takes what hal_buttons() reports as the press that woke
+     * us, latched one included (on the board hal_sleep() does not even
+     * enter Stop 2 if a press is latched), so it is not taken as a key. */
+    vhal_set_buttons(ep.buttons | ep.latched);
+    ep.latched = 0;
     app_wake();
+    vhal_set_buttons(ep.buttons);
     en.wakes++;
 }
 
 API int sim_sleeping(void) { return vhal_sleeping(); }
-API void sim_set_buttons(uint32_t mask) { vhal_set_buttons((uint8_t)mask); }
+API void sim_set_buttons(uint32_t mask)
+{
+    uint8_t m = (uint8_t)mask;
+    ep.latched |= (uint8_t)(m & ~ep.buttons); /* the EXTI edge */
+    ep.buttons = m;
+    if (!ep.busy_left) vhal_set_buttons(m);
+}
 API void sim_set_battery_mv(uint32_t mv) { vhal_set_battery_mv((uint16_t)mv); }
 
 /* Moves simulated time forward, charging it to whatever state the board is
  * in (awake/asleep, IR transceiver on/off). */
 API void sim_advance(uint32_t ms)
 {
-    if (vhal_sleeping()) en.asleep_ms += ms;
-    else en.awake_ms += ms;
+    /* A refresh keeps the core awake (waiting in WFI), even the one that
+     * draws the sleep screen just before Stop 2. */
+    uint32_t busy = ms < ep.busy_left ? ms : ep.busy_left;
+    ep.busy_left -= busy;
+    en.busy_ms += busy;
+    en.awake_ms += busy;
+    if (vhal_sleeping()) en.asleep_ms += ms - busy;
+    else en.awake_ms += ms - busy;
     if (vhal_ir_on()) en.ir_ms += ms;
     vhal_advance(ms);
 }
@@ -175,6 +232,15 @@ API void sim_refresh_ui(void)
 {
     if (vhal_sleeping()) return;
     app_wake();
+}
+
+/* Moves the RTC forward without simulating the time in between (the battery
+ * panel's fast-forward). The page charges the skipped time itself, at the
+ * chosen usage profile, so the energy counters keep only simulated time. */
+API void sim_skip_ms(double ms)
+{
+    if (ms <= 0) return;
+    vhal_set_unix((int64_t)((double)hal_rtc_get() + ms / 1000.0));
 }
 
 API int sim_count(int type) { return store_count(type == 1 ? REC_TOTP : REC_CONTACT); }

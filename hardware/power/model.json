@@ -1,5 +1,5 @@
 {
-  "_comment": "IRL2FA power model. Currents at 3.0 V, 25 C. 'typ' from datasheet typicals, 'worst' from datasheet maxima. Used by hardware/power/power.py, hardware/tests/test_power.py and the browser simulator's battery meter. SPDX-License-Identifier: CERN-OHL-S-2.0",
+  "_comment": "IRL2FA power model: datasheet constants only. Currents at 3.0 V, 25 C; 'typ' from datasheet typicals, 'worst' from maxima or a stated conservative bound. How long each part is on comes from the emulated firmware, hardware/power/measured.json (firmware/renode/power.robot). Used by hardware/power/power.py, which also generates the browser simulator's sim/web/power-model.js. SPDX-License-Identifier: CERN-OHL-S-2.0",
   "battery": {
     "part": "CR2450",
     "nominal_mAh": 620,
@@ -34,30 +34,59 @@
       "source": "AO3401A IGSS 100 nA max"
     }
   },
-  "awake": {
-    "mcu_mA": {
-      "typ": 0.9,
-      "worst": 1.5,
-      "source": "52 uA/MHz at 16 MHz plus peripherals, mostly in WFI between polls"
+  "mcu": {
+    "clock_mhz": 16,
+    "run_mA": {
+      "typ": 1.2,
+      "worst": 2.0,
+      "source": "STM32U083 at 16 MHz HSI16, range 1, code from flash: 52 uA/MHz headline (DS14548 p.1, 1.8 V, range 2) is 0.83 mA; 1.2 mA allows for range 1, 3 V and HSI16. Not yet checked against the DS14548 Run-mode table."
     },
-    "awake_s_per_use": 40,
-    "epd_mA": {
+    "sleep_mA": {
+      "typ": 0.35,
+      "worst": 0.6,
+      "source": "Sleep mode (WFI) at 16 MHz with HSI16 and SysTick running: estimate, about 30 % of Run as on other Cortex-M0+ STM32s. Not yet checked against the DS14548 Sleep-mode table."
+    },
+    "_note": "Renode runs the core at 16 MIPS, so run time = instructions executed / 16e6: one cycle per instruction. A real Cortex-M0+ takes 1-3 cycles for loads, stores and branches, so the measured run time is a lower bound; the 'worst' current covers some of it."
+  },
+  "epd": {
+    "refresh_mA": {
       "typ": 3.5,
       "worst": 5.0,
-      "source": "GDEY0213B74 typical operating current 3.5 mA @ 3 V"
+      "source": "GDEY0213B74 typical operating current 3.5 mA @ 3 V (during a refresh)"
+    },
+    "logic_mA": {
+      "typ": 0.3,
+      "worst": 1.0,
+      "source": "SSD1680 powered with the analog block off (reset, register and RAM writes): assumption, no datasheet figure for this state"
     },
     "full_refresh_s": 3.0,
-    "fast_refresh_s": 0.6,
-    "full_refreshes_per_use": 2,
-    "fast_refreshes_per_use": 3,
-    "ir_mA": {
-      "typ": 6.0,
-      "worst": 10.0,
-      "source": "LED 18 mA at ~25 % duty while pairing + phototransistor load"
-    },
-    "pairing_s": 20,
-    "_awake_note": "About 10 s of reading/typing plus the firmware's 30 s idle timeout (IDLE_SLEEP_S_DEFAULT in firmware/core/app.c). Pressing left on the home menu sleeps at once."
+    "partial_refresh_s": 0.42,
+    "_refresh_source": "GDEY0213B74: full refresh 3 s, partial 0.42 s @ 25 C. The emulated SSD1680 holds BUSY this long, so these also set the measured BUSY time.",
+    "spi_hz": 8000000,
+    "_spi_note": "SPI1 at fPCLK/2 = 8 MHz (hal_stm32u0.c). The emulated SPI is instantaneous, so the wire time, bytes x 8 / 8 MHz, is added as run time: the core polls TXE/RXNE through every byte."
   },
+  "i2c": {
+    "hz": 100000,
+    "bus_mA": {
+      "typ": 0.32,
+      "worst": 0.64,
+      "source": "two 4.7 kohm pull-ups at 3 V (0.64 mA each when pulled low), low about a quarter of the bit time on average; worst: half"
+    }
+  },
+  "ir": {
+    "baud": 4800,
+    "led_mA": {
+      "typ": 18.0,
+      "worst": 25.0,
+      "source": "VSMB2948SL through 100 ohm and AO3400A: 18 mA at 3 V; hardware/spice/ir_led.cir limits it to 25 mA on a fresh cell"
+    },
+    "rx_mA": {
+      "typ": 0.1,
+      "worst": 0.3,
+      "source": "VEMT2523SLX01 emitter follower into 10 kohm: photocurrent only, at most 3 V / 10 kohm = 0.3 mA when lit; dark current is nA"
+    }
+  },
+  "measured": "measured.json",
   "usage_profiles": {
     "light": {
       "uses_per_day": 5,

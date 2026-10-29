@@ -32,3 +32,12 @@ def monitor_int(monitor_output):
 
 def monitor_text(monitor_output):
     return monitor_output.strip()
+
+
+def power_model_epd_ms(model_path):
+    """(full, partial) refresh BUSY times in ms from hardware/power/model.json,
+    so the emulated panel and the battery budget use the same figures."""
+    import json
+    with open(model_path) as f:
+        epd = json.load(f)["epd"]
+    return int(round(epd["full_refresh_s"] * 1000)), int(round(epd["partial_refresh_s"] * 1000))

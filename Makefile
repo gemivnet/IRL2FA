@@ -6,7 +6,7 @@ PY ?= $(if $(wildcard .venv/bin/python),.venv/bin/python,python3)
 HW_IMAGE ?= irl2fa-hw
 HW = docker run --rm -u $$(id -u):$$(id -g) -e HOME=/tmp -v "$(CURDIR)":/w -w /w $(HW_IMAGE)
 
-.PHONY: check firmware stm32 renode sim case hardware hw-image fab pins screens
+.PHONY: check firmware stm32 renode sim case hardware hw-image fab pins screens power
 
 check: firmware stm32 renode sim case hardware
 
@@ -19,6 +19,7 @@ stm32:
 
 renode: stm32
 	SKIP_BUILD=1 firmware/renode/run.sh
+	$(PY) hardware/power/power.py --measured firmware/build/renode --check
 
 sim:
 	sim/build.sh
@@ -45,3 +46,10 @@ pins:
 
 screens:
 	$(PY) firmware/tools/screens.py
+
+# After a firmware change that moves the measured power profile on purpose:
+# re-measure in Renode and regenerate measured.json, the power doc, its chart
+# and the simulator's power model.
+power: stm32
+	SKIP_BUILD=1 firmware/renode/run.sh
+	$(PY) hardware/power/power.py --measured firmware/build/renode --write

@@ -12,6 +12,18 @@ rtc: Miscellaneous.RV3032 @ i2c1 0x51
     initialUnixTime: 946684800
     INT -> gpioPortB@4
 
+// Power instrumentation (models/PowerMonitor.cs): not a part on the board,
+// an observer for the battery budget, given a 4-byte window in the unused
+// 0xA0000000 region so the monitor can name it (sysbus.power). Input 0 is
+// IR_RX_PWR (PA11).
+power: Miscellaneous.IRL2FA_PowerMonitor @ sysbus 0xA0000000
+    cpu: cpu
+    irUart: usart1
+    epd: epd
+    rtc: rtc
+    mips: 16
+    irBaud: 4800
+
 // Joystick contacts: active low with pull-ups. pins.yaml `joystick:`:
 // JOY_A (PA1) left, JOY_B (PA2) up, JOY_C (PA3) down, JOY_D (PA15) right,
 // JOY_CENTER (PA0).
@@ -41,6 +53,7 @@ gpioPortA:
     4 -> exti@4 | epd@1
     6 -> exti@6 | epd@0
     8 -> exti@8 | epd@3
+    11 -> power@0
     15 -> exti@15
 
 gpioPortB:

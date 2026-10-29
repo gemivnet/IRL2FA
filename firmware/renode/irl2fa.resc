@@ -9,6 +9,7 @@ $unix?=1800000000
 include @firmware/renode/models/STM32U0_System.cs
 include @firmware/renode/models/SSD1680.cs
 include @firmware/renode/models/RV3032.cs
+include @firmware/renode/models/PowerMonitor.cs
 
 mach create $name
 machine LoadPlatformDescription @firmware/renode/irl2fa.repl

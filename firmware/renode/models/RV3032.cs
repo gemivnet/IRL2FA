@@ -36,6 +36,9 @@ namespace Antmicro.Renode.Peripherals.Miscellaneous
         public int EepromUpdates { get; private set; }
         public int TimerInterrupts { get; private set; }
         public bool ClkoutEnabled => (regs[0xC0] & 0x40) == 0;
+        // Bus activity for the power instrumentation: ("write"|"read", bytes
+        // on the bus including the address byte).
+        public event Action<string, int> Activity;
 
         public void Reset()
         {
@@ -61,6 +64,7 @@ namespace Antmicro.Renode.Peripherals.Miscellaneous
         // ---- I2C ----
         public void Write(byte[] data)
         {
+            Activity?.Invoke("write", data.Length + 1);
             foreach(var b in data)
             {
                 if(expectAddress) { pointer = b; expectAddress = false; continue; }
@@ -71,6 +75,7 @@ namespace Antmicro.Renode.Peripherals.Miscellaneous
 
         public byte[] Read(int count = 1)
         {
+            Activity?.Invoke("read", count + 1);
             var r = new byte[count];
             for(int i = 0; i < count; i++) { r[i] = Read(pointer); pointer = (byte)(pointer + 1); }
             expectAddress = true;
