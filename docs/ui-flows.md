@@ -11,8 +11,31 @@ The rules are the same on every screen:
 | ● | confirm / options |
 
 The device sleeps after 30 s without input. Before it does, it draws a
-neutral sleep screen, so no code or word stays visible on the e-paper. Any
-press wakes it. If a PIN is set, it asks for the PIN first.
+neutral sleep screen with a full refresh, so no code or word stays visible on
+the e-paper. Any press wakes it. If a PIN is set, it asks for the PIN first.
+
+**Refreshes.** The e-paper takes 0.42 s for a partial refresh and 3 s for a
+full (flashing) one, and the device cannot react in that time, but no press
+is lost: presses made during a refresh are handled after it, two presses as
+two presses. To keep the battery going (see
+[power-calculations.md](power-calculations.md)) the screen is redrawn only
+when something on it changes:
+
+- **Words** change every 15 s and **codes** every 30 or 60 s; the codes list
+  follows its codes. The **countdown bar** under the words or a code moves in
+  thirds of the period (5 s for words, 10 s for 30 s codes) with partial
+  refreshes only.
+- After 5 partial refreshes, the next change of content (a press, a new
+  word or code) is a full refresh, which clears the ghosting partial
+  refreshes leave. Countdown-bar steps never trigger one.
+- Waking is a partial refresh: the full one that drew the sleep screen left
+  the panel clean. The first screen after power-up is a full refresh.
+
+**Pairing** gives up after a minute if no other device answers ("No other
+device found") and goes back to the menu. It keeps the device awake while
+the two people compare the symbols and name each other, for at most three
+minutes; after that the usual 30 s idle timeout applies, so a device left on
+a pairing screen still goes to sleep.
 
 Every screen below is a real render from the firmware (`firmware/tools/screens.py`).
 

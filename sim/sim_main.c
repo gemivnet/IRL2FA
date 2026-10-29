@@ -37,14 +37,13 @@ static struct {
  * On the board hal_display_show() blocks until the panel drops BUSY (3 s
  * for a full refresh, 0.42 s for a partial one, hardware/power/model.json),
  * the core waiting in WFI. The core cannot poll in that time, but a press
- * is not lost: the EXTI edge latches it (hal_stm32u0.c btn_latched) and it
- * is reported at the next poll. Two presses of one direction during a
- * refresh are one press, as on the board. */
+ * is not lost: the virtual board latches press edges like the board's EXTI
+ * and filters them the same way (core/buttons.c), so it is reported at the
+ * next poll, and a second press during the refresh is a second press. */
 static struct {
     uint32_t full_ms, fast_ms;
     uint32_t busy_left;
-    uint8_t buttons, latched;
-} ep = {3000, 420, 0, 0, 0};
+} ep = {3000, 420, 0};
 
 /* Shared scratch buffer for moving IR bytes and strings across the JS/WASM
  * boundary without malloc. */
@@ -81,7 +80,6 @@ API void sim_reset(uint32_t seed_lo, uint32_t seed_hi)
 {
     vhal_reset(((uint64_t)seed_hi << 32) | seed_lo);
     ep.busy_left = 0;
-    ep.buttons = ep.latched = 0;
     sim_energy_reset();
 }
 
@@ -100,15 +98,13 @@ API int32_t sim_poll(void)
     if (vhal_sleeping()) return -1;
     if (ep.busy_left) return (int32_t)ep.busy_left;
     uint32_t full0 = vhal_refreshes(1), fast0 = vhal_refreshes(0);
-    vhal_set_buttons(ep.buttons | ep.latched);
-    ep.latched = 0;
     uint32_t r = app_poll();
-    vhal_set_buttons(ep.buttons);
     count_refreshes(full0, fast0);
     if (r == APP_SLEEP) {
         hal_sleep(app_wake_at());
         return -1;
     }
+    if (vhal_buttons_pending() && r > 1) r = 1; /* a held-back press: next poll now */
     if (ep.busy_left > r) r = ep.busy_left;
     return (int32_t)r;
 }
@@ -117,23 +113,16 @@ API void sim_wake(void)
 {
     if (!vhal_sleeping()) return;
     vhal_wake();
-    /* app_wake() takes what hal_buttons() reports as the press that woke
-     * us, latched one included (on the board hal_sleep() does not even
-     * enter Stop 2 if a press is latched), so it is not taken as a key. */
-    vhal_set_buttons(ep.buttons | ep.latched);
-    ep.latched = 0;
+    /* app_wake() takes what hal_buttons() reports, the latched press
+     * included, as the press that woke us, so it is not taken as a key. */
     app_wake();
-    vhal_set_buttons(ep.buttons);
     en.wakes++;
 }
 
 API int sim_sleeping(void) { return vhal_sleeping(); }
 API void sim_set_buttons(uint32_t mask)
 {
-    uint8_t m = (uint8_t)mask;
-    ep.latched |= (uint8_t)(m & ~ep.buttons); /* the EXTI edge */
-    ep.buttons = m;
-    if (!ep.busy_left) vhal_set_buttons(m);
+    vhal_set_buttons((uint8_t)mask);
 }
 API void sim_set_battery_mv(uint32_t mv) { vhal_set_battery_mv((uint16_t)mv); }
 

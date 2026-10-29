@@ -37,11 +37,15 @@ Needs Node 22 or later (CI uses 24). Build first.
 node --test sim/test
 ```
 
-The tests pair two devices over IR (at 2 cm through collisions, with 10% of
-frames dropped, and at 8.5 cm with bit errors), check that pairing keeps
-retrying but never completes at 14 cm, check the refresh pattern against the
-firmware's full-after-5-partial rule and a scripted use against the Renode
-measurement (refresh counts, awake time, charge), and
+The tests pair two devices over IR (at 2 cm in under 6 s with hardly any
+collisions thanks to listen-before-talk, with 10% of frames dropped, and at
+8 cm with bit errors), check that pairing keeps retrying at 14 cm and gives
+up after a minute so the device can sleep, check the refresh policy (bar
+steps partial, wake partial, sleep full, full after 5 partial content
+redraws), that a second press during a refresh is not lost, and replay the
+Renode power script from the same RTC time with the same press timing:
+the refresh sequence must be identical and awake time and charge within
+3 % and 5 %. They also
 check the SAS screens are identical, name the contacts with the joystick and
 check one device's SAY word is the other's HEAR word, both in the store and as
 drawn on the panels. They add `JBSWY3DPEHPK3PXP` through the character wheel
@@ -66,23 +70,28 @@ focus a device (click it or Tab to it) and use the arrow keys and Enter.
 
 - **E-paper.** `hal_display_show()` blocks on the board until the panel drops
   BUSY: 3 s for a full refresh, 0.42 s for a partial one
-  (`hardware/power/model.json`). The simulator holds the device busy for the
-  same time: the core does not poll, and a press is latched (as the EXTI edge
-  latch on the board does) and handled afterwards. Two presses of one
-  direction during one refresh are one press, as on the board. The page draws
+  (`hardware/power/model.json`), plus the STM32's own time per refresh
+  (drawing the screen, then the driver: supply on, resets, RAM transfer;
+  `epd.overhead_s`, measured in Renode). The simulator holds the device busy for that long: the core does
+  not poll, and a press is latched (as the EXTI edge latch on the board does)
+  and handled afterwards, by the same filter as on the board
+  (`firmware/core/buttons.c`), so a second press is a second press. The page draws
   a full refresh as the panel's flashing waveform (old image inverted, black,
   white, black, white, new image inverted, new image) and a partial one as a
   short flicker of the changed pixels that leaves a faint ghost; ghosting
   accumulates over partial refreshes and a full refresh clears it. The
-  firmware chooses which: full on wake, on sleep and after every 5 partial
-  refreshes (`FULL_REFRESH_EVERY` in `firmware/core/app.c`).
+  firmware chooses which: full on power-up and on sleep, and on a content
+  change after 5 partial redraws (`FULL_REFRESH_EVERY` in
+  `firmware/core/app.c`); countdown-bar steps and waking are partial.
 - **IR link** (`IR_LINK` in `web/irl2fa-device.js`). Received signal falls
   with the square of the distance and with the LED's (±25°) and
   phototransistor's (±35°) angular lobes; the bit error rate is the Gaussian
   tail of the resulting signal-to-noise ratio, and weak signals also lose
-  whole frames (dropouts). Frames take their airtime (10 bits a byte at 4800
-  baud) and the link is half duplex, so frames that overlap a device's own
-  transmission are lost. Clean to about 8 cm on axis, marginal at 9 cm,
+  whole frames (dropouts). Each byte arrives when its stop bit has (10 bits
+  at 4800 baud), as the UART delivers it, so the firmware can hear the other
+  device mid-frame and hold its own frame back (listen before talk). The
+  link is half duplex: bytes that arrive while the receiver is transmitting
+  are garbage. Clean to about 8 cm on axis, marginal at 9 cm,
   nothing beyond about 10 cm: assumptions until a board is measured.
 - **Battery** (`web/power-model.js`, generated). The C side counts time
   awake, asleep, with IR on and with the panel busy, and full/partial

@@ -26,10 +26,32 @@ anything.
 | Coding | plain UART, 4800 baud 8N1, inverted (idle = LED off) |
 | Framing | `'I' '2' type len payload[len] crc16` (CRC-16/CCITT-FALSE over type..payload) |
 
-The link is half-duplex and lossy: frames collide and the phototransistor
-also sees its own LED. Every frame is resent about every 0.25 s with random
-jitter. A device ignores its own echo, and a frame with a bad CRC is
+The link is half-duplex and lossy: the phototransistor also sees its own LED,
+so a frame that arrives while the receiving device is transmitting is lost.
+Every frame is resent about every 0.25 s (220 ms plus 0-127 ms of random
+jitter). A device ignores its own echo, and a frame with a bad CRC is
 dropped.
+
+**Listen before talk.** A COMMIT takes 79 ms on the air and a REVEAL 129 ms, so
+without care the two devices' frames overlap most of the time. A device
+therefore only starts a frame when no byte from the other device has arrived
+for 6 ms (about three byte times; bytes heard while its own frame is in the
+air are its echo and do not count). Otherwise it backs off 4-35 ms at random
+and listens again. In the browser simulator's link model (byte-by-byte
+airtime, half duplex), over the same 60 random seeds:
+
+| | 2 cm: median / 90 % / worst | 2 cm: never completes | 8 cm: median / 90 % / worst | 8 cm: never completes |
+|-|-|-|-|-|
+| Without listen-before-talk | 6.9 s / 14.0 s / – | 2 of 60 | 6.4 s / 14.1 s / – | 2 of 60 |
+| With it | 2.5 s / 2.9 s / 3.2 s | 0 | 2.6 s / 3.1 s / 3.6 s | 0 |
+
+Without it, a device whose REVEALs keep colliding hits the 15 s REVEAL
+timeout below and shows *Pairing failed*.
+
+**Giving up.** A device still looking for the other after 60 s (nobody there,
+or out of range) stops, says *No other device found* and returns to the
+menu. Pairing holds off the idle timeout for at most three minutes from the
+start (comparing and naming take a while), then the device sleeps as usual.
 
 ## Messages
 

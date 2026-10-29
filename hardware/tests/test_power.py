@@ -14,11 +14,8 @@ REGEN = "run: python3 hardware/power/power.py --update"
 
 
 def test_battery_life_requirement():
-    # The requirement is for the 'normal' profile (20 uses a day) with
-    # worst-case currents. Heavy use (60 a day) is reported in the doc, not
-    # enforced: with the measured redraw rate it is under a year.
-    req = power.MODEL["requirement_years"]
-    assert power.life_years("normal", "worst") >= req
+    # 20 uses a day with worst-case currents (power.REQUIRED).
+    assert power.requirement_problems() == []
 
 
 def test_measured_profile_is_sane():

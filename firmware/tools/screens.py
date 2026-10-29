@@ -11,7 +11,7 @@ from PIL import Image
 FW = Path(__file__).resolve().parents[1]
 OUT = FW.parent / "docs" / "images" / "screens"
 SRC = ["tools/screens.c", "vhal/vhal.c"] + [
-    f"core/{n}.c" for n in "hash base32 totp words wordlist pairing store gfx fonts timeutil app".split()
+    f"core/{n}.c" for n in "hash base32 totp words wordlist pairing store gfx fonts timeutil app buttons".split()
 ] + ["core/third_party/monocypher/monocypher.c"]
 
 PAPER = (233, 231, 222)

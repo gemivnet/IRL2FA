@@ -13,7 +13,11 @@
 void vhal_reset(uint64_t seed);           /* blank flash, time 0, seeded RNG */
 void vhal_advance(uint32_t ms);           /* moves both clocks forward */
 void vhal_set_unix(int64_t t);
-void vhal_set_buttons(uint8_t mask);
+void vhal_set_buttons(uint8_t mask);      /* contact levels; press edges are latched */
+int vhal_buttons_pending(void);
+/* Each hal_random() call moves the clock this far (default 0): the device's
+ * TRNG and the key generation that follows take real time. */
+void vhal_set_random_cost_ms(uint32_t ms);           /* a press is held back: poll again now */
 void vhal_set_battery_mv(uint16_t mv);
 
 const uint8_t *vhal_framebuffer(void);    /* last frame sent to the panel */

@@ -3,6 +3,7 @@
 
 #include <string.h>
 
+#include "../core/buttons.h"
 #include "../core/hal.h"
 #include "../core/third_party/monocypher/monocypher.h"
 
@@ -10,6 +11,11 @@ static struct {
     uint32_t ms;
     int64_t unix_ms;
     uint8_t buttons;
+    uint8_t edges;                 /* press edges since hal_buttons() last ran */
+    uint32_t edge_ms[BTN_COUNT];
+    btn_filter_t filter;
+    bool buttons_again;
+    uint32_t random_cost_ms;
     uint16_t battery_mv;
     uint8_t fb[DISPLAY_BYTES];
     uint32_t refresh[2];
@@ -43,7 +49,18 @@ void vhal_advance(uint32_t ms)
 }
 
 void vhal_set_unix(int64_t t) { v.unix_ms = t * 1000; }
-void vhal_set_buttons(uint8_t mask) { v.buttons = mask; }
+/* Like the board's EXTI latch: a press edge is remembered (with its time)
+ * until hal_buttons() runs, even if the button is released first. */
+void vhal_set_buttons(uint8_t mask)
+{
+    uint8_t pressed = (uint8_t)(mask & ~v.buttons);
+    for (unsigned i = 0; i < BTN_COUNT; i++)
+        if (pressed & (1u << i)) v.edge_ms[i] = v.ms;
+    v.edges |= pressed;
+    v.buttons = mask;
+}
+
+int vhal_buttons_pending(void) { return v.buttons_again; }
 void vhal_set_battery_mv(uint16_t mv) { v.battery_mv = mv; }
 const uint8_t *vhal_framebuffer(void) { return v.fb; }
 uint32_t vhal_refreshes(int full) { return v.refresh[full ? 1 : 0]; }
@@ -81,7 +98,12 @@ void hal_display_show(const uint8_t *fb, display_mode_t mode)
 uint32_t hal_millis(void) { return v.ms; }
 int64_t hal_rtc_get(void) { return v.unix_ms / 1000; }
 void hal_rtc_set(int64_t t) { v.unix_ms = t * 1000 + v.unix_ms % 1000; }
-uint8_t hal_buttons(void) { return v.buttons; }
+uint8_t hal_buttons(void)
+{
+    uint8_t r = btn_filter(&v.filter, v.buttons, v.edges, v.edge_ms, v.ms, &v.buttons_again);
+    v.edges = 0;
+    return r;
+}
 void hal_ir_enable(bool on) { v.ir_on = on; }
 
 void hal_ir_send(const uint8_t *buf, size_t len)
@@ -92,8 +114,11 @@ void hal_ir_send(const uint8_t *buf, size_t len)
     v.ir_len += len;
 }
 
+void vhal_set_random_cost_ms(uint32_t ms) { v.random_cost_ms = ms; }
+
 void hal_random(uint8_t *buf, size_t len)
 {
+    vhal_advance(v.random_cost_ms);
     /* Deterministic ChaCha20 stream: reproducible tests. The simulator
      * reseeds from crypto.getRandomValues at start-up. */
     static const uint8_t nonce[8] = {0};

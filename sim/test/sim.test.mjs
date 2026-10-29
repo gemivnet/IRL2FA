@@ -200,7 +200,7 @@ test('IR link model: clean up close, errors rising with distance and angle', () 
   assert.ok(at(3, 90).frameOk(38) < 1e-9, 'side by side: no link');
 });
 
-test('pairing at short range succeeds through half-duplex collisions', async () => {
+test('pairing at short range is quick: listen before talk avoids collisions', async () => {
   const { a, b, w } = await newWorld();
   startPairing(w, a, b);
   w.link = { distanceCm: 2, angleDeg: 10 };
@@ -212,6 +212,8 @@ test('pairing at short range succeeds through half-duplex collisions', async () 
   console.log(`  2 cm: paired in ${((w.elapsedMs - t0) / 1000).toFixed(1)} s; ${s.delivered} frames ok, ` +
     `${s.collisions} collided, ${s.corrupted} corrupted, ${s.dropouts} dropped`);
   assert.equal(s.corrupted + s.dropouts, 0, 'no bit errors at 2 cm');
+  assert.ok(w.elapsedMs - t0 < 6000, 'under 6 s');
+  assert.ok(s.collisions <= 2, 'hardly any collisions');
   settle(w, a);
   settle(w, b);
   assert.ok(regionEqual(a.framebuffer(), b.framebuffer(), TITLE_H + 1, 106), 'SAS screens match');
@@ -234,20 +236,33 @@ test('out of range, pairing keeps retrying and does not complete', async () => {
   assert.ok(s.delivered === 0 && s.corrupted + s.dropouts === heard, 'every frame that reached the other side was lost or damaged');
   // Bring them together: the same session completes.
   w.link = { distanceCm: 3, angleDeg: 0 };
-  assert.ok(w.until(() => a.screen() === 'sas' && b.screen() === 'sas', 60000), 'pairs once close');
+  assert.ok(w.until(() => a.screen() === 'sas' && b.screen() === 'sas', 10000), 'pairs once close');
 });
 
-test('at the edge of range (8 cm), pairing needs retries but completes', async () => {
+test('with nobody in range, pairing gives up after a minute and the device sleeps', async () => {
+  const { a, w } = await newWorld();
+  presses(w, a, BTN.DOWN, 2);
+  press(w, a, BTN.CENTER);
+  assert.equal(a.screen(), 'pair');
+  w.advance(55000);
+  assert.equal(a.screen(), 'pair', 'still looking at 55 s');
+  assert.ok(!a.sleeping && a.irOn());
+  w.advance(6000);
+  assert.equal(a.screen(), 'message', 'gave up at 60 s');
+  assert.ok(!a.irOn(), 'IR off');
+  assert.ok(w.until(() => a.sleeping, 35000), 'then the idle timeout puts it to sleep');
+});
+
+test('at the edge of range (8 cm), pairing completes despite bit errors', async () => {
   const { a, b, w } = await newWorld();
   startPairing(w, a, b);
   w.link = { distanceCm: 8, angleDeg: 0 };
   w.linked = true;
-  const ok = w.until(() => a.screen() === 'sas' && b.screen() === 'sas', 120000);
+  const ok = w.until(() => a.screen() === 'sas' && b.screen() === 'sas', 15000);
   const s = w.stats;
   console.log(`  8 cm: ${ok ? 'paired' : 'not paired'} after ${(w.elapsedMs / 1000).toFixed(0)} s; ` +
     `${s.corrupted} corrupted, ${s.dropouts} dropped, ${s.collisions} collided of ${s.frames}`);
-  assert.ok(s.corrupted + s.dropouts + s.collisions > 0, 'some frames damaged, dropped or collided');
-  assert.ok(ok, 'but it gets there');
+  assert.ok(ok, 'within 15 s, inside the reveal timeout');
 });
 
 test('adding a TOTP code with the joystick shows the RFC 6238 code', async () => {
@@ -364,13 +379,14 @@ test('energy accounting', async () => {
   assert.ok(chargeMAs(e, 'worst') > chargeMAs(e, 'typ'));
 });
 
-test('a refresh blocks the core; presses during it are latched, as on the board', async () => {
+test('a refresh blocks the core; presses during it are latched and none are lost', async () => {
   const { a, w } = await newWorld();
   press(w, a, BTN.CENTER);
   assert.equal(a.screen(), 'codes');
-  // The codes list redraws every 5 s. A press during that refresh is not
-  // lost: the EXTI latch holds it and the core handles it afterwards.
-  assert.ok(w.until(() => a.busyMs() > 0, 6000, 10), 'periodic redraw');
+  // The codes list redraws when its codes change (every 30 s). A press
+  // during that refresh is not lost: the EXTI latch holds it and the core
+  // handles it afterwards.
+  assert.ok(w.until(() => a.busyMs() > 0, 31000, 10), 'periodic redraw');
   const r0 = a.refreshes();
   a.setButtons(BTN.LEFT);
   w.advance(30);
@@ -381,9 +397,8 @@ test('a refresh blocks the core; presses during it are latched, as on the board'
   settle(w, a);
   assert.equal(a.screen(), 'menu', 'handled once the panel is idle');
 
-  // But a second press during the refresh that the first one caused is
-  // merged with it: the core never saw the first released. The board does
-  // the same (hal_buttons() in firmware/port/stm32u0/hal_stm32u0.c).
+  // A second press during the refresh that the first one caused is a
+  // second press (core/buttons.c; it used to merge with the first).
   a.setButtons(BTN.DOWN);
   w.advance(30);
   a.setButtons(0);
@@ -394,31 +409,65 @@ test('a refresh blocks the core; presses during it are latched, as on the board'
   a.setButtons(0);
   settle(w, a);
   press(w, a, BTN.CENTER);
-  assert.equal(a.screen(), 'contacts', 'one row down, not two');
+  assert.equal(a.screen(), 'pair', 'two rows down');
 });
 
-test('refreshes follow the firmware: full on wake and sleep and after every 5 partial ones', async () => {
+test('refresh policy: bar steps are partial, wake is partial, sleep is full', async () => {
   const { a, b, w } = await newWorld();
   await pairBoth(w, a, b);
   press(w, a, BTN.CENTER);
   typeText(w, a, CS_LABEL, 'B');
   press(w, a, BTN.CENTER);
   assert.equal(a.screen(), 'contact');
+  settle(w, a);
   const log = recordRefreshes(w);
-  w.advance(45000); // the words redraw every 5 s; then the idle timeout
+  w.advance(40000); // the bar moves every 5 s, the words every 15 s; then the idle timeout
   assert.ok(a.sleeping);
+  settle(w, a);
+  const idle = log.get(a).join('');
+  // Waiting on the words: 2 word changes and their bar steps, all partial
+  // unless a word change comes after 5 partial redraws; then the sleep screen.
+  assert.ok(/^p+F?p*F$/.test(idle), `idle redraws ${idle}`);
+  assert.ok((idle.match(/F/g) || []).length <= 2, 'at most one full refresh besides the sleep screen');
+  log.get(a).length = 0;
+  a.setUnixMs(Math.ceil(a.unix() / 60) * 60000 + 1000); // no clock redraw in what follows
   a.setButtons(BTN.CENTER);
   w.advance(30);
   a.setButtons(0);
-  presses(w, a, BTN.DOWN, 7);
+  settle(w, a);
+  presses(w, a, BTN.DOWN, 6);
   const seq = log.get(a).join('');
-  console.log(`  refreshes: ${seq}`);
-  assert.ok(!/p{6}/.test(seq), 'never more than 5 partial refreshes in a row');
-  // ... F (sleep screen) F (wake) then 5 partial and a full, FULL_REFRESH_EVERY = 5.
-  assert.ok(seq.includes('FFpppppF'), 'sleep and wake are full; then a full after 5 partial');
+  console.log(`  idle on the words: ${idle}; wake and 6 presses: ${seq}`);
+  assert.equal(seq, 'pppppFp', 'wake is partial (the sleep screen left the panel clean); full after 5 partial');
 });
 
-test('a scripted use in the simulator matches the emulator measurement', async () => {
+/** The timing of firmware/renode/power.robot: Press holds 80 ms, waits
+ * 150 ms, then until the panel is off on two checks 0.15 s apart; Tap adds
+ * a 0.6 s pause. */
+function robotWaitIdle(w, d) {
+  let idle = 0;
+  for (let i = 0; i < 400; i++) {
+    if (d.busyMs() === 0) {
+      if (++idle >= 2) return;
+      w.advance(150);
+    } else {
+      idle = 0;
+      w.advance(50);
+    }
+  }
+  throw new Error('panel never idle');
+}
+function robotTap(w, d, btn, expect) {
+  d.setButtons(btn);
+  w.advance(80);
+  d.setButtons(0);
+  w.advance(150);
+  robotWaitIdle(w, d);
+  w.advance(600);
+  if (expect) assert.equal(d.screen(), expect);
+}
+
+test('a scripted use in the simulator replays the emulator measurement exactly', async () => {
   const { a, b, w } = await newWorld();
   await pairBoth(w, a, b);
   press(w, a, BTN.CENTER);
@@ -426,49 +475,44 @@ test('a scripted use in the simulator matches the emulator measurement', async (
   press(w, a, BTN.CENTER);
   for (const label of ['A', 'B', 'C']) assert.ok(a.addTotp(label, 'AAAAAAAAAAAAAAAA') >= 0);
   settle(w, a);
-  press(w, a, BTN.LEFT);
-  press(w, a, BTN.LEFT);
-  w.until(() => a.sleeping, 60000);
-  w.advance(4000);
-  // The same script as firmware/renode/power.robot "a typical use".
-  const tap = (btn, expect) => {
-    press(w, a, btn);
-    w.advance(600);
-    if (expect) assert.equal(a.screen(), expect);
-  };
+  press(w, a, BTN.LEFT); // left on the home menu: sleep now
+  assert.ok(w.until(() => a.sleeping, 5000));
+  settle(w, a);
+  w.advance(500);
+  // Start from the same RTC time as the emulator run (the redraws follow
+  // the clock), then the same script as power.robot "a typical use".
+  const m = POWER.measured.use;
+  a.setUnixMs(m.start_unix_ms);
   a.resetEnergy();
   const log = recordRefreshes(w);
-  tap(BTN.CENTER, 'menu');
+  robotTap(w, a, BTN.CENTER, 'menu');
   w.advance(1000);
-  tap(BTN.DOWN);
-  tap(BTN.CENTER, 'contacts');
-  tap(BTN.CENTER, 'contact');
+  robotTap(w, a, BTN.DOWN);
+  robotTap(w, a, BTN.CENTER, 'contacts');
+  robotTap(w, a, BTN.CENTER, 'contact');
   w.advance(10000);
-  tap(BTN.LEFT, 'contacts');
-  tap(BTN.LEFT, 'menu');
-  tap(BTN.CENTER, 'codes');
+  robotTap(w, a, BTN.LEFT, 'contacts');
+  robotTap(w, a, BTN.LEFT, 'menu');
+  robotTap(w, a, BTN.CENTER, 'codes');
   w.advance(1000);
-  tap(BTN.DOWN);
-  tap(BTN.DOWN);
-  tap(BTN.CENTER, 'code');
+  robotTap(w, a, BTN.DOWN);
+  robotTap(w, a, BTN.DOWN);
+  robotTap(w, a, BTN.CENTER, 'code');
   w.advance(6000);
-  tap(BTN.UP);
+  robotTap(w, a, BTN.UP);
   w.advance(2000);
-  tap(BTN.UP);
+  robotTap(w, a, BTN.UP);
   w.advance(2000);
-  assert.ok(w.until(() => a.sleeping, 60000));
-  w.advance(4000);
+  assert.ok(w.until(() => a.sleeping, 60000, 250));
+  settle(w, a);
   const e = a.energy();
-  const m = POWER.measured.use;
-  const seq = log.get(a);
-  const full = seq.filter((x) => x === 'F').length, partial = seq.length - full;
+  const seq = log.get(a).join('');
   const mAs = chargeMAs(e, 'typ');
-  console.log(`  sim: ${(e.awakeMs / 1000).toFixed(1)} s awake, ${full} full + ${partial} partial, ${mAs.toFixed(1)} mA·s; ` +
-    `emulator: ${m.awake_s.toFixed(1)} s, ${m.full_refreshes} + ${m.partial_refreshes}, ${POWER.cases.typ.use_mAs} mA·s`);
-  assert.ok(Math.abs(full - m.full_refreshes) <= 1, 'full refreshes');
-  assert.ok(Math.abs(partial - m.partial_refreshes) <= 1, 'partial refreshes');
-  assert.ok(Math.abs(e.awakeMs / 1000 - m.awake_s) <= 0.1 * m.awake_s, 'awake time');
-  assert.ok(Math.abs(mAs - POWER.cases.typ.use_mAs) <= 0.1 * POWER.cases.typ.use_mAs, 'charge per use');
+  console.log(`  sim:      ${(e.awakeMs / 1000).toFixed(1)} s awake, ${seq}, ${mAs.toFixed(1)} mA·s\n` +
+    `  emulator: ${m.awake_s.toFixed(1)} s awake, ${m.refresh_seq}, ${POWER.cases.typ.use_mAs} mA·s`);
+  assert.equal(seq, m.refresh_seq, 'the same refreshes in the same order');
+  assert.ok(Math.abs(e.awakeMs / 1000 - m.awake_s) <= 0.03 * m.awake_s, 'awake time within 3 %');
+  assert.ok(Math.abs(mAs - POWER.cases.typ.use_mAs) <= 0.05 * POWER.cases.typ.use_mAs, 'charge per use within 5 %');
 });
 
 test('battery projection agrees with hardware/power/power.py, and the sim model is current', (t) => {

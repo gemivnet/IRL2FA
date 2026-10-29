@@ -46,6 +46,7 @@ namespace Antmicro.Renode.Peripherals.Miscellaneous
             epd.Activity += OnEpd;
             rtc.Activity += OnRtc;
             this.epd = epd;
+            this.rtc = rtc;
             sampler = new LimitTimer(machine.ClockSource, 1000, this, "power_sample", SampleMs, Direction.Ascending, false, WorkMode.Periodic, true);
             sampler.LimitReached += Sample;
         }
@@ -79,6 +80,7 @@ namespace Antmicro.Renode.Peripherals.Miscellaneous
             events.Clear();
             samples.Clear();
             t0 = Now();
+            startUnixMs = rtc.GetUnixTimeMs();
             instr0 = lastSampleInstr = cpu.ExecutedInstructions;
             stop2Ms = epdPoweredMs = irOnMs = 0;
             busyMs.Clear(); busyCount.Clear();
@@ -128,6 +130,7 @@ namespace Antmicro.Renode.Peripherals.Miscellaneous
             sb.AppendFormat(inv, "  \"session\": \"{0}\",\n", session);
             sb.AppendFormat(inv, "  \"mips\": {0},\n  \"ir_baud\": {1},\n  \"sample_ms\": {2},\n", mips, irBaud, SampleMs);
             sb.AppendFormat(inv, "  \"duration_ms\": {0:0.###},\n", t1 - t0);
+            sb.AppendFormat(inv, "  \"start_unix_ms\": {0:0.###},\n", startUnixMs);
             sb.AppendFormat(inv, "  \"instructions\": {0},\n", instr1 - instr0);
             sb.AppendFormat(inv, "  \"stop2_ms\": {0:0.###},\n  \"stop2_entries\": {1},\n  \"wfi_entries\": {2},\n", stop2Ms, stop2Entries, wfiEntries);
             sb.AppendFormat(inv, "  \"epd_powered_ms\": {0:0.###},\n  \"spi_bytes\": {1},\n", epdPoweredMs, spi1 - spi0);
@@ -242,6 +245,7 @@ namespace Antmicro.Renode.Peripherals.Miscellaneous
         private readonly IMachine machine;
         private readonly TranslationCPU cpu;
         private readonly SSD1680 epd;
+        private readonly RV3032 rtc;
         private readonly LimitTimer sampler;
         private readonly int mips, irBaud;
         private readonly List<string> events = new List<string>();
@@ -250,6 +254,7 @@ namespace Antmicro.Renode.Peripherals.Miscellaneous
         private readonly Dictionary<string, int> busyCount = new Dictionary<string, int>();
         private string session = "", busyKind;
         private bool running, inStop2, epdOn, irOn;
+        private double startUnixMs;
         private double t0, t1, stop2At, stop2Ms, epdOnAt, epdPoweredMs, busyAt, irOnAt, irOnMs;
         private ulong instr0, instr1, lastSampleInstr;
         private long spi0, spi1;

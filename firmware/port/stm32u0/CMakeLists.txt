@@ -16,7 +16,7 @@ add_executable(irl2fa.elf
     hal_stm32u0.c
     epd_ssd1680.c
     rv3032.c
-    ${CORE}/app.c ${CORE}/base32.c ${CORE}/fonts.c ${CORE}/gfx.c ${CORE}/hash.c
+    ${CORE}/app.c ${CORE}/base32.c ${CORE}/buttons.c ${CORE}/fonts.c ${CORE}/gfx.c ${CORE}/hash.c
     ${CORE}/pairing.c ${CORE}/store.c ${CORE}/timeutil.c ${CORE}/totp.c
     ${CORE}/wordlist.c ${CORE}/words.c
     ${CORE}/third_party/monocypher/monocypher.c)

@@ -38,7 +38,7 @@ SESSIONS = {"use": "power-use.json", "pairing": "power-pairing.json"}
 # a little room for Renode's quantum-level timing.
 TOLERANCE = {
     "rel": 0.05,
-    "exact": ("full_refreshes", "partial_refreshes", "stop2_entries"),
+    "exact": ("full_refreshes", "partial_refreshes", "stop2_entries", "refresh_seq"),
 }
 
 
@@ -78,7 +78,29 @@ def summarize(raw):
         "ir_tx_bytes": raw["ir_tx_bytes"],
         "ir_led_s": round(raw["ir_led_bits"] / ir["baud"], 4),
         "marks": marks,
+        # Every refresh in order (F full, p partial) and the RTC time the
+        # session started at, so the simulator can replay it exactly.
+        "refresh_seq": "".join("F" if e[2] == "busy:full" else "p" for e in raw["events"]
+                               if e[1] == "epd" and e[2] in ("busy:full", "busy:partial")),
+        "start_unix_ms": raw.get("start_unix_ms", 0),
+        "draw_s": draw_s(raw),
     }
+
+
+def draw_s(raw):
+    """CPU time to draw a screen before the panel is powered: from the RTC
+    read in the title bar's clock to the panel's supply switching on, median
+    over the refreshes where that read came fresh (under 60 ms before)."""
+    last, gaps = None, []
+    for t, what, detail in raw["events"]:
+        if what == "i2c" and detail.startswith("read"):
+            last = t
+        elif what == "epd" and detail == "on":
+            if last is not None and t - last < 60:
+                gaps.append(t - last)
+            last = None
+    gaps.sort()
+    return round(gaps[len(gaps) // 2] / 1000, 4) if gaps else 0.0
 
 
 def timeline(raw):
@@ -210,7 +232,12 @@ def sim_model(measured=None):
     out = {
         "battery": {k: MODEL["battery"][k] for k in ("part", "usable_mAh", "nominal_mAh",
                                                       "self_discharge_pct_per_year")},
-        "epd": {"full_refresh_s": e["full_refresh_s"], "partial_refresh_s": e["partial_refresh_s"]},
+        # overhead_s: per refresh, the time the STM32 keeps the core busy
+        # besides BUSY: drawing the screen, then the driver (supply on,
+        # resets, 2 x 4 kB of RAM). Both measured.
+        "epd": {"full_refresh_s": e["full_refresh_s"], "partial_refresh_s": e["partial_refresh_s"],
+                "overhead_s": round(use.get("draw_s", 0) + use["epd_logic_s"] /
+                                    max(1, use["full_refreshes"] + use["partial_refreshes"]), 3)},
         "ir": {"baud": MODEL["ir"]["baud"]},
         "measured": {k: {f: v for f, v in s.items() if f != "marks"}
                      for k, s in measured["sessions"].items()},
@@ -409,26 +436,38 @@ def markdown(measured=None):
     out += ["", f"At 20 uses a day (typical currents) the year's {n['total']:.0f} mAh splits into "
             f"{n['sleep']:.0f} mAh of sleep current, {n['use']:.0f} mAh of uses and "
             f"{n['pairing']:.1f} mAh of pairings.", "",
-            "## What the measurement changed", "",
-            "Before the emulator measurement the budget assumed a use was 40 s awake with 2 full "
-            "and 3 partial refreshes (63 mA·s typical, 3.7 years typical and 2.1 years worst case "
-            f"at 20 uses a day). The measured use is {use['awake_s']:.0f} s awake with "
-            f"{use['full_refreshes']} full and {use['partial_refreshes']} partial refreshes "
-            f"({session_mAs(use, 'typ'):.0f} mA·s typical): "
+            "## How the measurement changed the firmware", "",
+            "- **v0.1 budget, before any measurement:** a use assumed to be 40 s awake with 2 full "
+            "and 3 partial refreshes (63 mA·s typical): 3.7 years typical, 2.1 worst case at 20 "
+            "uses a day.",
+            "- **First emulator measurement:** 77 s awake with 5 full and 20 partial refreshes "
+            "(113 mA·s): 2.2 / 1.3 years, and heavy use (60 a day) under a year (0.8). The "
+            "contact, code and code-list screens redrew every 5 s for their countdown bars, and "
+            "every sixth redraw was a 3 s full refresh, for as long as the screen stayed up.",
+            "- **Now** (`firmware/core/app.c`): a screen is redrawn when its content changes "
+            "(words every 15 s, codes every 30 or 60 s); the countdown bar moves in thirds of the "
+            "period with partial refreshes that never trigger a full one; a full refresh comes on "
+            "the first content change after 5 partial ones; waking is a partial refresh because "
+            "the sleep screen's full refresh left the panel clean; the sleep screen stays a full "
+            "refresh so nothing sensitive is left on the glass. The same use is now "
+            f"{use['awake_s']:.0f} s awake with {use['full_refreshes']} full and "
+            f"{use['partial_refreshes']} partial refreshes ({session_mAs(use, 'typ'):.0f} mA·s): "
             f"{life_years('normal', 'typ', measured):.1f} years typical and "
-            f"{life_years('normal', 'worst', measured):.1f} years worst case.", "",
-            "- **The e-paper dominates**: "
-            f"{100 * charge_parts(use, 'typ')['e-paper refreshing'] / session_mAs(use, 'typ'):.0f} % "
-            "of a use. The contact, code and code-list screens redraw every 5 s for their countdown "
-            "bars (`current_view_key()` in `firmware/core/app.c`), and every sixth redraw is a full "
-            "3 s refresh, for as long as the screen stays up, including the 30 s before the idle "
-            "timeout.",
-            "- **Heavy use (60 a day) is under a year** with these figures. Redrawing those screens "
-            "only when the word or code changes (every 15 or 30 s), or a shorter idle timeout on "
-            "them, would cut most of it; that is a firmware change for a separate pull request.",
-            "- **Pairing is cheap** per pairing (the LED is lit for about "
-            f"{100 * pair['ir_led_s'] / max(1e-9, pair['ir_on_s']):.0f} % of the IR-on time), and "
-            "rare.", "",
+            f"{life_years('normal', 'worst', measured):.1f} worst case at 20 uses a day, and "
+            f"{life_years('heavy', 'typ', measured):.2f} years typical at 60 a day, so heavy use "
+            "is still just short of a year. The next lever is the MCU waiting in Sleep mode at "
+            "16 MHz while awake "
+            f"({100 * charge_parts(use, 'typ')['MCU in WFI'] / session_mAs(use, 'typ'):.0f} % of a "
+            "use, with a current that is still an estimate): idling in Stop 2 between polls, "
+            "with a low-power timer as the time base, is a port change of its own.",
+            "- **The clock** (`firmware/port/stm32u0/rv3032.c`): the RTC driver returned the "
+            "second it last read for up to 250 ms, so just after a boundary a screen could show "
+            "the previous code or word and redraw a moment later, an extra refresh. It now "
+            "counts on from the RV-3032's hundredths with the millisecond tick. Found by "
+            "replaying the measured use in the simulator, whose clock is exact.",
+            "- **Pairing** listens before it talks, so frames rarely collide, and gives up after "
+            "60 s; the LED is lit for about "
+            f"{100 * pair['ir_led_s'] / max(1e-9, pair['ir_on_s']):.0f} % of the IR-on time.", "",
             "## What is still an assumption", "",
             "- **The e-paper current waveform.** The panel is modelled as a flat "
             f"{e['refresh_mA']['typ']} mA for the whole BUSY time, which is itself the datasheet "
@@ -457,6 +496,22 @@ def markdown(measured=None):
     return "\n".join(out) + "\n"
 
 
+# The battery-life requirement: 20 uses a day with worst-case currents.
+# (60 a day with typical currents is reported in the doc: 0.98 years with
+# the MCU idling awake in Sleep mode; see "How the measurement changed".)
+REQUIRED = (("normal", "worst"),)
+
+
+def requirement_problems(measured=None):
+    req = MODEL["requirement_years"]
+    out = []
+    for prof, case in REQUIRED:
+        life = life_years(prof, case, measured)
+        if life < req:
+            out.append(f"{prof}, {case}: {life:.2f} years < {req} year requirement")
+    return out
+
+
 def drift(fresh, committed):
     """Differences beyond TOLERANCE between two measured.json 'sessions'."""
     problems = []
@@ -466,7 +521,7 @@ def drift(fresh, committed):
             problems.append(f"{name}: session missing from the fresh run")
             continue
         for k, v in s.items():
-            if k == "marks" or k not in f:
+            if k in ("marks", "start_unix_ms", "draw_s") or k not in f:
                 continue
             if k in TOLERANCE["exact"]:
                 if f[k] != v:
@@ -525,9 +580,7 @@ def main():
         if a.check:
             problems = drift(fresh, load_measured())
             req = MODEL["requirement_years"]
-            life = life_years("normal", "worst", fresh)
-            if life < req:
-                problems.append(f"normal, worst case: {life:.2f} years < {req} year requirement")
+            problems += requirement_problems(fresh)
             if problems:
                 print("POWER CHECK FAILED:\n  " + "\n  ".join(problems), file=sys.stderr)
                 print("If the change is intended: python3 hardware/power/power.py "

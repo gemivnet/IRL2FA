@@ -21,12 +21,27 @@
 #define REPEAT_DELAY_MS 450
 #define REPEAT_RATE_MS 90
 #define FULL_REFRESH_EVERY 5   /* GDEY0213B74 datasheet: full refresh after 5 fast/partial ones */
+#define BAR_STEPS 3            /* countdown bars move in thirds of the period (partial refreshes) */
 #define PAIR_TX_MS 220
 /* Once the other device's COMMIT is in, its REVEAL follows within a second
  * or two even on a lossy link. A device stuck waiting longer is the sign of
  * a man in the middle who saw the two SAS values would not match and held
  * the REVEAL back: show that as a failed pairing, not an endless wait. */
 #define PAIR_REVEAL_TIMEOUT_MS 15000
+/* Listen before talk: the link is half duplex (each phototransistor also
+ * sees its own LED), so a frame sent while the other device's is in the air
+ * is lost on both sides. A frame is only started once no byte from the
+ * other device has arrived for PAIR_QUIET_MS (about 3 byte times at 4800
+ * baud); otherwise it waits a random 4-35 ms and looks again. */
+#define PAIR_QUIET_MS 6
+#define PAIR_BAUD 4800
+/* Give up when no exchange completes in a minute (nobody there, or out of
+ * range), so a device left on the pairing screen goes back to the menu and
+ * can sleep: pairing keeps the device awake only until then. */
+#define PAIR_TIMEOUT_MS 60000
+/* Pairing keeps the device awake (the two people compare symbols and name
+ * each other at their own pace) for at most this long from the start. */
+#define PAIR_AWAKE_MS 180000
 #define TIME_VALID_AFTER 1767225600 /* 2026-01-01T00:00:00Z */
 #define TITLE_H 15
 #define ROW_H 18
@@ -89,6 +104,8 @@ static struct {
     bool force_full;
     int fast_count;
     uint32_t view_key;     /* changes when time-dependent content changes */
+    uint32_t tick_key;     /* changes when only a countdown bar moves */
+    uint8_t code_period;   /* period of the code on screen (s) */
     uint32_t last_input_ms;
 
     uint8_t held;
@@ -152,6 +169,9 @@ static struct {
     unsigned pair_seq;
     uint32_t pair_next_tx;
     uint32_t pair_found_ms; /* when the peer's COMMIT arrived */
+    uint32_t pair_started_ms;
+    uint32_t pair_rx_ms;    /* last byte heard from the other device */
+    uint32_t pair_tx_end;   /* our own frame is in the air until then */
 } ui;
 
 static const char *const SCREEN_NAMES[] = {
@@ -497,6 +517,7 @@ static void draw_code(void)
         return;
     }
     title_bar(r.label);
+    ui.code_period = r.period;
     char code[10], spaced[12];
     totp_format(totp((hash_alg_t)r.alg, r.secret, r.secret_len, (uint64_t)now_utc(), r.period,
                      r.digits),
@@ -613,6 +634,9 @@ static void start_pairing(void)
     crypto_wipe(rnd, sizeof(rnd));
     ui.pair_seq = 0;
     ui.pair_next_tx = hal_millis();
+    ui.pair_started_ms = ui.pair_next_tx;
+    ui.pair_rx_ms = ui.pair_next_tx - 1000u;
+    ui.pair_tx_end = ui.pair_next_tx;
     hal_ir_enable(true);
     go(SCR_PAIR);
 }
@@ -1199,14 +1223,18 @@ static void scan_buttons(uint32_t now)
 /* ------------------------------------------------------------------ */
 /* rendering and main loop                                            */
 
+/* Changes when what a screen shows changes with time. A redraw for it may
+ * be a full refresh (after FULL_REFRESH_EVERY partial ones). */
 static uint32_t current_view_key(void)
 {
     int64_t t = now_utc();
     switch (ui.scr) {
-    case SCR_CODE:
-    case SCR_CODES:
-    case SCR_CONTACT:
-        return (uint32_t)(t / 5);        /* countdown bars in 5 s steps */
+    case SCR_CODE:                       /* the code (and the clock) */
+        return (uint32_t)(t / (ui.code_period ? ui.code_period : 30));
+    case SCR_CODES:                      /* 30 and 60 s codes both change on 30 s steps */
+        return (uint32_t)(t / 30);
+    case SCR_CONTACT:                    /* the words */
+        return (uint32_t)(t / WORDS_PERIOD_S);
     case SCR_PIN:
         return (uint32_t)(hal_millis() / 1000);
     default:
@@ -1214,7 +1242,20 @@ static uint32_t current_view_key(void)
     }
 }
 
-static void render(void)
+/* Changes when only a countdown bar moves: always a partial refresh, and
+ * not counted towards the next full one (the bar is a few hundred pixels;
+ * its ghosting clears at the next content change). Before this, every 5 s
+ * bar step counted, so a code or contact left on screen got a 3 s full
+ * refresh every 30 s: most of a use's charge (docs/power-calculations.md). */
+static uint32_t current_tick_key(void)
+{
+    int64_t t = now_utc();
+    if (ui.scr == SCR_CONTACT) return (uint32_t)(t / (WORDS_PERIOD_S / BAR_STEPS));
+    if (ui.scr == SCR_CODE) return (uint32_t)(t / ((ui.code_period ? ui.code_period : 30) / BAR_STEPS));
+    return 0;
+}
+
+static void render(bool tick_only)
 {
     gfx_clear();
     switch (ui.scr) {
@@ -1234,12 +1275,16 @@ static void render(void)
     case SCR_MESSAGE: draw_message(); break;
     case SCR_ABOUT: draw_about(); break;
     }
+    /* Keys as of what was just drawn (drawing the code screen sets
+     * code_period), so a redraw is not followed by a spurious one. */
+    ui.view_key = current_view_key();
+    ui.tick_key = current_tick_key();
     display_mode_t mode = DISPLAY_FAST;
-    if (ui.force_full || ui.fast_count >= FULL_REFRESH_EVERY) {
+    if (ui.force_full || (!tick_only && ui.fast_count >= FULL_REFRESH_EVERY)) {
         mode = DISPLAY_FULL;
         ui.fast_count = 0;
         ui.force_full = false;
-    } else {
+    } else if (!tick_only) {
         ui.fast_count++;
     }
     hal_display_show(gfx_fb, mode);
@@ -1267,7 +1312,10 @@ void app_wake(void)
 {
     ui.held = hal_buttons();
     ui.last_input_ms = hal_millis();
-    ui.force_full = true;
+    /* The sleep screen went up with a full refresh, so the panel is clean:
+     * the first screen can be a partial one (0.42 s, not 3 s). The STM32
+     * driver still does a full one if it lost track of the panel. */
+    ui.force_full = false;
     ui.sel = 0;
     list_top = 0;
     menu_top = 0;
@@ -1282,6 +1330,11 @@ int64_t app_wake_at(void)
 
 void app_ir_rx(const uint8_t *data, size_t len)
 {
+    /* Carrier sense for the pairing transmitter: any byte while our own
+     * frame is not in the air (that would be our echo) means the other
+     * device is talking. */
+    uint32_t now = hal_millis();
+    if (len && (int32_t)(now - ui.pair_tx_end) > 0) ui.pair_rx_ms = now;
     if (ui.scr != SCR_PAIR && ui.scr != SCR_SAS) return;
     if (pairing_rx(&ui.pair, data, len)) {
         if (ui.pair.state == PAIR_REVEALING) ui.pair_found_ms = hal_millis();
@@ -1305,23 +1358,35 @@ uint32_t app_poll(void)
     if ((ui.scr == SCR_PAIR || ui.scr == SCR_SAS || ui.scr == SCR_TEXT) &&
         ui.pair.state >= PAIR_SEARCHING && ui.pair.state <= PAIR_DONE &&
         (int32_t)(now - ui.pair_next_tx) >= 0) {
-        uint8_t frame[PAIR_FRAME_MAX];
-        size_t n = pairing_tx(&ui.pair, frame, sizeof(frame), ui.pair_seq++);
-        if (n) hal_ir_send(frame, n);
         uint8_t jitter;
         hal_random(&jitter, 1);
-        ui.pair_next_tx = now + PAIR_TX_MS + (jitter & 0x7f);
-        ui.last_input_ms = now; /* don't fall asleep mid-pairing */
+        if ((int32_t)(now - ui.pair_rx_ms) < PAIR_QUIET_MS) {
+            /* The other device is mid-frame: back off and listen again. */
+            ui.pair_next_tx = now + 4u + (jitter & 0x1f);
+        } else {
+            uint8_t frame[PAIR_FRAME_MAX];
+            size_t n = pairing_tx(&ui.pair, frame, sizeof(frame), ui.pair_seq++);
+            if (n) hal_ir_send(frame, n);
+            ui.pair_tx_end = now + (uint32_t)(n * 10u * 1000u / PAIR_BAUD) + 2u;
+            ui.pair_next_tx = now + PAIR_TX_MS + (jitter & 0x7f);
+        }
+        /* Don't fall asleep mid-pairing, but not for ever either. */
+        if ((int32_t)(now - ui.pair_started_ms) < PAIR_AWAKE_MS) ui.last_input_ms = now;
+    }
+    if (ui.scr == SCR_PAIR && (ui.pair.state == PAIR_SEARCHING || ui.pair.state == PAIR_REVEALING) &&
+        (int32_t)(now - ui.pair_started_ms) >= PAIR_TIMEOUT_MS) {
+        /* Signed: start_pairing() ran inside this poll, after `now` was
+         * read, and key generation takes a while on the device. */
+        stop_pairing();
+        message_to_menu("No other device found", "Hold them top edge to top edge", M_HOME);
     }
 
-    uint32_t key = current_view_key();
-    if (key != ui.view_key) {
-        ui.view_key = key;
-        ui.dirty = true;
-    }
+    if (current_view_key() != ui.view_key) ui.dirty = true;
     if (ui.dirty) {
         ui.dirty = false;
-        render();
+        render(false);
+    } else if (current_tick_key() != ui.tick_key) {
+        render(true);
     }
 
     uint32_t idle_limit = (store_settings()->sleep_s ? store_settings()->sleep_s
@@ -1332,7 +1397,10 @@ uint32_t app_poll(void)
         crypto_wipe(ui.text.buf, sizeof(ui.text.buf));
         store_lock();
         draw_sleep();
+        /* Always full: it wipes every trace of words and codes off the
+         * glass for as long as the device sleeps. */
         hal_display_show(gfx_fb, DISPLAY_FULL);
+        ui.fast_count = 0;
         return APP_SLEEP;
     }
     if (ui.held) return 20;

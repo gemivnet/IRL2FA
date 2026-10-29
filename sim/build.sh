@@ -16,7 +16,7 @@ EMSDK_IMAGE="${EMSDK_IMAGE:-emscripten/emsdk:3.1.74}"
 CORE="firmware/core/hash.c firmware/core/base32.c firmware/core/totp.c
       firmware/core/words.c firmware/core/wordlist.c firmware/core/pairing.c
       firmware/core/store.c firmware/core/gfx.c firmware/core/fonts.c
-      firmware/core/timeutil.c firmware/core/app.c
+      firmware/core/timeutil.c firmware/core/app.c firmware/core/buttons.c
       firmware/core/third_party/monocypher/monocypher.c
       firmware/vhal/vhal.c sim/sim_main.c"
 

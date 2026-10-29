@@ -57,6 +57,7 @@ namespace Antmicro.Renode.Peripherals.Miscellaneous
         // ---- test controls ----
         public void SetUnixTime(long t) { baseUnix = t; baseMs = NowMs(); }
         public long GetUnixTime() { return baseUnix + (long)Math.Floor((NowMs() - baseMs) / 1000.0); }
+        public double GetUnixTimeMs() { return baseUnix * 1000.0 + (NowMs() - baseMs); }
         public void ClearPowerOnFlag() { regs[0x0D] &= 0xFC; }
         public void PokeRegister(int address, int value) { regs[address & 0xFF] = (byte)value; }
         public int PeekRegister(int address) { return Read((byte)address); }

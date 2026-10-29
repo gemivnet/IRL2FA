@@ -16,6 +16,7 @@
 #include "board.h"
 #include "timeutil.h"
 
+#define R_HUNDREDTHS 0x00
 #define R_SECONDS 0x01
 #define R_TIMER0 0x0B
 #define R_STATUS 0x0D
@@ -48,9 +49,16 @@
 static const uint8_t MARKER[4] = {'I', 'R', 'L', 'T'};
 
 static bool valid;
-static int64_t cache_t;
-static uint32_t cache_ms;
+static int64_t cache_t;    /* whole seconds read from the clock... */
+static uint32_t cache_sub; /* ...and how far into that second (ms) */
+static uint32_t cache_ms;  /* board_millis() at that read */
 static bool cache_ok;
+
+/* The time now, from the last read and the millisecond tick since. */
+static int64_t cache_now(uint32_t now)
+{
+    return cache_t + (int64_t)((cache_sub + (now - cache_ms)) / 1000u);
+}
 
 static bool rd(uint8_t reg, uint8_t *buf, size_t n)
 {
@@ -141,14 +149,19 @@ int64_t rv3032_get(void)
 {
     if (!valid) return 0;
     uint32_t now = board_millis();
-    /* The core asks many times per screen; one read per 250 ms is plenty
-     * (codes change on whole seconds and are shown with 5 s granularity). */
-    if (cache_ok && now - cache_ms < 250u) return cache_t;
-    uint8_t r[7];
-    if (!rd(R_SECONDS, r, sizeof(r))) {
+    /* The core asks many times per screen; one read per 250 ms is plenty.
+     * In between, count on from the last read with the millisecond tick,
+     * starting from the hundredths it gave: returning the cached second
+     * as is could lag a second boundary by up to 250 ms, and the screen
+     * would show the previous word or code and redraw a moment later
+     * (an extra refresh the emulator caught). */
+    if (cache_ok && now - cache_ms < 250u) return cache_now(now);
+    uint8_t b[8];
+    if (!rd(R_HUNDREDTHS, b, sizeof(b))) {
         /* Keep counting from the last good read rather than flash "--:--". */
-        return cache_ok ? cache_t + (int64_t)((now - cache_ms) / 1000u) : 0;
+        return cache_ok ? cache_now(now) : 0;
     }
+    const uint8_t *r = b + 1; /* Seconds .. Year */
     civil_t c = {
         .sec = from_bcd(r[0] & 0x7F),
         .min = from_bcd(r[1] & 0x7F),
@@ -157,12 +170,14 @@ int64_t rv3032_get(void)
         .month = from_bcd(r[5] & 0x1F),
         .year = 2000 + from_bcd(r[6]),
     };
+    uint32_t hundredths = (uint32_t)from_bcd(b[0]);
     if (c.sec > 59 || c.min > 59 || c.hour > 23 || c.month < 1 || c.month > 12 || c.day < 1 ||
         c.day > time_days_in_month(c.year, c.month)) {
         valid = false;
         return 0;
     }
     cache_t = time_from_civil(&c);
+    cache_sub = hundredths < 100u ? hundredths * 10u : 0u;
     cache_ms = now;
     cache_ok = true;
     return cache_t;
@@ -187,6 +202,7 @@ void rv3032_set(int64_t unix_time)
     wr1(R_STATUS, 0);
     valid = wr(R_USER_RAM, MARKER, sizeof(MARKER));
     cache_t = unix_time;
+    cache_sub = 0; /* the prescaler restarted */
     cache_ms = board_millis();
     cache_ok = valid;
 }

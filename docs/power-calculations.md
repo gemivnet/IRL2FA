@@ -28,29 +28,29 @@ The script: wake with a press, open the contact and read the SAY/HEAR words for 
 
 | | Use | Pairing |
 |-|-|-|
-| Awake (wake press to Stop 2) | 79.4 s | 61.9 s |
-| Core executing (instructions / 16 MHz) | 3.742 s (59,875,968 instr.) | 3.843 s (61,486,097 instr.) |
-| Core in WFI (Sleep mode) | 75.6 s | 58.0 s |
-| Full / partial refreshes | 6 / 20 | 4 / 12 |
-| E-paper BUSY (full + partial) | 26.40 s | 17.04 s |
-| E-paper powered, not refreshing | 3.73 s | 2.29 s |
-| SPI to the panel | 209,014 B (209 ms at 8 MHz) | 128,624 B (129 ms) |
-| RTC I2C transactions | 358 (1790 B) | 310 (1550 B) |
-| IR receiver on / LED lit | 0.0 s / 0.00 s | 21.3 s / 2.42 s (2240 B sent) |
+| Awake (wake press to Stop 2) | 74.7 s | 60.1 s |
+| Core executing (instructions / 16 MHz) | 3.067 s (49,072,989 instr.) | 3.870 s (61,922,243 instr.) |
+| Core in WFI (Sleep mode) | 71.6 s | 56.2 s |
+| Full / partial refreshes | 3 / 18 | 2 / 14 |
+| E-paper BUSY (full + partial) | 16.56 s | 11.88 s |
+| E-paper powered, not refreshing | 3.02 s | 2.28 s |
+| SPI to the panel | 168,819 B (169 ms at 8 MHz) | 128,624 B (129 ms) |
+| RTC I2C transactions | 388 (2134 B) | 330 (1815 B) |
+| IR receiver on / LED lit | 0.0 s / 0.00 s | 22.1 s / 2.58 s (2398 B sent) |
 | Stop 2 entries | 1 | 1 |
 
 ## Charge
 
 | Contributor | Current typ / worst | Use: typ / worst (mA·s) | Pairing: typ / worst (mA·s) |
 |-|-|-|-|
-| MCU running | 1.2 / 2.0 mA | 4.74 / 7.90 | 4.77 / 7.94 |
-| MCU in WFI | 0.35 / 0.6 mA | 26.47 / 45.38 | 20.31 / 34.81 |
-| e-paper refreshing | 3.5 / 5.0 mA | 92.40 / 132.00 | 59.64 / 85.20 |
-| e-paper powered, not refreshing | 0.3 / 1.0 mA | 1.12 / 3.73 | 0.69 / 2.29 |
-| RTC I2C | 0.32 / 0.64 mA | 0.05 / 0.10 | 0.04 / 0.09 |
-| IR LED | 18 / 25 mA | 0.00 / 0.00 | 43.54 / 60.47 |
-| IR receiver | 0.1 / 0.3 mA | 0.00 / 0.00 | 2.13 / 6.39 |
-| **Total** | | **124.8 / 189.1** | **131.1 / 197.2** |
+| MCU running | 1.2 / 2.0 mA | 3.88 / 6.47 | 4.80 / 8.00 |
+| MCU in WFI | 0.35 / 0.6 mA | 25.08 / 42.99 | 19.68 / 33.73 |
+| e-paper refreshing | 3.5 / 5.0 mA | 57.96 / 82.80 | 41.58 / 59.40 |
+| e-paper powered, not refreshing | 0.3 / 1.0 mA | 0.90 / 3.02 | 0.69 / 2.28 |
+| RTC I2C | 0.32 / 0.64 mA | 0.06 / 0.12 | 0.05 / 0.10 |
+| IR LED | 18 / 25 mA | 0.00 / 0.00 | 46.35 / 64.38 |
+| IR receiver | 0.1 / 0.3 mA | 0.00 / 0.00 | 2.21 / 6.62 |
+| **Total** | | **87.9 / 135.4** | **115.3 / 174.5** |
 
 ### Current sources
 
@@ -67,19 +67,19 @@ The script: wake with a press, open the contact and read the SAY/HEAR words for 
 
 | Profile | Uses/day | Pairings/year | Typical: mAh/year | Typical: years | Worst: mAh/year | Worst: years |
 |-|-|-|-|-|-|-|
-| light | 5 | 2 | 74 | 6.8 | 150 | 3.5 |
-| normal | 20 | 6 | 264 | 2.0 | 437 | 1.2 |
-| heavy | 60 | 12 | 770 | 0.7 | 1205 | 0.4 |
+| light | 5 | 2 | 55 | 9.0 | 122 | 4.2 |
+| normal | 20 | 6 | 189 | 2.8 | 328 | 1.6 |
+| heavy | 60 | 12 | 545 | 1.0 | 878 | 0.6 |
 
-At 20 uses a day (typical currents) the year's 264 mAh splits into 10 mAh of sleep current, 253 mAh of uses and 0.2 mAh of pairings.
+At 20 uses a day (typical currents) the year's 189 mAh splits into 10 mAh of sleep current, 178 mAh of uses and 0.2 mAh of pairings.
 
-## What the measurement changed
+## How the measurement changed the firmware
 
-Before the emulator measurement the budget assumed a use was 40 s awake with 2 full and 3 partial refreshes (63 mA·s typical, 3.7 years typical and 2.1 years worst case at 20 uses a day). The measured use is 79 s awake with 6 full and 20 partial refreshes (125 mA·s typical): 2.0 years typical and 1.2 years worst case.
-
-- **The e-paper dominates**: 74 % of a use. The contact, code and code-list screens redraw every 5 s for their countdown bars (`current_view_key()` in `firmware/core/app.c`), and every sixth redraw is a full 3 s refresh, for as long as the screen stays up, including the 30 s before the idle timeout.
-- **Heavy use (60 a day) is under a year** with these figures. Redrawing those screens only when the word or code changes (every 15 or 30 s), or a shorter idle timeout on them, would cut most of it; that is a firmware change for a separate pull request.
-- **Pairing is cheap** per pairing (the LED is lit for about 11 % of the IR-on time), and rare.
+- **v0.1 budget, before any measurement:** a use assumed to be 40 s awake with 2 full and 3 partial refreshes (63 mA·s typical): 3.7 years typical, 2.1 worst case at 20 uses a day.
+- **First emulator measurement:** 77 s awake with 5 full and 20 partial refreshes (113 mA·s): 2.2 / 1.3 years, and heavy use (60 a day) under a year (0.8). The contact, code and code-list screens redrew every 5 s for their countdown bars, and every sixth redraw was a 3 s full refresh, for as long as the screen stayed up.
+- **Now** (`firmware/core/app.c`): a screen is redrawn when its content changes (words every 15 s, codes every 30 or 60 s); the countdown bar moves in thirds of the period with partial refreshes that never trigger a full one; a full refresh comes on the first content change after 5 partial ones; waking is a partial refresh because the sleep screen's full refresh left the panel clean; the sleep screen stays a full refresh so nothing sensitive is left on the glass. The same use is now 75 s awake with 3 full and 18 partial refreshes (88 mA·s): 2.8 years typical and 1.6 worst case at 20 uses a day, and 0.98 years typical at 60 a day, so heavy use is still just short of a year. The next lever is the MCU waiting in Sleep mode at 16 MHz while awake (29 % of a use, with a current that is still an estimate): idling in Stop 2 between polls, with a low-power timer as the time base, is a port change of its own.
+- **The clock** (`firmware/port/stm32u0/rv3032.c`): the RTC driver returned the second it last read for up to 250 ms, so just after a boundary a screen could show the previous code or word and redraw a moment later, an extra refresh. It now counts on from the RV-3032's hundredths with the millisecond tick. Found by replaying the measured use in the simulator, whose clock is exact.
+- **Pairing** listens before it talks, so frames rarely collide, and gives up after 60 s; the LED is lit for about 12 % of the IR-on time.
 
 ## What is still an assumption
 

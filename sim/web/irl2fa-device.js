@@ -24,8 +24,12 @@ export class Device {
     this.ioCap = mod._sim_io_cap();
     this.str = mod._sim_str_buf();
     this.strCap = mod._sim_str_cap();
-    // The panel's BUSY times, from the same model as the battery budget.
-    mod._sim_set_epd_timing(Math.round(POWER.epd.full_refresh_s * 1000), Math.round(POWER.epd.partial_refresh_s * 1000));
+    // How long a refresh keeps the core from polling: the panel's BUSY time
+    // plus the STM32's own time (drawing, then the driver: supply on,
+    // resets, RAM transfer), both from the same model as the battery budget.
+    const ov = POWER.epd.overhead_s || 0;
+    mod._sim_set_epd_timing(Math.round((POWER.epd.full_refresh_s + ov) * 1000),
+      Math.round((POWER.epd.partial_refresh_s + ov) * 1000));
   }
 
   static async create(factory, name, moduleOpts = {}) {
@@ -224,7 +228,7 @@ export class World {
     this.elapsedMs = 0;
     this.onRefresh = null;   // (device, isFull) => void
     this.onIr = null;        // (fromIdx, toIdx, bytes, delivered, lost, reason) => void
-    this.pending = [];       // frames in flight
+    this.pending = [];       // bytes in flight
     this.txLog = devices.map(() => []);   // [start, end] of each device's frames
     this.txUntil = devices.map(() => 0);
     this.stats = { frames: 0, delivered: 0, corrupted: 0, dropouts: 0, collisions: 0, unheard: 0 };
@@ -242,18 +246,34 @@ export class World {
 
   quality() { return irLinkQuality(this.link); }
 
-  /** Takes what each device has sent and puts it on the air. */
+  /** Takes what each device has sent and puts it on the air, one byte per
+   * 10 bit times (start, 8 data, stop): the receiver gets each byte when
+   * its stop bit has arrived, as the UART interrupt delivers it on the
+   * board, so a device can hear that the other is mid-frame. */
   _send() {
     const ds = this.devices;
     const now = this.elapsedMs;
+    const bt = this.airtime ? (10 * 1000) / this.baud : 0;
+    const q = this.quality();
     for (let i = 0; i < ds.length; i++) {
       const bytes = ds[i].irTake();
       if (!bytes.length) continue;
       const start = Math.max(now, this.txUntil[i]);
-      const end = this.airtime ? start + (bytes.length * 10 * 1000) / this.baud : start;
+      const end = start + bytes.length * bt;
       this.txUntil[i] = end;
       this.txLog[i].push([start, end]);
-      for (let j = 0; j < ds.length; j++) if (j !== i) this.pending.push({ at: end, start, end, from: i, to: j, bytes });
+      for (let j = 0; j < ds.length; j++) {
+        if (j === i) continue;
+        // Per frame and receiver: does it lose byte sync for this frame?
+        const frame = {
+          from: i, to: j, bytes, n: bytes.length, got: 0,
+          dropped: q.dropout > 0 && this.random() < q.dropout || (this.noisy && this.random() < this.dropRate),
+          collided: false, flipped: false, unheard: false,
+        };
+        for (let k = 0; k < bytes.length; k++) {
+          this.pending.push({ at: start + (k + 1) * bt, t0: start + k * bt, frame, k });
+        }
+      }
     }
   }
 
@@ -263,38 +283,42 @@ export class World {
     return false;
   }
 
-  /** Delivers frames whose last bit has arrived. */
+  /** Delivers the bytes whose stop bit has arrived. */
   _deliver() {
     const now = this.elapsedMs;
-    const due = this.pending.filter((p) => p.at <= now);
-    if (!due.length) return;
+    if (!this.pending.some((p) => p.at <= now)) return;
+    const due = this.pending.filter((p) => p.at <= now).sort((a, b) => a.at - b.at);
     this.pending = this.pending.filter((p) => p.at > now);
     const q = this.quality();
     for (const p of due) {
-      const to = this.devices[p.to];
-      let reason = 'ok';
-      let bytes = p.bytes;
-      if (!this.linked || to.sleeping || !to.irOn()) reason = 'unheard';
-      else if (this.airtime && this._overlaps(p.to, p.start, p.end)) reason = 'collision';
-      else if (this.random() < q.dropout || (this.noisy && this.random() < this.dropRate)) reason = 'dropout';
-      else if (q.ber > 1e-12) {
-        bytes = Uint8Array.from(bytes);
-        let flips = 0;
-        for (let k = 0; k < bytes.length; k++)
-          for (let b = 0; b < 8; b++) if (this.random() < q.ber) { bytes[k] ^= 1 << b; flips++; }
-        if (flips) reason = 'corrupted';
+      const f = p.frame;
+      const to = this.devices[f.to];
+      let byte = f.bytes[p.k];
+      if (!this.linked || to.sleeping || !to.irOn()) f.unheard = true;
+      else if (!f.dropped) {
+        if (this.airtime && this._overlaps(f.to, p.t0, p.at)) {
+          // Its own LED is lit: the phototransistor sees both. Garbage.
+          f.collided = true;
+          byte = Math.floor(this.random() * 256);
+        } else if (q.ber > 1e-12) {
+          for (let b = 0; b < 8; b++) if (this.random() < q.ber) { byte ^= 1 << b; f.flipped = true; }
+        }
+        to.irRx(Uint8Array.of(byte));
       }
-      this.stats.frames++;
-      const delivered = reason === 'ok' || reason === 'corrupted';
-      if (delivered) to.irRx(bytes);
-      if (reason === 'ok') this.stats.delivered++;
-      else if (reason === 'corrupted') this.stats.corrupted++;
-      else if (reason === 'dropout') this.stats.dropouts++;
-      else if (reason === 'collision') this.stats.collisions++;
-      else this.stats.unheard++;
-      if (this.onIr) this.onIr(p.from, p.to, p.bytes, reason === 'ok', reason !== 'ok' && reason !== 'unheard', reason);
+      if (p.k === f.n - 1) this._frameDone(f);
     }
     for (const log of this.txLog) while (log.length && log[0][1] < now - 2000) log.shift();
+  }
+
+  _frameDone(f) {
+    const reason = f.unheard ? 'unheard' : f.dropped ? 'dropout' : f.collided ? 'collision' : f.flipped ? 'corrupted' : 'ok';
+    this.stats.frames++;
+    if (reason === 'ok') this.stats.delivered++;
+    else if (reason === 'corrupted') this.stats.corrupted++;
+    else if (reason === 'dropout') this.stats.dropouts++;
+    else if (reason === 'collision') this.stats.collisions++;
+    else this.stats.unheard++;
+    if (this.onIr) this.onIr(f.from, f.to, f.bytes, reason === 'ok', reason !== 'ok' && reason !== 'unheard', reason);
   }
 
   /** Runs `ms` of simulated time, polling each awake device when it asks. */

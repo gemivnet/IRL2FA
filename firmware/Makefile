@@ -7,9 +7,9 @@ SAN ?= -fsanitize=address,undefined -fno-omit-frame-pointer
 
 CORE = core/hash.c core/base32.c core/totp.c core/words.c core/wordlist.c \
        core/pairing.c core/store.c core/gfx.c core/fonts.c core/timeutil.c \
-       core/app.c core/third_party/monocypher/monocypher.c
+       core/app.c core/buttons.c core/third_party/monocypher/monocypher.c
 TESTS = tests/test_main.c tests/test_crypto.c tests/test_device.c tests/test_powercut.c \
-        tests/test_app.c vhal/vhal.c
+        tests/test_app.c tests/test_behaviour.c vhal/vhal.c
 
 BUILD = build/host
 
@@ -51,7 +51,7 @@ FUZZ_CFLAGS = -std=c11 -O1 -g -fsanitize=fuzzer,address,undefined -fno-sanitize-
               -fno-omit-frame-pointer
 FUZZ_SRC_pairing = core/pairing.c core/hash.c $(MONO)
 FUZZ_SRC_base32 = core/base32.c
-FUZZ_SRC_store = core/store.c core/hash.c vhal/vhal.c $(MONO)
+FUZZ_SRC_store = core/store.c core/hash.c core/buttons.c vhal/vhal.c $(MONO)
 FUZZ_SRC_app = $(CORE) vhal/vhal.c
 FUZZ_RUN = -max_total_time=$(FUZZ_TIME) -timeout=10 -rss_limit_mb=2048 -max_len=4096 \
            -print_final_stats=1
@@ -78,7 +78,7 @@ CT_CFLAGS = -std=c11 -O2 -g -DIRL2FA_CTGRIND -Wall -Wextra -Werror -Wno-unused-p
 $(VERIFY)/ct_check: verify/ct_check.c verify/ct.supp $(CORE) $(wildcard core/*.h vhal/*)
 	@mkdir -p $(VERIFY)
 	$(CC) $(CT_CFLAGS) -fno-inline -c -o $(VERIFY)/monocypher-noinline.o $(MONO)
-	$(CC) $(CT_CFLAGS) -o $@ verify/ct_check.c core/pairing.c core/store.c core/hash.c \
+	$(CC) $(CT_CFLAGS) -o $@ verify/ct_check.c core/pairing.c core/store.c core/hash.c core/buttons.c \
 	  vhal/vhal.c $(VERIFY)/monocypher-noinline.o
 
 ct: $(VERIFY)/ct_check

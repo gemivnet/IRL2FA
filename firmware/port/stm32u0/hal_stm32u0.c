@@ -6,6 +6,7 @@
 #include <string.h>
 
 #include "board.h"
+#include "buttons.h"
 #include "epd_ssd1680.h"
 #include "hal.h"
 #include "rv3032.h"
@@ -134,9 +135,9 @@ void pin_config(GPIO_TypeDef *port, uint32_t mask, uint32_t mode, uint32_t pull,
 
 #define PIN_CFG(p, mode, pull, af) pin_config(PIN_PORT(p), PIN_MASK(p), (mode), (pull), (af))
 
-static uint8_t btn_reported;
-static uint32_t btn_last_seen[5];
+static btn_filter_t btn_filter_state;
 static volatile uint8_t btn_latched;
+static volatile uint32_t btn_edge_ms[BTN_COUNT]; /* time of each button's latest press edge */
 
 static void gpio_init(void)
 {
@@ -218,6 +219,8 @@ static void exti_irq(void)
 #undef X
     if (b) {
         btn_latched |= b;
+        for (unsigned i = 0; i < BTN_COUNT; i++)
+            if (b & (1u << i)) btn_edge_ms[i] = ms_ticks;
         board_wake_flags |= WAKE_BUTTON;
     }
     if (p & PIN_RTC_INT_MASK) board_wake_flags |= WAKE_RTC;
@@ -227,33 +230,30 @@ void EXTI0_1_IRQHandler(void) { exti_irq(); }
 void EXTI2_3_IRQHandler(void) { exti_irq(); }
 void EXTI4_15_IRQHandler(void) { exti_irq(); }
 
-/* A press is reported at once, even if it was released before we looked
- * (latched by the EXTI edge); a release only after the contact has read
- * open for DEBOUNCE_MS, which also swallows bounce. */
-#define DEBOUNCE_MS 25u
-
+/* Press edges are latched by EXTI, so a press is never missed; the
+ * filter (core/buttons.c) also keeps a second press made during a display
+ * refresh from merging with the first. */
 uint8_t hal_buttons(void)
 {
     uint8_t raw = 0;
 #define X(p, b) if (!pin_read(PIN_PORT(p), PIN_MASK(p))) raw |= (b);
     JOY_FOR_EACH(X)
 #undef X
+    uint32_t edge_ms[BTN_COUNT];
     __disable_irq();
     uint8_t latched = btn_latched;
     btn_latched = 0;
+    for (unsigned i = 0; i < BTN_COUNT; i++) edge_ms[i] = btn_edge_ms[i];
     __enable_irq();
-    uint8_t down = raw | latched;
-    uint32_t now = ms_ticks;
-    for (unsigned i = 0; i < 5; i++) {
-        uint8_t bit = (uint8_t)(1u << i);
-        if (down & bit) {
-            btn_last_seen[i] = now;
-            btn_reported |= bit;
-        } else if ((btn_reported & bit) && now - btn_last_seen[i] >= DEBOUNCE_MS) {
-            btn_reported &= (uint8_t)~bit;
-        }
+    bool again = false;
+    uint8_t r = btn_filter(&btn_filter_state, raw, latched, edge_ms, ms_ticks, &again);
+    if (again) {
+        /* A press is held back one call: don't let the main loop idle. */
+        __disable_irq();
+        board_wake_flags |= WAKE_BUTTON;
+        __enable_irq();
     }
-    return btn_reported;
+    return r;
 }
 
 /* ------------------------------------------------------------------ */
