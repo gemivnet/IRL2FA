@@ -1,5 +1,7 @@
 # Firmware CI: host unit tests (ASan/UBSan), generated pin header check,
-# STM32U083 cross build with size report, and the Renode emulation tests.
+# STM32U083 cross build with size report, the Renode emulation tests, and
+# the verification pack: static analysis, constant-time check, coverage
+# gate and libFuzzer runs (firmware/verify/Dockerfile has the toolchain).
 # SPDX-License-Identifier: AGPL-3.0-or-later
 name: firmware
 
@@ -21,6 +23,65 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Unit tests (ASan + UBSan)
         run: make -C firmware test
+
+  lint:
+    # cppcheck + clang-tidy, zero findings
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - run: docker build -q -t irl2fa-verify firmware/verify
+      - name: cppcheck and clang-tidy
+        run: docker run --rm -u "$(id -u):$(id -g)" -v "$PWD":/w -w /w/firmware irl2fa-verify make lint
+
+  constant-time:
+    # valgrind memcheck with secrets marked undefined (ctgrind)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - run: docker build -q -t irl2fa-verify firmware/verify
+      - name: Constant-time check
+        run: docker run --rm -u "$(id -u):$(id -g)" -v "$PWD":/w -w /w/firmware irl2fa-verify make ct
+
+  coverage:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - run: docker build -q -t irl2fa-verify firmware/verify
+      - name: Coverage of firmware/core under the host tests (minimum enforced)
+        run: |
+          docker run --rm -u "$(id -u):$(id -g)" -v "$PWD":/w -w /w/firmware \
+            -e GITHUB_STEP_SUMMARY=/w/step-summary.md irl2fa-verify make coverage
+      - name: Summary
+        if: always()
+        run: test -f step-summary.md && cat step-summary.md >> "$GITHUB_STEP_SUMMARY" || true
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: firmware-coverage
+          path: firmware/build/verify/coverage/
+          if-no-files-found: error
+
+  fuzz:
+    # libFuzzer + ASan + UBSan, 60 s per harness from the committed seeds
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [pairing, store, base32, app]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - run: docker build -q -t irl2fa-verify firmware/verify
+      - name: fuzz_${{ matrix.target }}
+        run: |
+          docker run --rm -u "$(id -u):$(id -g)" -v "$PWD":/w -w /w/firmware irl2fa-verify \
+            make fuzz-${{ matrix.target }} FUZZ_TIME=60
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: failure()
+        with:
+          name: fuzz-crash-${{ matrix.target }}
+          path: |
+            firmware/build/verify/crash-*
+            firmware/build/verify/fuzz-*.log
 
   pins:
     runs-on: ubuntu-24.04

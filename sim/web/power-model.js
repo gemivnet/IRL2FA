@@ -17,31 +17,31 @@ export default Object.freeze({
   },
   "measured": {
     "use": {
-      "awake_s": 77.047,
-      "instructions": 57676000,
-      "mcu_run_s": 3.6048,
-      "mcu_sleep_s": 73.4423,
+      "awake_s": 79.3778,
+      "instructions": 59875968,
+      "mcu_run_s": 3.7422,
+      "mcu_sleep_s": 75.6356,
       "stop2_entries": 1,
-      "spi_bytes": 200975,
-      "spi_s": 0.201,
-      "full_refreshes": 5,
+      "spi_bytes": 209014,
+      "spi_s": 0.209,
+      "full_refreshes": 6,
       "partial_refreshes": 20,
-      "epd_busy_full_s": 15.0001,
+      "epd_busy_full_s": 18.0,
       "epd_busy_partial_s": 8.4,
-      "epd_powered_s": 26.9914,
-      "epd_logic_s": 3.5913,
-      "i2c_transactions": 360,
-      "i2c_bytes": 1800,
-      "i2c_s": 0.162,
+      "epd_powered_s": 30.1339,
+      "epd_logic_s": 3.7339,
+      "i2c_transactions": 358,
+      "i2c_bytes": 1790,
+      "i2c_s": 0.1611,
       "ir_on_s": 0.0,
       "ir_tx_bytes": 0,
       "ir_led_s": 0.0
     },
     "pairing": {
       "awake_s": 61.8669,
-      "instructions": 61385757,
-      "mcu_run_s": 3.8366,
-      "mcu_sleep_s": 58.0303,
+      "instructions": 61486097,
+      "mcu_run_s": 3.8429,
+      "mcu_sleep_s": 58.024,
       "stop2_entries": 1,
       "spi_bytes": 128624,
       "spi_s": 0.1286,
@@ -49,8 +49,8 @@ export default Object.freeze({
       "partial_refreshes": 12,
       "epd_busy_full_s": 12.0,
       "epd_busy_partial_s": 5.04,
-      "epd_powered_s": 19.3253,
-      "epd_logic_s": 2.2853,
+      "epd_powered_s": 19.3275,
+      "epd_logic_s": 2.2875,
       "i2c_transactions": 310,
       "i2c_bytes": 1550,
       "i2c_s": 0.1395,
@@ -62,20 +62,20 @@ export default Object.freeze({
   "cases": {
     "typ": {
       "sleep_uA": 1.17,
-      "awake_mA": 0.3936,
+      "awake_mA": 0.3939,
       "full_refresh_mAs": 10.54,
       "partial_refresh_mAs": 1.513,
       "ir_mA": 2.144,
-      "use_mAs": 113.3,
+      "use_mAs": 124.8,
       "pairing_mAs": 131.1
     },
     "worst": {
       "sleep_uA": 6.11,
-      "awake_mA": 0.6721,
+      "awake_mA": 0.6726,
       "full_refresh_mAs": 15.14,
       "partial_refresh_mAs": 2.244,
       "ir_mA": 3.139,
-      "use_mAs": 172.4,
+      "use_mAs": 189.1,
       "pairing_mAs": 197.2
     }
   },
@@ -84,24 +84,24 @@ export default Object.freeze({
       "uses_per_day": 5,
       "pairings_per_year": 2,
       "life_years": {
-        "typ": 7.38,
-        "worst": 3.69
+        "typ": 6.84,
+        "worst": 3.49
       }
     },
     "normal": {
       "uses_per_day": 20,
       "pairings_per_year": 6,
       "life_years": {
-        "typ": 2.2,
-        "worst": 1.32
+        "typ": 2.01,
+        "worst": 1.22
       }
     },
     "heavy": {
       "uses_per_day": 60,
       "pairings_per_year": 12,
       "life_years": {
-        "typ": 0.77,
-        "worst": 0.49
+        "typ": 0.7,
+        "worst": 0.45
       }
     }
   },

@@ -50,6 +50,10 @@ size_t pairing_tx(const pairing_t *p, uint8_t *out, size_t cap, unsigned seq);
 
 void pairing_wipe(pairing_t *p);
 
+/* Gives up a session that has not finished: wipes its secrets and moves it
+ * to PAIR_FAILED (a no-op once DONE or FAILED). */
+void pairing_abort(pairing_t *p);
+
 /* Exposed for the tests. */
 uint16_t pairing_crc16(const uint8_t *data, size_t len);
 

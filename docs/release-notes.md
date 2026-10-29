@@ -22,7 +22,7 @@ this as a prototype release and please [file a build report](https://github.com/
 - **Hardware.**
   - STM32U083 MCU, 2.13″ 250×122 e-paper (Good Display GDEY0213B74), RV-3032 temperature-compensated RTC.
   - Alps 5-way joystick, IR pairing link, CR2450 cell.
-  - About 2.2 years typical (1.3 worst case) battery life at 20 uses a day, measured on the emulated firmware.
+  - About 2.0 years typical (1.2 worst case) battery life at 20 uses a day, measured on the emulated firmware.
 - **Firmware.**
   - Person-to-person verification words.
   - In-person IR pairing: X25519 with commit/reveal and a 6-symbol comparison string.

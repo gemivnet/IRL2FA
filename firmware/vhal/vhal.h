@@ -27,7 +27,18 @@ uint8_t *vhal_flash(void);                /* VHAL_FLASH_PAGES * 2048 bytes */
 uint32_t vhal_flash_erases(void);
 
 /* Every flash operation, fail point for power-cut tests: after `n` more
- * erase/write calls the next one is dropped and every later one too. */
+ * erase/write calls the next one is cut (see vhal_fail_mode) and every
+ * later one is dropped. */
 void vhal_fail_after(int n);
+
+/* What the cut operation leaves behind. */
+typedef enum {
+    VHAL_CUT_DROP = 0,    /* nothing: the operation never started */
+    VHAL_CUT_HALF = 1,    /* the first half of the page / double-words done */
+    VHAL_CUT_GARBAGE = 2, /* the affected bytes are left as noise */
+} vhal_cut_t;
+void vhal_fail_mode(vhal_cut_t mode);
+int vhal_fail_tripped(void);              /* 1 once a cut has happened */
+uint32_t vhal_flash_ops(void);            /* erase + write calls so far */
 
 #endif

@@ -1,0 +1,452 @@
+# Manufacturer land patterns and package dimensions for every footprint on
+# the board. hardware/tests/test_footprints.py checks the footprints in
+# hardware/irl2fa.kicad_pcb (as embedded, i.e. what gets fabricated) and
+# their library copies against this table. A footprint used on the board
+# with no entry here fails the test: adding a part means adding an entry.
+#
+# Coordinates: mm, KiCad footprint frame seen from the TOP (component side),
+# x right, y DOWN, origin at the footprint anchor. Back-side footprints are
+# un-mirrored before comparing. Datasheet drawings are rotated into this
+# frame where needed (noted per entry); a rotation keeps the pin order, so
+# pin 1 and the numbering direction are checked as drawn.
+#
+# Per entry:
+#   datasheet / source  where every number comes from (URL + page/figure)
+#   pads                manufacturer pads: num, at [x, y], size [w, h] (w along x),
+#                       optional shape (circle) and drill [min, max]
+#   rows                shorthand for a pad row: first, count, at (first pad), step, size
+#   holes               non-plated holes: at, drill [min, max]
+#   pin1                sign of pad 1's x and y (-1, 0, +1): which side/corner pin 1 is on
+#   pitch               centre distance between two named pads
+#                       (a list of them when pad 1 is several pads, e.g. a clip's two legs)
+#   body                package body outline on F.Fab: size [w, h], at [x, y] (default 0, 0);
+#                       curved: true checks the outline's extremes, for rounded sides
+#   envelope            extra extents [x0, y0, x1, y1] the courtyard must enclose (lens, cell...)
+#   edge_cuts           bounding box of the footprint's own Edge.Cuts graphics
+#   tol                 per-dimension tolerances (mm), defaults below:
+#     edge_out          how far any footprint pad edge may lie OUTSIDE the
+#                       manufacturer pad's edge (bigger / shifted pad)
+#     heel_out          like edge_out, for the pad edge facing the footprint
+#                       centre (the heel, under the body); defaults to edge_out
+#     edge_in           how far any footprint pad edge may lie INSIDE it
+#                       (smaller / shifted pad). edge_in = edge_out = t means
+#                       "centre and size within t".
+#     hole_pos          hole / drilled pad position
+#     pitch             pitch
+#     body              body outline edges
+#     courtyard         max courtyard margin beyond pads, body and envelope
+#   Where a stock KiCad footprint (IPC-7351 generator) is larger than the
+#   manufacturer's pattern, edge_out is widened and the reason is given in a
+#   comment: those pads still cover the recommended land completely.
+#
+# SPDX-License-Identifier: CERN-OHL-S-2.0
+
+defaults:
+  tol: {edge_out: 0.05, edge_in: 0.05, hole_pos: 0.05, pitch: 0.02, body: 0.2, courtyard: 1.0}
+
+footprints:
+
+  # ------------------------------------------------------------------ custom (irl2fa.pretty)
+
+  irl2fa:SW_Nav_Alps_SKRHABE010:
+    part: Alps Alpine SKRHABE010 (LCSC C139794)
+    datasheet: https://tech.alpsalpine.com/cms.media/product_catalog_mu_02_skrh_en_34aeb8c2e3.pdf
+    source: >-
+      SKRH catalog p.2, Drawing No.2 "Land Dimensions" (viewed from mounting face):
+      signal pads span 8.5 outer / 5.8 inner in x, 3.85 / 1.85 in y, middle pad 1 high;
+      frame tabs 2 wide, 9.9 / 6.3 spans; guide-boss holes 0.75 +0.1/0 and 1.05 +0.1/0,
+      3.8 +-0.05 apart, small one on the pin-1 side (top). Pin numbers from the
+      Dimensions view and circuit diagram: 1 A, 2 Center, 3 C (left), 4 B, 5 Common, 6 D (right).
+      Body 7.35 x 7.5 (table x = 7.35).
+    pads:
+      - {num: "1", at: [-3.575, -1.425], size: [1.35, 1.0]}
+      - {num: "2", at: [-3.575, 0], size: [1.35, 1.0]}
+      - {num: "3", at: [-3.575, 1.425], size: [1.35, 1.0]}
+      - {num: "4", at: [3.575, -1.425], size: [1.35, 1.0]}
+      - {num: "5", at: [3.575, 0], size: [1.35, 1.0]}
+      - {num: "6", at: [3.575, 1.425], size: [1.35, 1.0]}
+      - {num: MP, at: [0, -4.05], size: [2.0, 1.8]}
+      - {num: MP, at: [0, 4.05], size: [2.0, 1.8]}
+    holes:
+      - {at: [0, -1.9], drill: [0.75, 0.85]}
+      - {at: [0, 1.9], drill: [1.05, 1.15]}
+    pin1: [-1, -1]
+    pitch: {pads: ["1", "2"], value: 1.425}
+    body: {size: [7.35, 7.5]}
+
+  irl2fa:Hirose_FH34SRJ-24S-0.5SH_1x24-1MP_P0.50mm_Horizontal:
+    part: Hirose FH34SRJ-24S-0.5SH(50) (LCSC C324726)
+    datasheet: https://datasheet.lcsc.com/datasheet/pdf/4fa13630ce538d3df6cea685e5f75b4e.pdf?productCode=C324726
+    source: >-
+      Hirose FH34SRJ catalog (Nov.1.2018) p.4 "Recommended PCB mounting pattern":
+      signal pads 0.3 +-0.05 x 0.8 +-0.05 at 0.5 pitch, B = 11.5 for 24 pos; fitting
+      nails 0.8 +-0.05 high, E = 13.1 / F = 13.9 +-0.1 (so 0.4 wide at x +-6.75);
+      3.3 +-0.05 from the signal pads' outer edge to the nails' outer edge (nail
+      centre y = -0.4 + 3.3 - 0.4 = 2.5). Contact No.1 on the right (p.3 top view).
+      Body p.3: D = 13.38 +-0.1 wide, 3.8 deep (reference dimension, so the body
+      position is checked loosely).
+    rows:
+      - {first: 1, count: 24, at: [5.75, 0], step: [-0.5, 0], size: [0.3, 0.8]}
+    pads:
+      - {num: MP, at: [-6.75, 2.5], size: [0.4, 0.8]}
+      - {num: MP, at: [6.75, 2.5], size: [0.4, 0.8]}
+    pin1: [1, 0]
+    pitch: {pads: ["1", "2"], value: 0.5}
+    body: {size: [13.38, 3.8], at: [0, 1.15]}
+    tol: {body: 0.3}
+
+  irl2fa:BatteryHolder_MYOUNG_MY-2450-01_CR2450:
+    part: MYOUNG MY-2450-01, "CR2450-W" (LCSC C964845)
+    datasheet: https://datasheet.lcsc.com/datasheet/pdf/26b02de8ee838f915c56d5652dea3d54.pdf?productCode=C964845
+    source: >-
+      MYOUNG drawing MY-CP-0106 rev A/0 (single sheet), "PCB Layout Diagram, Top View":
+      pads 2-6.15 x 2-6.00, outer span 36.80, pad top 9.20 from the closed end and 8.00
+      from the pad bottom to the open end (9.20 + 6.00 + 8.00 = the 23.20 +-0.3 plate
+      depth). Top view: plate 25.50 +-0.3 wide, 23.20 deep, closed end 7.50 wide;
+      height 5.70. Drawing tolerance X.XX +-0.20. Both legs are the + terminal (pad 1).
+      The footprint origin is the cell centre, 12.50 from the closed end (a design
+      choice: the cell rests against the 0.25 stop flap), so the pads sit at
+      y = -12.50 + 9.20 + 3.00 = -0.30. Pad 2 (-) is our own 12.0 mm bare copper disc
+      under the cell: the clip has no - contact (the cell's - face rests on the PCB),
+      so it has no datasheet and is checked as designed, centred on the cell.
+    pads:
+      - {num: "1", at: [15.325, -0.3], size: [6.15, 6.0]}
+      - {num: "1", at: [-15.325, -0.3], size: [6.15, 6.0]}
+      - {num: "2", at: [0, 0], size: [12.0, 12.0], shape: circle}
+    pin1: [[1, -1], [-1, -1]]                   # + on both legs, 0.3 towards the closed end
+    body: {size: [25.5, 23.2], at: [0, -0.9], curved: true}   # lobed open end
+    envelope: [-12.25, -12.25, 12.25, 12.25]   # the CR2450 cell
+    tol: {body: 0.3}
+
+  irl2fa:LED_Vishay_VSMB2948SL_SideView:
+    part: Vishay VSMB2948SL (LCSC C6604342)
+    datasheet: https://www.vishay.com/docs/83498/vsmb2948sl.pdf
+    source: >-
+      Doc 83498 rev 1.1 p.5, drawing 6.544-5410.02-4: "Solder pad proposal acc. IPC 7351"
+      0.9 x 1.2 pads, 4.2 outer span. Front view (looking into the lens): Anode right,
+      Cathode left; with the lens facing -y that puts K at +x (pad 1) and A at -x.
+      Body 2.2 wide x 1.6 deep, 2.55 including the lens; untoleranced dims +-0.2.
+      The body's y offset from the pads is not dimensioned (Fab: y -0.42..+1.18),
+      so it is checked within the drawing's +-0.2 only.
+    pads:
+      - {num: "1", at: [1.65, 0], size: [0.9, 1.2]}
+      - {num: "2", at: [-1.65, 0], size: [0.9, 1.2]}
+    pin1: [1, 0]
+    body: {size: [2.2, 1.6], at: [0, 0.38]}
+    envelope: [-0.9, -1.37, 0.9, 1.18]          # lens tip 2.55 from the body back
+    tol: {body: 0.2}
+
+  irl2fa:PhotoTransistor_Vishay_VEMT2523SLX01_SideView:
+    part: Vishay VEMT2523SLX01 (LCSC C511451)
+    datasheet: https://www.vishay.com/docs/84167/vemt2523slx01.pdf
+    source: >-
+      Doc 84167 rev 1.0 p.4, drawing 6.544-5410.01-4: same package and IPC-7351 pad
+      proposal as the VSMB2948SL (0.9 x 1.2, 4.2 outer span). Front view: Emitter right,
+      Collector left, so C at +x (pad 1), E at -x.
+    pads:
+      - {num: "1", at: [1.65, 0], size: [0.9, 1.2]}
+      - {num: "2", at: [-1.65, 0], size: [0.9, 1.2]}
+    pin1: [1, 0]
+    body: {size: [2.2, 1.6], at: [0, 0.38]}
+    envelope: [-0.9, -1.37, 0.9, 1.18]
+    tol: {body: 0.2}
+
+  irl2fa:EPD_GoodDisplay_GDEY0213B74_Outline:
+    part: Good Display GDEY0213B74 (hand-fitted, no pads)
+    datasheet: https://v4.cecdn.yun300.cn/100001_1909185148/GDEY0213B74.pdf
+    source: >-
+      GDEY0213B74 datasheet p.6 (Outline Dimension 29.2 x 59.2 x 1.0) and p.7
+      "Mechanical Drawing of EPD module": glass 59.20 +-0.20 x 29.20 +-0.20, FPC 12.50
+      wide. The Edge.Cuts FPC fold slot is a board decision, 1.4 x 14.0 at board
+      (2.6, 10.0), from hardware/board.yaml; relative to the glass centre (35.6, 17.0)
+      that is x -33.0..-31.6, y -7.0..7.0.
+    pads: []
+    body: {size: [59.2, 29.2]}
+    edge_cuts: [-33.0, -7.0, -31.6, 7.0]
+    tol: {body: 0.2}
+
+  # ------------------------------------------------------------------ stock KiCad: ICs
+
+  Package_DFN_QFN:UFQFPN-32-1EP_5x5mm_P0.5mm_EP3.5x3.5mm:
+    part: ST STM32U083KCU6, UFQFPN32 (LCSC C22459164)
+    datasheet: https://www.st.com/resource/en/datasheet/stm32u083kc.pdf
+    datasheet_copy: https://datasheet.lcsc.com/datasheet/pdf/1d8e3bb2642efa1578790415a746a5f0.pdf?productCode=C22459164
+    source: >-
+      DS14463 rev 2, section 7.2 (UFQFPN32, A0B8): Figure 35 "recommended footprint"
+      (p.107): pads 0.25 x 0.65, 0.5 pitch, 5.50 outer span (centres at +-2.425),
+      exposed pad 3.60 x 3.60; pin 1 top-left, counter-clockwise (left column 1-8 down,
+      bottom row 9-16, right column 17-24 up, top row 25-32 right to left). Table 89:
+      body 5.00 BSC, exposed pad D2/E2 3.50-3.70 (aaa = 0.15).
+      KiCad's IPC-7351 pattern makes the pads 0.875 long (2.0..2.875 from centre against
+      ST's 2.1..2.75: 0.125 more toe, 0.1 more heel) and the EP 3.5 (D2 min) against
+      ST's 3.6: accepted, the pads cover ST's land and the EP covers the smallest
+      package EP. Hence edge_out 0.15 and EP edge_in 0.05.
+    rows:
+      - {first: 1, count: 8, at: [-2.425, -1.75], step: [0, 0.5], size: [0.65, 0.25]}
+      - {first: 9, count: 8, at: [-1.75, 2.425], step: [0.5, 0], size: [0.25, 0.65]}
+      - {first: 17, count: 8, at: [2.425, 1.75], step: [0, -0.5], size: [0.65, 0.25]}
+      - {first: 25, count: 8, at: [1.75, -2.425], step: [-0.5, 0], size: [0.25, 0.65]}
+    pads:
+      - {num: "33", at: [0, 0], size: [3.6, 3.6], exposed: true}
+    pin1: [-1, -1]
+    pitch: {pads: ["1", "2"], value: 0.5}
+    body: {size: [5.0, 5.0]}
+    tol: {edge_out: 0.15, edge_in: 0.05, body: 0.15}
+
+  Package_SON:MicroCrystal_C7_SON-8_1.5x3.2mm_P0.9mm:
+    part: Micro Crystal RV-3032-C7 (LCSC C5127802)
+    datasheet: https://www.microcrystal.com/fileadmin/Media/Products/RTC/App.Manual/RV-3032-C7_App-Manual.pdf
+    source: >-
+      RV-3032-C7 Application Manual rev 1.3 (May 2023) section 9.1 p.145, drawing
+      RV-3032-C7_Pack-drw_20200615, "Recommended solder pad layout" (top view, long
+      axis horizontal): pads 0.5 x 0.8, 0.9 pitch, rows 0.4 apart (2.0 overall), 3.2
+      across; pin 1 bottom-left, counter-clockwise. Rotated +90 deg into KiCad's
+      orientation (long axis vertical): pin 1 top-left, 1-4 down the left column,
+      5-8 up the right. Body 3.2 x 1.5 +-0.1. Pinout: datasheet v1.4 p.2 "PIN CONNECTIONS".
+      KiCad's IPC pads are 0.65 x 0.95 at x +-0.65 (0.175..1.125 against 0.2..1.0,
+      0.075 wider each side): they cover the recommended land, gap between pads
+      0.25; accepted, hence edge_out 0.15.
+    pads:
+      - {num: "1", at: [-0.6, -1.35], size: [0.8, 0.5]}
+      - {num: "2", at: [-0.6, -0.45], size: [0.8, 0.5]}
+      - {num: "3", at: [-0.6, 0.45], size: [0.8, 0.5]}
+      - {num: "4", at: [-0.6, 1.35], size: [0.8, 0.5]}
+      - {num: "5", at: [0.6, 1.35], size: [0.8, 0.5]}
+      - {num: "6", at: [0.6, 0.45], size: [0.8, 0.5]}
+      - {num: "7", at: [0.6, -0.45], size: [0.8, 0.5]}
+      - {num: "8", at: [0.6, -1.35], size: [0.8, 0.5]}
+    pin1: [-1, -1]
+    pitch: {pads: ["1", "2"], value: 0.9}
+    body: {size: [1.5, 3.2]}
+    tol: {edge_out: 0.15, edge_in: 0.05, body: 0.1}
+
+  Package_TO_SOT_SMD:SOT-23:
+    part: AOS AO3401A (LCSC C15127), AO3400A (LCSC C20917)
+    datasheet: https://www.aosmd.com/sites/default/files/res/package/SOT23.pdf
+    source: >-
+      AOS "SOT23 Package Outline" PO-00001 rev N, "Recommended land pattern": pads
+      0.80 x 0.80, 0.95 from the centre line (e1 = 1.90), rows 2.40 apart; pins 1, 2 on
+      one side, 3 opposite. Rotated +90 deg into KiCad's orientation (1, 2 on the left).
+      Body D 2.90 x E1 1.60 (+-0.2). Pinout G-S-D from the AO3401A/AO3400A datasheets p.1.
+      KiCad's IPC pads are 1.475 x 0.6 at x +-0.9375: they reach 0.6 further in under
+      the body (heel) and are 0.1 narrower each side than AOS's 0.8 (still wider than the
+      0.5 max lead). Accepted: heel_out 0.65, edge_out 0.1 elsewhere, edge_in 0.1.
+    pads:
+      - {num: "1", at: [-1.2, -0.95], size: [0.8, 0.8]}
+      - {num: "2", at: [-1.2, 0.95], size: [0.8, 0.8]}
+      - {num: "3", at: [1.2, 0], size: [0.8, 0.8]}
+    pin1: [-1, -1]
+    pitch: {pads: ["1", "2"], value: 1.9}
+    body: {size: [1.6, 2.9]}
+    tol: {edge_out: 0.1, heel_out: 0.65, edge_in: 0.1, body: 0.2}
+
+  Package_TO_SOT_SMD:SOT-323_SC-70:
+    part: Vishay Si1308EDL (LCSC C469327)
+    datasheet: https://datasheet.lcsc.com/datasheet/pdf/a865757ba512c18824d75705c123f47e.pdf?productCode=C469327
+    source: >-
+      Vishay AN826 (doc 72601, rev 21-Jan-08) p.17 "Recommended minimum pads for SC-70:
+      3-lead" (included in the Si1308EDL datasheet): pads 0.559 x 0.648, 2.438 overall
+      height (rows 1.79 apart), 1.803 overall width, pin 3 centred. Package doc 71153:
+      e1 1.30 nom, D 2.00 x E1 1.25. Pinout G-S-D (AN813 fig.1). Rotated +90 deg into
+      KiCad's orientation. These are MINIMUM pads, so KiCad's larger pads are fine
+      (edge_out 0.35). Ambiguity: AN826's inch figures give a 1.245 pin pitch against
+      the package's 1.30 e1; KiCad uses 1.30, which leaves its 0.5 wide pads up to 0.057
+      inside the 0.559 minimum pad edge. Documented, edge_in 0.07.
+    pads:
+      - {num: "1", at: [-0.895, -0.6225], size: [0.648, 0.559]}
+      - {num: "2", at: [-0.895, 0.6225], size: [0.648, 0.559]}
+      - {num: "3", at: [0.895, 0], size: [0.648, 0.559]}
+    pin1: [-1, -1]
+    pitch: {pads: ["1", "2"], value: 1.3}
+    body: {size: [1.25, 2.0]}
+    tol: {edge_out: 0.35, edge_in: 0.07, pitch: 0.06, body: 0.15}
+
+  Inductor_SMD:L_APV_ANR3015:
+    part: APV ANR3015T470M (LCSC C7427088)
+    datasheet: http://en.apvind.com/public/upload/20240407/3375c395e460caa8519b4d637d9113ce.pdf
+    source: >-
+      APV ANR series catalog (2023-08-25) p.2 "Dimensions & Recommended Land Pattern",
+      ANR3015: a = 1.5 (gap), b = 0.8 (pad width), c = 2.7 (pad length); body
+      A = B = 3.0 +-0.2.
+    pads:
+      - {num: "1", at: [-1.15, 0], size: [0.8, 2.7]}
+      - {num: "2", at: [1.15, 0], size: [0.8, 2.7]}
+    pin1: [-1, 0]
+    body: {size: [3.0, 3.0]}
+
+  # ------------------------------------------------------------------ stock KiCad: discretes
+
+  Diode_SMD:D_SOD-123:
+    part: JSCJ MBR0530 (LCSC C77336)
+    datasheet: https://datasheet.lcsc.com/datasheet/pdf/8d647b709d5440b4976f135071ba6493.pdf?productCode=C77336
+    source: >-
+      JSCJ MBR0520-MBR0580 datasheet (E, Mar 2015) p.4 "SOD-123 Suggested Pad Layout":
+      pads 0.8 x 1.0, 3.24 centre to centre, +-0.05. Body E 2.6-2.8 x D 1.5-1.7.
+      Pad 1 = cathode (marking bar) per the Device:D symbol. KiCad's IPC pads are
+      0.9 x 1.2 at +-1.65 (0.08 more toe, 0.1 wider each side): accepted, edge_out 0.15.
+    pads:
+      - {num: "1", at: [-1.62, 0], size: [0.8, 1.0]}
+      - {num: "2", at: [1.62, 0], size: [0.8, 1.0]}
+    pin1: [-1, 0]
+    body: {size: [2.7, 1.6]}
+    tol: {edge_out: 0.15, body: 0.15}
+
+  # Chip passives: one entry per package. The resistors are UNI-ROYAL 0402WGF...;
+  # their datasheet gives a recommended pattern. The Samsung CL capacitors'
+  # catalog (LCSC C1525, p.76 "Design of Solder Land Pattern") gives only
+  # fillet rules, no dimensions, so the capacitor footprints are checked against
+  # the same EIA-size pattern from UNI-ROYAL. KiCad's IPC-7351 pads are up to
+  # 0.125 larger per edge; they cover the recommended land, so edge_out is wider.
+  Resistor_SMD:R_0402_1005Metric:
+    part: UNI-ROYAL 0402WGF thick-film resistors (LCSC C25744 and others)
+    datasheet: https://datasheet.lcsc.com/datasheet/pdf/0a975aaa49b7c97f38a963127be4a823.pdf?productCode=C25744
+    source: >-
+      UNI-ROYAL Thick Film Chip Resistors data sheet V.3 (Feb.12,2019) p.5 section 8
+      "Recommend the size of welding plate", 0402: A 0.50 (gap), B 0.45 (pad length),
+      C 0.5 (pad width), D 1.4 (overall), +-0.05. Body p.3: 1.00 x 0.50.
+    pads:
+      - {num: "1", at: [-0.475, 0], size: [0.45, 0.5]}
+      - {num: "2", at: [0.475, 0], size: [0.45, 0.5]}
+    pin1: [-1, 0]
+    body: {size: [1.0, 0.5]}
+    tol: {edge_out: 0.1, body: 0.1}
+
+  Capacitor_SMD:C_0402_1005Metric:
+    part: Samsung CL05 series (LCSC C1525, C52923, C15195)
+    datasheet: https://datasheet.lcsc.com/datasheet/pdf/0a975aaa49b7c97f38a963127be4a823.pdf?productCode=C25744
+    source: >-
+      UNI-ROYAL 0402 pattern (data sheet V.3 p.5 section 8): A 0.50, B 0.45, C 0.5, D 1.4.
+      Samsung CL05 body 1.0 x 0.5 +-0.05.
+    pads:
+      - {num: "1", at: [-0.475, 0], size: [0.45, 0.5]}
+      - {num: "2", at: [0.475, 0], size: [0.45, 0.5]}
+    pin1: [-1, 0]
+    body: {size: [1.0, 0.5]}
+    tol: {edge_out: 0.1, body: 0.1}
+
+  Capacitor_SMD:C_0603_1608Metric:
+    part: Samsung CL10 series (LCSC C19666, C15849)
+    datasheet: https://datasheet.lcsc.com/datasheet/pdf/0a975aaa49b7c97f38a963127be4a823.pdf?productCode=C25744
+    source: >-
+      UNI-ROYAL 0603 pattern (data sheet V.3 p.5 section 8): A 0.9, B 0.65, C 0.8, D 2.1.
+      Samsung CL10 body 1.6 x 0.8 +-0.1.
+    pads:
+      - {num: "1", at: [-0.775, 0], size: [0.65, 0.8]}
+      - {num: "2", at: [0.775, 0], size: [0.65, 0.8]}
+    pin1: [-1, 0]
+    body: {size: [1.6, 0.8]}
+    tol: {edge_out: 0.15, body: 0.1}
+
+  Capacitor_SMD:C_0805_2012Metric:
+    part: Samsung CL21 series (LCSC C16780, C1779)
+    datasheet: https://datasheet.lcsc.com/datasheet/pdf/0a975aaa49b7c97f38a963127be4a823.pdf?productCode=C25744
+    source: >-
+      UNI-ROYAL 0805 pattern (data sheet V.3 p.5 section 8): A 1.0, B 1.0, C 1.3, D 3.0
+      (+-0.1). Samsung CL21 body 2.0 x 1.25 +-0.2.
+    pads:
+      - {num: "1", at: [-1.0, 0], size: [1.0, 1.3]}
+      - {num: "2", at: [1.0, 0], size: [1.0, 1.3]}
+    pin1: [-1, 0]
+    body: {size: [2.0, 1.25]}
+    tol: {edge_out: 0.1, edge_in: 0.1, body: 0.15}
+
+  # ------------------------------------------------------------------ stock KiCad: mechanical / test
+
+  Connector:Tag-Connect_TC2030-IDC-NL_2x03_P1.27mm_Vertical:
+    part: Tag-Connect TC2030-IDC-NL cable footprint (not assembled)
+    datasheet: https://www.tag-connect.com/wp-content/uploads/bsk-pdf-manager/2019/12/TC2030-IDC-NL-Datasheet-Rev-B.pdf
+    source: >-
+      Drawing TC2030-IDC-NL-FP rev B sheet 1 "PCB top layer": contact pads 0.787 +-0.076
+      dia on a 1.27 grid, rows 1.27 apart; pin 1 bottom-left, odd pins along the bottom,
+      2 top-left, 6 top-right. Alignment holes 0.991 +-0.076 dia, NPTH: one 1.27 left of
+      pad 1/2's column on the centre line, two 5.08 to its right at +-1.016.
+      No solder paste on the contact pads. No body (cable only).
+    pads:
+      - {num: "1", at: [-1.27, 0.635], size: [0.787, 0.787], shape: circle}
+      - {num: "2", at: [-1.27, -0.635], size: [0.787, 0.787], shape: circle}
+      - {num: "3", at: [0, 0.635], size: [0.787, 0.787], shape: circle}
+      - {num: "4", at: [0, -0.635], size: [0.787, 0.787], shape: circle}
+      - {num: "5", at: [1.27, 0.635], size: [0.787, 0.787], shape: circle}
+      - {num: "6", at: [1.27, -0.635], size: [0.787, 0.787], shape: circle}
+    holes:
+      - {at: [-2.54, 0], drill: [0.915, 1.067]}
+      - {at: [2.54, -1.016], drill: [0.915, 1.067]}
+      - {at: [2.54, 1.016], drill: [0.915, 1.067]}
+    no_paste: true
+    pin1: [-1, 1]
+    pitch: {pads: ["1", "3"], value: 1.27}
+    tol: {edge_out: 0.076, edge_in: 0.076, hole_pos: 0.025}
+
+  MountingHole:MountingHole_2.2mm_M2_Pad:
+    part: M2 screw (no part)
+    datasheet: https://www.iso.org/standard/4171.html
+    source: >-
+      ISO 273 clearance holes for M2: fine 2.2, medium 2.4. The 4.4 copper ring is a
+      design choice (covers an ISO 7380 / ISO 4762 M2 head, 3.5 / 3.8 dia); no datasheet.
+    pads:
+      - {num: "1", at: [0, 0], size: [4.4, 4.4], shape: circle, drill: [2.2, 2.4]}
+    pin1: [0, 0]
+
+  TestPoint:TestPoint_Pad_D1.0mm:
+    part: probe pad (no part)
+    datasheet: none
+    source: >-
+      Design choice, no datasheet: 1.0 mm round SMD pad for a probe or pogo pin
+      (VBAT current measurement, GND).
+    pads:
+      - {num: "1", at: [0, 0], size: [1.0, 1.0], shape: circle}
+    pin1: [0, 0]
+
+# Pin functions per part, from the datasheet pinouts, compared with the
+# schematic symbols' pin names in the netlist (normalised: ~{INT} -> INT).
+# The STM32U083 pins are checked against hardware/pins.yaml instead.
+parts:
+  RV-3032-C7:     # Micro Crystal RV-3032-C7 datasheet v1.4 p.2 "PIN CONNECTIONS"
+    {"1": VBACKUP, "2": SDA, "3": INT, "4": EVI, "5": VSS, "6": VDD, "7": CLKOUT, "8": SCL}
+  AO3401A:        # AOS AO3401A datasheet p.1 (SOT23 top view): G 1, S 2, D 3
+    {"1": G, "2": S, "3": D}
+  AO3400A:        # AOS AO3400A datasheet p.1
+    {"1": G, "2": S, "3": D}
+  Si1308EDL:      # Vishay AN813 fig.1, SOT-323 SC-70 (3-leads): G 1, S 2, D 3
+    {"1": G, "2": S, "3": D}
+  MBR0530:        # cathode bar = pad 1 (K)
+    {"1": K, "2": A}
+  VSMB2948SL:     # Vishay doc 83498 p.5: cathode / anode
+    {"1": K, "2": A}
+  VEMT2523SLX01:  # Vishay doc 84167 p.4: collector / emitter
+    {"1": C, "2": E}
+  SKRHABE010:     # Alps SKRH Drawing No.2 circuit diagram
+    {"1": A, "2": CENTER, "3": C, "4": B, "5": COMMON, "6": D}
+  CR2450:         # MYOUNG MY-CP-0138: terminal + = pad 1, - = pad 2
+    {"1": "+", "2": "-"}
+
+# The e-paper's FPC pins (GDEY0213B74 datasheet p.7 pin table) land on J1's
+# pins with the same numbers: checks J1's nets against the panel's pin names.
+panel:
+  ref: J1
+  source: GDEY0213B74 datasheet p.7, pin table (1 NC .. 24 VCOM)
+  pins:
+    "1": [NC, null]
+    "2": [GDR, EPD_GDR]
+    "3": [RESE, EPD_RESE]
+    "4": [NC, null]
+    "5": [VSH2, EPD_VSH2]
+    "6": [TSCL, null]
+    "7": [TSDA, null]
+    "8": [BS1, GND]          # BS1 low = 4-wire SPI
+    "9": [BUSY, EPD_BUSY]
+    "10": [RES#, EPD_RST]
+    "11": [D/C#, EPD_DC]
+    "12": [CS#, EPD_CS]
+    "13": [SCL, EPD_SCK]
+    "14": [SDA, EPD_SDI]
+    "15": [VDDIO, VEPD]
+    "16": [VCI, VEPD]
+    "17": [VSS, GND]
+    "18": [VDD, EPD_VDD]
+    "19": [VPP, null]
+    "20": [VSH1, EPD_VSH1]
+    "21": [VGH, EPD_PREVGH]
+    "22": [VSL, EPD_VSL]
+    "23": [VGL, EPD_PREVGL]
+    "24": [VCOM, EPD_VCOM]

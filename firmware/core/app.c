@@ -6,6 +6,7 @@
 #include <string.h>
 
 #include "base32.h"
+#include "ct.h"
 #include "gfx.h"
 #include "hal.h"
 #include "pairing.h"
@@ -21,6 +22,11 @@
 #define REPEAT_RATE_MS 90
 #define FULL_REFRESH_EVERY 5   /* GDEY0213B74 datasheet: full refresh after 5 fast/partial ones */
 #define PAIR_TX_MS 220
+/* Once the other device's COMMIT is in, its REVEAL follows within a second
+ * or two even on a lossy link. A device stuck waiting longer is the sign of
+ * a man in the middle who saw the two SAS values would not match and held
+ * the REVEAL back: show that as a failed pairing, not an endless wait. */
+#define PAIR_REVEAL_TIMEOUT_MS 15000
 #define TIME_VALID_AFTER 1767225600 /* 2026-01-01T00:00:00Z */
 #define TITLE_H 15
 #define ROW_H 18
@@ -91,7 +97,6 @@ static struct {
 
     /* lists */
     int sel;
-    int top;
     int slot;              /* slot being viewed or edited */
 
     struct {
@@ -146,6 +151,7 @@ static struct {
     pairing_t pair;
     unsigned pair_seq;
     uint32_t pair_next_tx;
+    uint32_t pair_found_ms; /* when the peer's COMMIT arrived */
 } ui;
 
 static const char *const SCREEN_NAMES[] = {
@@ -446,6 +452,8 @@ static void text_key(uint8_t b)
         if (ui.text.len == 0) return;
         text_finish();
         return;
+    default:
+        break;
     }
     ui.dirty = true;
 }
@@ -497,7 +505,7 @@ static void draw_code(void)
     int half = r.digits / 2;
     memcpy(spaced, code, (size_t)half);
     spaced[half] = ' ';
-    strcpy(spaced + half + 1, code + half);
+    copy_str(spaced + half + 1, sizeof(spaced) - (size_t)half - 1, code + half);
     gfx_text_centered(&font_digits, DISPLAY_W / 2, TITLE_H + 6, spaced);
 
     int remaining = r.period - (int)(now_utc() % r.period);
@@ -638,6 +646,9 @@ static void draw_sas(void)
     title_bar("Compare screens");
     gfx_text_centered(&font_small, DISPLAY_W / 2, TITLE_H + 4,
                       "Both screens must show the same symbols:");
+    /* If the other device never got here, a man in the middle may have held
+     * its REVEAL back: both must start again (docs/formal-verification.md). */
+    gfx_text_centered(&font_small, DISPLAY_W / 2, 78, "No symbols on the other? " GFX_LEFT " on both.");
     int size = 26, gap = 10;
     int total = PAIR_SAS_LEN * size + (PAIR_SAS_LEN - 1) * gap;
     int x = (DISPLAY_W - total) / 2;
@@ -709,7 +720,7 @@ static void draw_time(void)
 {
     title_bar("Date & time (local)");
     char date[16], tim[16];
-    civil_t *c = &ui.tm.c;
+    const civil_t *c = &ui.tm.c;
     snprintf(date, sizeof(date), "%04d-%02d-%02d", c->year, c->month, c->day);
     snprintf(tim, sizeof(tim), "%02d:%02d:%02d", c->hour, c->min, c->sec);
     int cw = gfx_text_width(&font_mono, "0");
@@ -736,6 +747,7 @@ static void time_adjust(int d)
     case 3: c->hour = (c->hour + d + 24) % 24; break;
     case 4: c->min = (c->min + d + 60) % 60; break;
     case 5: c->sec = (c->sec + d + 60) % 60; break;
+    default: break;
     }
     int dim = time_days_in_month(c->year, c->month);
     if (c->day < 1) c->day = dim;
@@ -980,8 +992,9 @@ static void pin_submit(void)
         open_pin(P_CONFIRM, "Enter it again");
         break;
     case P_CONFIRM:
+        /* The length is public (the screen shows a dot per symbol). */
         if (ui.pin.len != ui.pin.first_len ||
-            memcmp(ui.pin.digits, ui.pin.first, (size_t)ui.pin.len) != 0) {
+            !ct_equal(ui.pin.digits, ui.pin.first, (size_t)ui.pin.len)) {
             crypto_wipe(ui.pin.first, sizeof(ui.pin.first));
             open_pin(P_NEW, "Didn't match. Choose again");
             return;
@@ -1271,6 +1284,7 @@ void app_ir_rx(const uint8_t *data, size_t len)
 {
     if (ui.scr != SCR_PAIR && ui.scr != SCR_SAS) return;
     if (pairing_rx(&ui.pair, data, len)) {
+        if (ui.pair.state == PAIR_REVEALING) ui.pair_found_ms = hal_millis();
         if (ui.pair.state == PAIR_DONE && ui.scr == SCR_PAIR) go(SCR_SAS);
         ui.dirty = true;
     }
@@ -1280,6 +1294,12 @@ uint32_t app_poll(void)
 {
     uint32_t now = hal_millis();
     scan_buttons(now);
+
+    if (ui.scr == SCR_PAIR && ui.pair.state == PAIR_REVEALING &&
+        now - ui.pair_found_ms >= PAIR_REVEAL_TIMEOUT_MS) {
+        pairing_abort(&ui.pair);
+        ui.dirty = true;
+    }
 
     /* Pairing keeps retransmitting until the person confirms the SAS. */
     if ((ui.scr == SCR_PAIR || ui.scr == SCR_SAS || ui.scr == SCR_TEXT) &&

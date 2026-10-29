@@ -3,6 +3,7 @@
 
 #include <string.h>
 
+#include "ct.h"
 #include "hal.h"
 #include "third_party/monocypher/monocypher.h"
 
@@ -149,6 +150,12 @@ store_status_t store_mount(void)
     hal_flash_read(page_off(META_PAGE), &meta, sizeof(meta));
     if (meta.magic != META_MAGIC || meta.version != 1) fresh_store();
     scan_types();
+    if (meta.pin_set && store_pin_fails() >= STORE_PIN_TRIES) {
+        /* The last allowed attempt was logged but the power failed before
+         * the wipe it triggers. */
+        store_wipe();
+        return STORE_OK;
+    }
     if (meta.pin_set) {
         unlocked = false;
         crypto_wipe(master_key, sizeof(master_key));
@@ -213,13 +220,16 @@ static void pinlog_append(uint64_t v)
 {
     int n = pinlog_used();
     if (n >= (int)(HAL_FLASH_PAGE / 8) - 1) {
-        /* Compact: keep only the current failure count. */
+        /* Compact: keep only the current failure count. The new page goes
+         * through the journal, so a power cut leaves the old log or the new
+         * one, never an erased log (which would reset the count). */
         uint8_t fails = store_pin_fails();
-        hal_flash_erase(PINLOG_PAGE);
-        n = 0;
         uint64_t t = PINLOG_TRY;
-        for (uint8_t k = 0; k < fails; k++, n++)
-            hal_flash_write(page_off(PINLOG_PAGE) + (uint32_t)n * 8, &t, 8);
+        memset(page_buf, 0xff, sizeof(page_buf));
+        for (n = 0; n < fails; n++) memcpy(page_buf + (size_t)n * 8, &t, 8);
+        memcpy(page_buf + (size_t)n * 8, &v, 8);
+        commit_page(PINLOG_PAGE);
+        return;
     }
     hal_flash_write(page_off(PINLOG_PAGE) + (uint32_t)n * 8, &v, 8);
 }
@@ -231,8 +241,11 @@ uint8_t store_pin_fails(void)
     for (int i = 0; i < n; i++) {
         uint64_t v;
         hal_flash_read(page_off(PINLOG_PAGE) + (uint32_t)i * 8, &v, 8);
+        /* Anything else is an entry torn by a power cut. A torn TRY means
+         * the power failed before that attempt could be checked, and a torn
+         * OK follows a TRY that is already counted, so neither is a try. */
         if (v == PINLOG_OK) fails = 0;
-        else if (fails < 255) fails++;
+        else if (v == PINLOG_TRY && fails < 255) fails++;
     }
     return fails;
 }
@@ -240,10 +253,15 @@ uint8_t store_pin_fails(void)
 store_status_t store_unlock(const uint8_t *pin, int len)
 {
     if (!meta.pin_set || unlocked) return STORE_OK;
+    if (store_pin_fails() >= STORE_PIN_TRIES) {
+        store_wipe();
+        return STORE_WIPED;
+    }
     pinlog_append(PINLOG_TRY);
     uint8_t kek[32];
     pin_kek(pin, len, meta.salt, kek);
     int bad = crypto_aead_unlock(master_key, meta.mac, kek, meta.nonce, NULL, 0, meta.mk, 32);
+    CT_PUBLIC(&bad, sizeof(bad)); /* right or wrong PIN is shown anyway */
     crypto_wipe(kek, sizeof(kek));
     if (bad) {
         crypto_wipe(master_key, sizeof(master_key));
@@ -345,9 +363,10 @@ static bool read_slot(uint16_t i, rec_type_t want, void *out, size_t len)
                    (i % STORE_SLOTS_PER_PAGE) * STORE_SLOT_SIZE;
     hal_flash_read(off, raw, sizeof(raw));
     slot_ad(i, raw[0], ad);
-    if (crypto_aead_unlock(pt, raw + SLOT_MAC, master_key, raw + SLOT_NONCE, ad, sizeof(ad),
-                           raw + SLOT_CT, SLOT_PT_LEN) != 0)
-        return false;
+    int bad = crypto_aead_unlock(pt, raw + SLOT_MAC, master_key, raw + SLOT_NONCE, ad, sizeof(ad),
+                                 raw + SLOT_CT, SLOT_PT_LEN);
+    CT_PUBLIC(&bad, sizeof(bad));
+    if (bad) return false;
     memcpy(out, pt, len);
     crypto_wipe(pt, sizeof(pt));
     return true;

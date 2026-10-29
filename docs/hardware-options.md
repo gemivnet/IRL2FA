@@ -73,7 +73,7 @@ by the 59×29 mm glass, not by the cell. See [power-calculations.md](power-calcu
 | Cell | Capacity | Device thickness | Life (normal use, typical / worst) |
 |-|-|-|-|
 | CR2032 | 225 mAh | ~9.2 mm | ~0.9 / 0.6 years (misses the 1-year goal) |
-| **CR2450** ✔ | 540 mAh usable | **11.0 mm** (case model) | **2.2 / 1.3 years** |
+| **CR2450** ✔ | 540 mAh usable | **11.0 mm** (case model) | **2.0 / 1.2 years** |
 | AAA + boost converter | ~1100 mAh | ~15-16 mm | longer, but thicker and needs a boost converter. Alkaline cells leak. |
 
 ### Battery holder

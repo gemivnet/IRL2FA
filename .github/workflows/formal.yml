@@ -1,0 +1,38 @@
+# Formal verification of the IR pairing protocol: proves the Tamarin model
+# in formal/pairing.spthy and checks the deliberately broken variants are
+# caught. See docs/formal-verification.md.
+# SPDX-License-Identifier: AGPL-3.0-or-later
+name: formal
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  tamarin:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Prove the pairing model (Tamarin 1.12.0 + Maude 3.5.1 in Docker)
+        run: formal/run.sh
+      - name: Summary
+        if: always()
+        run: |
+          for f in formal/build/*.txt; do
+            [ -e "$f" ] || continue
+            echo "### $(basename "$f" .txt)" >> "$GITHUB_STEP_SUMMARY"
+            echo '```' >> "$GITHUB_STEP_SUMMARY"
+            sed -n '/^summary of summaries:/,$p' "$f" >> "$GITHUB_STEP_SUMMARY"
+            echo '```' >> "$GITHUB_STEP_SUMMARY"
+          done
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: tamarin-output
+          path: formal/build
+          if-no-files-found: ignore

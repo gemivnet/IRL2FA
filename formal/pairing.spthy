@@ -1,0 +1,286 @@
+/*
+ * IRL2FA in-person pairing: commit/reveal X25519 key agreement plus a
+ * 6-symbol short authentication string (SAS) that the two people compare.
+ *
+ * Ground truth: firmware/core/pairing.c and the SCR_SAS handling in
+ * firmware/core/app.c. docs/formal-verification.md maps every rule below to
+ * the C code and explains what is and is not proven.
+ *
+ * Run with formal/run.sh. Preprocessor flags select deliberately broken
+ * variants that run.sh expects to FAIL (see the end of this file):
+ *   -D=NO_COMMIT_CHECK   accept a REVEAL without checking it against the COMMIT
+ *   -D=REVEAL_EARLY      send pk and nonce before holding the peer's COMMIT
+ *   -D=NO_SAS_CHECK      people accept without comparing the symbols
+ *
+ * SPDX-License-Identifier: AGPL-3.0-or-later
+ */
+theory IRL2FA_Pairing
+begin
+
+builtins: diffie-hellman
+
+/* h       SHA-256 (commitment); free constructor, so binding and hiding.
+ * trunc   "first 8 bytes of": REVEAL carries trunc(peer commit) as an address.
+ * hkdf    HKDF-SHA256(salt, ikm, info) -> 40-byte okm.
+ * keypart okm[0..31]  (the contact key)
+ * saspart okm[32..35] (the 32-bit value whose base-5 digits are the SAS)
+ * None of them has an inverse: the adversary can only apply them. */
+functions: h/1, trunc/1, hkdf/3, keypart/1, saspart/1
+
+/* ------------------------------------------------------------------ */
+/* Restrictions                                                        */
+
+restriction NotEqual:
+  "All x y #i. NotEq(x, y) @ #i ==> not (x = y)"
+
+/* memcmp(pub, peer_pub) gives a strict order on public keys. The only
+ * property the protocol relies on is that two devices holding the same
+ * pair agree on which one is low, i.e. the order is antisymmetric (and
+ * irreflexive). Leaving transitivity out over-approximates the real order,
+ * which is sound for every all-traces lemma below. */
+restriction Order_antisymmetric:
+  "All x y #i #j. Order(x, y) @ #i & Order(y, x) @ #j ==> F"
+
+/* ------------------------------------------------------------------ */
+/* Device: one pairing session (pairing_start .. finish)               */
+
+/* pairing_start: 32 random bytes -> X25519 secret, 16 -> nonce;
+ * commit = SHA-256("IRL2FA commit v1" || pub || nonce); state SEARCHING;
+ * pairing_tx sends COMMIT(commit) over IR (to the adversary). */
+#ifdef REVEAL_EARLY
+/* BROKEN VARIANT: the device sends its key and nonce at once, while still
+ * SEARCHING, before it holds the peer's COMMIT. */
+rule Pair_Start_Reveal_Early:
+  let pk = 'g'^~sk
+      c  = h(<'IRL2FA_commit_v1', pk, ~n>)
+  in
+  [ Fr(~tid), Fr(~sk), Fr(~n) ]
+--[ Start(~tid), Committed(~tid, pk, c) ]->
+  [ St_Searching(~tid, ~sk, ~n, c)
+  , !Session_Secret(~tid, ~sk)
+  , Out(c), Out(<pk, ~n>) ]
+#else
+rule Pair_Start:
+  let pk = 'g'^~sk
+      c  = h(<'IRL2FA_commit_v1', pk, ~n>)
+  in
+  [ Fr(~tid), Fr(~sk), Fr(~n) ]
+--[ Start(~tid), Committed(~tid, pk, c) ]->
+  [ St_Searching(~tid, ~sk, ~n, c)
+  , !Session_Secret(~tid, ~sk)
+  , Out(c) ]
+#endif
+
+/* handle_frame, T_COMMIT in SEARCHING: ignore our own echo, lock onto the
+ * first other COMMIT, go to REVEALING. pairing_tx now also sends
+ * REVEAL(pub, nonce, first 8 bytes of peer_commit). Retransmissions are
+ * subsumed by the adversary's ability to replay anything it has seen. */
+rule Recv_Commit:
+  let pk = 'g'^~sk
+  in
+  [ St_Searching(tid, ~sk, ~n, c), In(cp) ]
+--[ NotEq(cp, c), GotCommit(tid, pk, cp) ]->
+  [ St_Revealing(tid, ~sk, ~n, c, cp)
+  , Out(<pk, ~n, trunc(cp)>) ]
+
+/* handle_frame, T_REVEAL in REVEALING, addressed to our commit (the
+ * trunc(c) pattern), not our own echo, and the commitment check
+ * make_commit(pkp, np) == peer_commit succeeds -> finish().
+ * finish(): shared = X25519(priv, peer_pub); is_low = memcmp(pub, peer_pub) < 0;
+ * okm = HKDF(salt "IRL2FA pair v1", shared, info = pk_low || pk_high || "key+sas\0").
+ * The low and high cases are two rules; Order() pins the comparison. */
+rule Recv_Reveal_Low:
+  let pk     = 'g'^~sk
+      shared = pkp^~sk
+      okm    = hkdf('IRL2FA_pair_v1', shared, <pk, pkp, 'key_sas'>)
+      cp     = h(<'IRL2FA_commit_v1', pkp, np>)
+  in
+  [ St_Revealing(tid, ~sk, ~n, c, cp), In(<pkp, np, trunc(c)>) ]
+--[ NotEq(pkp, pk), Order(pk, pkp)
+  , Done(tid, pk, pkp, cp, keypart(okm), saspart(okm)) ]->
+  [ St_Done(tid, pk, pkp, keypart(okm)), Shown(tid, saspart(okm)) ]
+
+rule Recv_Reveal_High:
+  let pk     = 'g'^~sk
+      shared = pkp^~sk
+      okm    = hkdf('IRL2FA_pair_v1', shared, <pkp, pk, 'key_sas'>)
+      cp     = h(<'IRL2FA_commit_v1', pkp, np>)
+  in
+  [ St_Revealing(tid, ~sk, ~n, c, cp), In(<pkp, np, trunc(c)>) ]
+--[ NotEq(pkp, pk), Order(pkp, pk)
+  , Done(tid, pk, pkp, cp, keypart(okm), saspart(okm)) ]->
+  [ St_Done(tid, pk, pkp, keypart(okm)), Shown(tid, saspart(okm)) ]
+
+#ifdef NO_COMMIT_CHECK
+/* BROKEN VARIANT: a REVEAL is accepted whatever COMMIT the device holds. */
+rule Recv_Reveal_Unchecked_Low:
+  let pk     = 'g'^~sk
+      okm    = hkdf('IRL2FA_pair_v1', pkp^~sk, <pk, pkp, 'key_sas'>)
+  in
+  [ St_Revealing(tid, ~sk, ~n, c, cp), In(<pkp, np, trunc(c)>) ]
+--[ NotEq(pkp, pk), Order(pk, pkp)
+  , Done(tid, pk, pkp, cp, keypart(okm), saspart(okm)) ]->
+  [ St_Done(tid, pk, pkp, keypart(okm)), Shown(tid, saspart(okm)) ]
+
+rule Recv_Reveal_Unchecked_High:
+  let pk     = 'g'^~sk
+      okm    = hkdf('IRL2FA_pair_v1', pkp^~sk, <pkp, pk, 'key_sas'>)
+  in
+  [ St_Revealing(tid, ~sk, ~n, c, cp), In(<pkp, np, trunc(c)>) ]
+--[ NotEq(pkp, pk), Order(pkp, pk)
+  , Done(tid, pk, pkp, cp, keypart(okm), saspart(okm)) ]->
+  [ St_Done(tid, pk, pkp, keypart(okm)), Shown(tid, saspart(okm)) ]
+#endif
+
+/* handle_frame: a REVEAL addressed to us whose key does not open the
+ * stored commitment sends the session to PAIR_FAILED (a dead end). */
+rule Recv_Reveal_Bad:
+  [ St_Revealing(tid, ~sk, ~n, c, cp), In(<pkp, np, trunc(c)>) ]
+--[ NotEq(pkp, 'g'^~sk), NotEq(cp, h(<'IRL2FA_commit_v1', pkp, np>)), Failed(tid) ]->
+  [ ]
+
+/* ------------------------------------------------------------------ */
+/* People: SCR_SAS                                                      */
+
+/* The two people look at both screens (an authentic, out-of-band channel
+ * the adversary cannot write to) and each presses centre if the symbols
+ * match. Which two sessions are side by side is up to the adversary.
+ * Shown is linear: every session's SAS is compared at most once, which is
+ * what the people do (a mismatch or a cancel ends the session in app.c).
+ *
+ * The SAS is short, so two *different* saspart() values can display the
+ * same 6 symbols. Symbolically saspart() is injective, so that collision
+ * has to be modelled explicitly: Humans_Collision lets the comparison
+ * succeed on unequal SAS values, and records the event Collision. Its
+ * probability (1/5^6 per attempt) is argued in docs/formal-verification.md
+ * using the lemmas commit_before_reveal and collision_inputs_fixed. */
+rule Humans_Match:
+  [ Shown(tA, s), Shown(tB, s) ]
+--[ Compared(tA), Compared(tB), Match(tA, tB), Match(tB, tA) ]->
+  [ Ok(tA), Ok(tB) ]
+
+rule Humans_Collision:
+  [ Shown(tA, sA), Shown(tB, sB) ]
+--[ NotEq(sA, sB), Compared(tA), Compared(tB)
+  , Collision(tA, tB, sA, sB), Collision(tB, tA, sB, sA) ]->
+  [ Ok(tA), Ok(tB) ]
+
+#ifdef NO_SAS_CHECK
+/* BROKEN VARIANT: the owner presses centre without comparing. */
+rule Humans_Skip:
+  [ Shown(t, s) ] --[ Compared(t) ]-> [ Ok(t) ]
+#endif
+
+/* SCR_SAS, centre: name the contact and store key and role. */
+rule Accept:
+  [ St_Done(tid, pk, pkp, k), Ok(tid) ]
+--[ Accept(tid, pk, pkp, k) ]->
+  [ !Contact(tid, k) ]
+
+/* ------------------------------------------------------------------ */
+/* Compromise: a device whose session secret or stored contact key the  */
+/* adversary reads (e.g. by physical extraction).                        */
+
+rule Compromise_Session:
+  [ !Session_Secret(tid, ~sk) ] --[ Compromised(tid) ]-> [ Out(~sk) ]
+
+rule Compromise_Contact:
+  [ !Contact(tid, k) ] --[ Compromised(tid) ]-> [ Out(k) ]
+
+/* ================================================================== */
+/* Sanity: the model is not vacuous                                    */
+
+/* Two honest devices pair over a passive channel, the SAS matches and both
+ * owners accept the same key. */
+lemma executable_honest_pairing:
+  exists-trace
+  "Ex tA tB pkA pkB k #a #b.
+       Accept(tA, pkA, pkB, k) @ #a & Accept(tB, pkB, pkA, k) @ #b
+     & not (tA = tB)
+     & not (Ex t #r. Compromised(t) @ #r)
+     & not (Ex t1 t2 s1 s2 #c. Collision(t1, t2, s1, s2) @ #c)"
+
+/* With a SAS collision the man in the middle wins: the attack the SAS is
+ * there to stop is really in the model. */
+lemma executable_mitm_with_collision:
+  exists-trace
+  "Ex tA pkA pkp k #a #j.
+       Accept(tA, pkA, pkp, k) @ #a & K(k) @ #j
+     & not (Ex t #r. Compromised(t) @ #r)"
+
+/* ================================================================== */
+/* Security                                                             */
+
+/* (a) Secrecy: a key accepted after a genuine SAS match between two
+ * uncompromised devices is never known to the adversary. */
+lemma key_secrecy:
+  "All tA tB pkA pkB k #a #m.
+       Accept(tA, pkA, pkB, k) @ #a & Match(tA, tB) @ #m
+     & not (Ex #r. Compromised(tA) @ #r)
+     & not (Ex #r. Compromised(tB) @ #r)
+   ==> not (Ex #j. K(k) @ #j)"
+
+/* The main theorem in attack form: the adversary learns an accepted key
+ * only through a SAS collision or by compromising one of the two devices. */
+lemma mitm_requires_sas_collision:
+  "All tA pkA pkp k #a #j.
+       Accept(tA, pkA, pkp, k) @ #a & K(k) @ #j
+   ==> (Ex tB sA sB #c. Collision(tA, tB, sA, sB) @ #c)
+     | (Ex #r. Compromised(tA) @ #r)
+     | (Ex tB #m #r. Match(tA, tB) @ #m & Compromised(tB) @ #r)"
+
+/* (b) Injective agreement: if A's owner accepts key k with public keys
+ * (pkA, pkB) and the comparison was not a collision, then exactly one
+ * other session, B, derived the same k from the same two public keys (and
+ * showed the same SAS); no third session holds k. B's owner pressing
+ * centre is B's owner's own choice and is not implied. */
+lemma injective_agreement:
+  "All tA pkA pkB k #a.
+       Accept(tA, pkA, pkB, k) @ #a
+     & not (Ex tB sA sB #c. Collision(tA, tB, sA, sB) @ #c)
+   ==> (Ex tB cp s #d.
+           Done(tB, pkB, pkA, cp, k, s) @ #d & not (tA = tB)
+         & not (Ex tC p1 p2 cp2 s2 #e.
+                  Done(tC, p1, p2, cp2, k, s2) @ #e
+                & not (tC = tA) & not (tC = tB)))"
+
+/* Each session is compared at most once and accepted at most once: every
+ * attempt at a collision costs the adversary one comparison by people. */
+lemma one_comparison_per_session:
+  "All t #i #j. Compared(t) @ #i & Compared(t) @ #j ==> #i = #j"
+
+/* (c) Commit before reveal. When a session finishes with peer key pkp:
+ *   - the commitment cp it holds opens to exactly that key: cp = h(label,
+ *     pkp, np) (the device checked it, and h is binding);
+ *   - the adversary knew cp, so had fixed it, before the device took it;
+ *   - the device took cp (GotCommit) before the adversary could know the
+ *     device's own public key pk.
+ * So the peer key, and with it this session's SAS as a function of pk, was
+ * fixed before the adversary learnt pk. */
+lemma commit_before_reveal:
+  "All tid pk pkp cp k s #d.
+       Done(tid, pk, pkp, cp, k, s) @ #d
+     & not (Ex #r. Compromised(tid) @ #r)
+   ==> Ex np #g #m.
+         cp = h(<'IRL2FA_commit_v1', pkp, np>)
+       & GotCommit(tid, pk, cp) @ #g & #g < #d
+       & K(cp) @ #m & #m < #g
+       & (All #l. K(pk) @ #l ==> #g < #l)"
+
+/* (c) The same for both sessions of any successful SAS collision (the
+ * Collision event is recorded in both directions, so this covers each
+ * side): each SAS that collided was a function of a device's fresh public
+ * key and of a peer key the adversary had fixed by commitment before it
+ * saw that public key. */
+lemma collision_inputs_fixed:
+  "All tA tB sA sB #c.
+       Collision(tA, tB, sA, sB) @ #c
+     & not (Ex #r. Compromised(tA) @ #r)
+   ==> Ex pkA pkp cp k np #d #g #m.
+         Done(tA, pkA, pkp, cp, k, sA) @ #d & #d < #c
+       & cp = h(<'IRL2FA_commit_v1', pkp, np>)
+       & GotCommit(tA, pkA, cp) @ #g & #g < #d
+       & K(cp) @ #m & #m < #g
+       & (All #l. K(pkA) @ #l ==> #g < #l)"
+
+end
