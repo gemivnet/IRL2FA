@@ -18,10 +18,10 @@ It is also a standard **TOTP authenticator** (the 6-digit codes from Google Auth
 </p>
 
 <p align="center">
-  <a href="https://georgemain.com/IRL2FA/"><b>▶ Try it in your browser</b></a> ·
+  <a href="https://irl2fa.com/"><b>▶ Try it in your browser</b></a> ·
   <a href="#build-one">Build one</a> ·
   <a href="docs/pairing-protocol.md">How pairing works</a> ·
-  <a href="https://irl2fa.com">irl2fa.com</a>
+  <a href="https://github.com/gemivnet/IRL2FA/releases/latest">Download</a>
 </p>
 
 ---
@@ -61,7 +61,7 @@ The full design is in [docs/pairing-protocol.md](docs/pairing-protocol.md) and [
 
 The firmware's portable core is compiled to WebAssembly and runs two devices side by side in your browser: pair them over a simulated IR link, compare words, add a TOTP secret and check it against your phone.
 
-**[georgemain.com/IRL2FA](https://georgemain.com/IRL2FA/)**
+**[irl2fa.com](https://irl2fa.com/)**
 
 <p align="center"><img src="docs/images/sim/sim-pairing.png" alt="Simulator: two devices pairing" width="760" /></p>
 
@@ -83,7 +83,7 @@ The firmware's portable core is compiled to WebAssembly and runs two devices sid
   <img src="docs/images/pcb/pcb-back.png" alt="PCB back" width="420" />
 </p>
 
-- Design files: [schematic (PDF)](hardware/fab/irl2fa-schematic.pdf) · [KiCad 9 project](hardware/) · [interactive BOM](https://georgemain.com/IRL2FA/ibom.html) · [3D model (STEP)](hardware/fab/irl2fa.step)
+- Design files: [schematic (PDF)](hardware/fab/irl2fa-schematic.pdf) · [KiCad 9 project](hardware/) · [interactive BOM](https://irl2fa.com/ibom.html) · [3D model (STEP)](hardware/fab/irl2fa.step)
 - Design notes: [PCB design](docs/pcb-design.md) · [pin assignments](docs/pin-assignments.md) · [why these parts](docs/hardware-options.md) · [design review](docs/design-review.md)
 
 ## Build one
@@ -95,7 +95,7 @@ You need a PCB, a display, a coin cell, a printed case and four screws. Everythi
    - Choose 1.0 mm thickness and PCB Assembly on **both sides**.
    - Add [`irl2fa-bom-jlcpcb.csv`](hardware/fab/irl2fa-bom-jlcpcb.csv) and [`irl2fa-cpl-jlcpcb.csv`](hardware/fab/irl2fa-cpl-jlcpcb.csv).
    - Every part has an LCSC number. The [BOM](docs/bill-of-materials.md) lists prices, stock and alternatives.
-   - To solder it yourself, use the [interactive BOM](https://georgemain.com/IRL2FA/ibom.html).
+   - To solder it yourself, use the [interactive BOM](https://irl2fa.com/ibom.html).
 2. **Buy the display.** A [Good Display GDEY0213B74](https://www.good-display.com/product/391.html) (about $5), or the GDEM0213B74WT if it has to work below 0 °C.
 3. **Print the case.**
    - Files: [`case/stl/`](case/stl/) or [`case/3mf/irl2fa-all.3mf`](case/3mf/), in PETG or PLA with no supports.

@@ -4,7 +4,7 @@ The first release with everything needed to build an IRL2FA. The design is
 simulated and checked end to end, but **no board has been built yet**: treat
 this as a prototype release and please [file a build report](https://github.com/gemivnet/IRL2FA/issues/new?template=build_report.yml).
 
-**Try it first:** the [browser simulator](https://georgemain.com/IRL2FA/) runs the same firmware.
+**Try it first:** the [browser simulator](https://irl2fa.com/) runs the same firmware.
 
 ### Downloads
 
