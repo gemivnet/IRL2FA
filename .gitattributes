@@ -1,2 +1,11 @@
 * text=auto eol=lf
 *.stp binary
+*.step binary
+*.STEP binary
+*.wrl binary
+*.stl binary
+*.3mf binary
+*.png binary
+*.pdf binary
+*.zip binary
+*.wasm binary
