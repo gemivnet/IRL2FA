@@ -1,3 +1,5 @@
+> **Status (2026-10): redesign in progress.** The hardware is moving to an STM32U0, IR pairing and a fully open part library; firmware, a browser simulator, PCB and case files are landing in this repo.
+
 # IRL2FA - Air-Gapped Real-World 2-Factor Authenticator
 
 IRL2FA is a compact physical device designed to verify the authenticity of digital communications in an increasingly AI-dominated world. Its primary purpose is to prevent AI impersonation fraud in personal communications, while also serving as a standalone 2FA (Two-Factor Authentication) device for those who prefer not to have continuous access to their phones.
