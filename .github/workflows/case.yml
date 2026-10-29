@@ -1,0 +1,72 @@
+# SPDX-License-Identifier: CC-BY-SA-4.0
+name: case
+
+on:
+  push:
+    paths:
+      - "case/**"
+      - "hardware/board.yaml"
+      - ".github/workflows/case.yml"
+  pull_request:
+    paths:
+      - "case/**"
+      - "hardware/board.yaml"
+      - ".github/workflows/case.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  case:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: case/requirements.txt
+
+      - name: Install Python tooling
+        run: python -m pip install -r case/requirements.txt
+
+      - name: Regenerate board dimensions from hardware/board.yaml
+        run: |
+          python case/tools/gen_dims.py
+          git diff --exit-code -- case/board_dims.scad || {
+            echo "::error::case/board_dims.scad is stale: run python case/tools/gen_dims.py (or case/build.sh) and commit it"
+            exit 1
+          }
+
+      - name: Pull OpenSCAD
+        run: docker pull openscad/openscad:latest
+
+      - name: Keep the committed STLs
+        run: cp -r case/stl "$RUNNER_TEMP/committed-stl"
+
+      - name: Build STLs, 3MF and renders
+        env:
+          PYTHON: python
+        run: case/build.sh
+
+      - name: Committed STLs must match the sources
+        # OpenSCAD's STL output is not byte-stable across runs, so this compares
+        # triangle count, bounding box and volume within 0.1 %.
+        run: python case/tools/compare_stl.py "$RUNNER_TEMP/committed-stl" case/stl
+
+      - name: Geometry tests
+        run: python -m pytest case/tests -v
+
+      - name: Upload renders and printable files
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: irl2fa-case
+          path: |
+            docs/images/case/*.png
+            case/stl/
+            case/3mf/
+          if-no-files-found: warn
