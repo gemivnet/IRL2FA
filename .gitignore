@@ -434,3 +434,9 @@ FodyWeavers.xsd
 
 # JetBrains Rider
 *.sln.iml
+# IRL2FA build outputs and local tooling
+.venv/
+firmware/build/
+sim/dist/
+# fabrication outputs are committed on purpose
+!hardware/fab/**
