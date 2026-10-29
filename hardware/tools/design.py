@@ -225,36 +225,36 @@ BLOCK_TITLES = {
 # rotation None = chosen by gen_pcb.py (see orient_fpc_connector).
 PLACEMENT = {
     "BT1": ("B", 40.0, 17.0, 0),       # + terminal on the right (front view), next to Q1
-    "Q1": ("B", 59.0, 25.0, 90),
+    "Q1": ("B", 58.6, 26.2, 90),
     "C1": ("B", 60.5, 10.5, 90),
     "C2": ("B", 61.2, 22.6, 90),
     "TP1": ("B", 56.5, 31.6, 0),
     "TP2": ("B", 59.3, 31.6, 0),
-    "U1": ("B", 66.5, 16.5, 0),
-    "C3": ("B", 62.4, 14.4, 90),
-    "C4": ("B", 69.8, 19.6, 90),
-    "C5": ("B", 62.4, 18.2, 90),
-    "C6": ("B", 64.8, 12.4, 0),
-    "C7": ("B", 67.4, 12.4, 0),
-    "C8": ("B", 69.8, 13.4, 90),
-    "R1": ("B", 67.6, 21.4, 0),
+    "U1": ("B", 65.0, 17.0, 90),
+    "C3": ("B", 63.4, 21.4, 0),
+    "C4": ("B", 65.0, 12.6, 0),
+    "C5": ("B", 60.3, 13.9, 90),
+    "C6": ("B", 65.6, 21.4, 0),
+    "C7": ("B", 67.7, 21.4, 0),
+    "C8": ("B", 64.2, 23.0, 0),
+    "R1": ("B", 68.8, 19.4, 90),
     "J3": ("B", 66.5, 28.0, 0),
-    "U2": ("B", 66.0, 5.6, 90),
-    "C9": ("B", 63.6, 5.6, 90),
-    "R2": ("B", 68.2, 7.6, 0),
-    "R3": ("B", 68.6, 3.4, 0),
-    "R4": ("B", 70.8, 4.6, 90),
+    "U2": ("B", 70.8, 8.6, 0),
+    "C9": ("B", 73.4, 8.6, 90),
+    "R2": ("B", 70.8, 5.7, 0),
+    "R3": ("B", 68.6, 11.2, 0),
+    "R4": ("B", 68.6, 12.6, 0),
     "SW1": ("F", 72.8, 17.0, 45),
-    "J1": ("B", 14.0, 16.8, None),
-    "Q2": ("B", 18.6, 28.6, 0),
-    "R5": ("B", 18.6, 31.4, 0),
+    "J1": ("B", 13.0, 16.8, None),   # FPC end reaches x ~13.5 (14.3 mm tail): ~0.8 mm insertion margin
+    "Q2": ("B", 18.6, 29.1, 0),
+    "R5": ("B", 21.6, 31.4, 0),
     "L1": ("B", 25.2, 6.6, 0),
     "Q3": ("B", 21.4, 6.4, 0),
     "R6": ("B", 18.6, 6.6, 90),
     "R7": ("B", 21.4, 9.0, 0),
-    "D1": ("B", 29.0, 6.4, 0),
-    "D2": ("B", 28.4, 2.8, 0),
-    "D3": ("B", 33.4, 2.8, 0),
+    "D1": ("B", 29.6, 6.2, 0),
+    "D2": ("B", 29.0, 2.8, 0),
+    "D3": ("B", 34.0, 2.8, 0),
     "C10": ("B", 17.6, 4.2, 0),
     "C11": ("B", 24.4, 11.2, 90),
     "D4": ("B", BOARD["ir"]["emitter"]["x"], BOARD["ir"]["emitter"]["y"], 0),
@@ -262,11 +262,25 @@ PLACEMENT = {
     "Q4": ("B", 55.4, 6.8, 0),
     "R9": ("B", 52.6, 6.8, 90),
     "Q5": ("B", BOARD["ir"]["detector"]["x"], BOARD["ir"]["detector"]["y"], 0),
-    "R10": ("B", 25.0, 2.8, 0),
+    "R10": ("B", 25.4, 2.8, 0),
     "DS1": ("F", 35.6, 17.0, 0),
 }
-for _i in range(8):  # panel capacitors C12..C19, a column beside J1
-    PLACEMENT[f"C{12 + _i}"] = ("B", 17.6, 9.0 + 2.0 * _i, 0)
+# Panel capacitors in a column beside J1, leaving a gap level with J1's
+# signal pins (9-14) so those can escape towards the MCU.
+_CAP_Y = {"C12": 9.0, "C13": 10.8, "C14": 12.6,                      # PREVGH, VSH2, VEPD
+          "C15": 19.4, "C16": 21.1, "C17": 22.8, "C18": 24.5, "C19": 26.2}
+for _ref, _y in _CAP_Y.items():
+    PLACEMENT[_ref] = ("B", 17.6, _y, 0)
 for _p in PARTS:
     if _p["ref"] in PLACEMENT:
         _p["pcb"] = PLACEMENT[_p["ref"]]
+
+# Placement experiments: IRL2FA_PLACE="U1=B,66.5,16.5,90;C3=..." overrides.
+import os as _os  # noqa: E402
+
+for _item in filter(None, _os.environ.get("IRL2FA_PLACE", "").split(";")):
+    _ref, _v = _item.split("=")
+    _side, _x, _y, _r = _v.split(",")
+    for _p in PARTS:
+        if _p["ref"] == _ref:
+            _p["pcb"] = (_side, float(_x), float(_y), float(_r))

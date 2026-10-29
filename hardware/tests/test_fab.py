@@ -41,7 +41,7 @@ def test_drills_within_jlcpcb_limits():
             d = getattr(obj, "tool", None) or getattr(obj, "aperture", None)
             dia = getattr(d, "diameter", None)
             if dia:
-                sizes.add(round(gerbonara.utils.MM.convert_from(layer.unit, dia), 3))
+                sizes.add(round(gerbonara.utils.MM.convert_from(obj.unit, dia), 3))
     assert sizes, "no drills found"
     assert min(sizes) >= 0.3 - 1e-6, f"drill below 0.3 mm: {sorted(sizes)}"
     assert max(sizes) <= 6.3

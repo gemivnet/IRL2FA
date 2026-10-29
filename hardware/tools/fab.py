@@ -58,6 +58,18 @@ def kicad_bom(out_dir):
     return rows
 
 
+def expand_refs(refs):
+    """'C12-C19, R1' -> 'C12,C13,...,C19,R1' (JLCPCB wants every designator)."""
+    out = []
+    for part in refs.replace(" ", "").split(","):
+        m = re.fullmatch(r"([A-Za-z]+)(\d+)-([A-Za-z]+)?(\d+)", part)
+        if m:
+            out += [f"{m.group(1)}{i}" for i in range(int(m.group(2)), int(m.group(4)) + 1)]
+        elif part:
+            out.append(part)
+    return ",".join(out)
+
+
 def write_csv(path, header, rows):
     buf = io.StringIO()
     w = csv.writer(buf, lineterminator="\n")
@@ -94,8 +106,9 @@ def generate(out):
         if not r["LCSC"]:
             continue
         fp = r["Footprint"].split(":")[-1]
-        jlc.append([r["Value"], r["Refs"], fp, r["LCSC"]])
-        full.append([r["Qty"], r["Refs"], r["Value"], r["Manufacturer"], r["MPN"], r["LCSC"], fp])
+        refs = expand_refs(r["Refs"])
+        jlc.append([r["Value"], refs, fp, r["LCSC"]])
+        full.append([r["Qty"], refs, r["Value"], r["Manufacturer"], r["MPN"], r["LCSC"], fp])
     write_csv(out / "irl2fa-bom-jlcpcb.csv", ["Comment", "Designator", "Footprint", "LCSC Part #"], jlc)
     write_csv(out / "irl2fa-bom.csv",
               ["Quantity", "References", "Description", "Manufacturer", "MPN", "LCSC", "Footprint"], full)

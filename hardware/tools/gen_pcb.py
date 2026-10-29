@@ -29,6 +29,7 @@ HW = Path(__file__).resolve().parents[1]
 PCB = HW / "irl2fa.kicad_pcb"
 STOCK_FP = Path(os.environ.get("KICAD_FOOTPRINT_DIR", "/usr/share/kicad/footprints"))
 ORIGIN = (100.0, 100.0)  # board top-left in KiCad coordinates
+LAYERS = int(os.environ.get("IRL2FA_LAYERS", "2"))  # 4 = fallback stack-up
 B = design.BOARD["board"]
 
 
@@ -111,9 +112,10 @@ def add_edge_keepout(board, band=0.45):
         z.SetDoNotAllowPads(False)
         z.SetDoNotAllowFootprints(False)
         z.SetDoNotAllowCopperPour(False)
-        ls = pcbnew.LSET()
-        ls.AddLayer(pcbnew.F_Cu)
-        ls.AddLayer(pcbnew.B_Cu)
+        ls = pcbnew.LSET.AllCuMask(LAYERS) if hasattr(pcbnew.LSET, "AllCuMask") else pcbnew.LSET()
+        if not hasattr(pcbnew.LSET, "AllCuMask"):
+            ls.AddLayer(pcbnew.F_Cu)
+            ls.AddLayer(pcbnew.B_Cu)
         z.SetLayerSet(ls)
         z.SetZoneName("edge keepout")
         poly = z.Outline()
@@ -165,7 +167,7 @@ def step_place(netlist):
     board = pcbnew.NewBoard(str(PCB))
     ds = board.GetDesignSettings()
     ds.SetBoardThickness(mm(B["thickness"]))
-    board.SetCopperLayerCount(2)
+    board.SetCopperLayerCount(LAYERS)
     # Drill/place origin at the board's bottom-left corner: fab outputs are
     # exported relative to it, so all coordinates are positive.
     ds.SetAuxOrigin(pt(0, B["height"]))
@@ -248,10 +250,26 @@ def step_ses():
     print("imported routes:", len(board.GetTracks()))
 
 
+def widen_necks(board, min_w=0.1):
+    """Freerouting necks tracks down at some pads below the fab minimum;
+    widen those short stubs back to the minimum (DRC checks the result)."""
+    n = 0
+    for t in board.GetTracks():
+        if t.GetClass() == "PCB_TRACK" and t.GetWidth() < mm(min_w):
+            t.SetWidth(mm(min_w))
+            n += 1
+    return n
+
+
 def step_finish():
     board = pcbnew.LoadBoard(str(PCB))
+    print("widened", widen_necks(board), "necked-down track segments")
+    for z in list(board.Zones()):
+        if not z.GetIsRuleArea():
+            board.Remove(z)
     gnd = board.FindNet("GND")
-    for layer in (pcbnew.F_Cu, pcbnew.B_Cu):
+    layers = [pcbnew.F_Cu, pcbnew.B_Cu] + ([pcbnew.In1_Cu, pcbnew.In2_Cu] if board.GetCopperLayerCount() == 4 else [])
+    for layer in layers:
         z = pcbnew.ZONE(board)
         z.SetLayer(layer)
         z.SetNet(gnd)

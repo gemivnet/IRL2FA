@@ -75,7 +75,10 @@ def main():
            f"Prices and stock: LCSC, fetched {cache['fetched']}._", "",
            "## Assembled by JLCPCB (or hand-soldered)", "",
            "Unit prices are per board: the \"×1 kit\" column assumes you buy one board's worth "
-           "(LCSC's minimum order applies), \"×100\" is the per-board price at 100 boards.", "",
+           "(LCSC's minimum order applies), \"×100\" is the per-board price at 100 boards. "
+           "Stock is LCSC's; JLCPCB keeps its own inventory for assembly, so a part out of stock at "
+           "LCSC (common for Basic parts such as the 0402 resistors) is usually still available "
+           "to JLCPCB's assembly service.", "",
            "| Qty | Refs | Part | Manufacturer | MPN | LCSC | Stock | Unit ×1 kit | Unit ×100 | Line ×100 |",
            "|-|-|-|-|-|-|-|-|-|-|"]
     t1 = t100 = 0.0

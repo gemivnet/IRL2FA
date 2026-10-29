@@ -16,18 +16,23 @@ JAR=hardware/build/freerouting-$FR_VERSION.jar
 if [ ! -f "$JAR" ]; then
   curl -sSfL -o "$JAR" "https://github.com/freerouting/freerouting/releases/download/v$FR_VERSION/freerouting-$FR_VERSION.jar"
 fi
-kicad() { docker run --rm -e SKIP_LOCAL -u "$(id -u):$(id -g)" -e HOME=/tmp -v "$PWD":/w -w /w "$KICAD_IMAGE" "$@"; }
+kicad() { docker run --rm -e SKIP_LOCAL -e IRL2FA_PLACE -e IRL2FA_LAYERS -u "$(id -u):$(id -g)" -e HOME=/tmp -v "$PWD":/w -w /w "$KICAD_IMAGE" "$@"; }
 
 if [ "${SKIP_SCHEMATIC:-0}" != 1 ]; then
   kicad python3 hardware/tools/gen_schematic.py
 fi
 kicad kicad-cli sch export netlist --format kicadsexpr -o hardware/build/irl2fa.net hardware/irl2fa.kicad_sch
 kicad python3 hardware/tools/gen_pcb.py --step place
+route() {
+  docker run --rm -u "$(id -u):$(id -g)" -e HOME=/tmp -v "$PWD":/w -w /w "$JAVA_IMAGE" \
+    java -jar "$JAR" -de hardware/build/irl2fa.dsn -do hardware/build/irl2fa.ses -mp "$PASSES" ${FR_ARGS:-} --gui.enabled=false \
+    | tee hardware/build/freerouting.log | grep -E "Auto-routing stage completed|optimization stage completed" || true
+}
 kicad python3 hardware/tools/gen_pcb.py --step dsn
-docker run --rm -e SKIP_LOCAL -u "$(id -u):$(id -g)" -e HOME=/tmp -v "$PWD":/w -w /w "$JAVA_IMAGE" \
-  java -jar "$JAR" -de hardware/build/irl2fa.dsn -do hardware/build/irl2fa.ses -mp "$PASSES" --gui.enabled=false
+route
 kicad python3 hardware/tools/gen_pcb.py --step ses
 kicad python3 hardware/tools/gen_pcb.py --step finish
+kicad python3 hardware/tools/set_models.py
 kicad kicad-cli sch erc --severity-error --exit-code-violations -o hardware/build/erc.rpt hardware/irl2fa.kicad_sch || { cat hardware/build/erc.rpt; exit 1; }
 kicad kicad-cli pcb drc --schematic-parity --severity-error --exit-code-violations -o hardware/build/drc.rpt hardware/irl2fa.kicad_pcb || { cat hardware/build/drc.rpt; exit 1; }
 echo "ERC and DRC clean"
