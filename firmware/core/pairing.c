@@ -3,6 +3,7 @@
 
 #include <string.h>
 
+#include "ct.h"
 #include "hash.h"
 #include "third_party/monocypher/monocypher.h"
 
@@ -46,7 +47,9 @@ void pairing_start(pairing_t *p, const uint8_t random[48])
     memcpy(p->priv, random, 32);
     memcpy(p->nonce, random + 32, 16);
     crypto_x25519_public_key(p->pub, p->priv);
+    CT_PUBLIC(p->pub, sizeof(p->pub));       /* sent in REVEAL */
     make_commit(p->pub, p->nonce, p->commit);
+    CT_PUBLIC(p->commit, sizeof(p->commit)); /* sent in COMMIT */
     p->state = PAIR_SEARCHING;
 }
 
@@ -68,7 +71,8 @@ static void finish(pairing_t *p)
 
     static const uint8_t SALT[] = "IRL2FA pair v1";
     uint8_t okm[32 + 8];
-    memcpy(info + 64, "key+sas\0", 8);
+    /* 8 bytes on purpose, NUL included: part of the protocol, not a string. */
+    memcpy(info + 64, "key+sas\0", 8); // NOLINT(bugprone-not-null-terminated-result)
     hkdf_sha256(SALT, sizeof(SALT) - 1, shared, sizeof(shared), info, sizeof(info),
                 okm, sizeof(okm));
     memcpy(p->key, okm, 32);
@@ -80,6 +84,7 @@ static void finish(pairing_t *p)
         p->sas[i] = (uint8_t)(v % 5);
         v /= 5;
     }
+    CT_PUBLIC(p->sas, sizeof(p->sas)); /* shown on both screens */
     crypto_wipe(shared, sizeof(shared));
     crypto_wipe(okm, sizeof(okm));
     crypto_wipe(p->priv, sizeof(p->priv));
@@ -175,6 +180,7 @@ size_t pairing_tx(const pairing_t *p, uint8_t *out, size_t cap, unsigned seq)
         uint8_t pl[REVEAL_LEN];
         memcpy(pl, p->pub, 32);
         memcpy(pl + 32, p->nonce, 16);
+        CT_PUBLIC(pl + 32, 16); /* the nonce is published by the reveal */
         memcpy(pl + 48, p->peer_commit, 8);
         return frame(out, cap, T_REVEAL, pl, sizeof(pl));
     }

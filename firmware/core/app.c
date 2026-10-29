@@ -6,6 +6,7 @@
 #include <string.h>
 
 #include "base32.h"
+#include "ct.h"
 #include "gfx.h"
 #include "hal.h"
 #include "pairing.h"
@@ -91,7 +92,6 @@ static struct {
 
     /* lists */
     int sel;
-    int top;
     int slot;              /* slot being viewed or edited */
 
     struct {
@@ -446,6 +446,8 @@ static void text_key(uint8_t b)
         if (ui.text.len == 0) return;
         text_finish();
         return;
+    default:
+        break;
     }
     ui.dirty = true;
 }
@@ -497,7 +499,7 @@ static void draw_code(void)
     int half = r.digits / 2;
     memcpy(spaced, code, (size_t)half);
     spaced[half] = ' ';
-    strcpy(spaced + half + 1, code + half);
+    copy_str(spaced + half + 1, sizeof(spaced) - (size_t)half - 1, code + half);
     gfx_text_centered(&font_digits, DISPLAY_W / 2, TITLE_H + 6, spaced);
 
     int remaining = r.period - (int)(now_utc() % r.period);
@@ -709,7 +711,7 @@ static void draw_time(void)
 {
     title_bar("Date & time (local)");
     char date[16], tim[16];
-    civil_t *c = &ui.tm.c;
+    const civil_t *c = &ui.tm.c;
     snprintf(date, sizeof(date), "%04d-%02d-%02d", c->year, c->month, c->day);
     snprintf(tim, sizeof(tim), "%02d:%02d:%02d", c->hour, c->min, c->sec);
     int cw = gfx_text_width(&font_mono, "0");
@@ -736,6 +738,7 @@ static void time_adjust(int d)
     case 3: c->hour = (c->hour + d + 24) % 24; break;
     case 4: c->min = (c->min + d + 60) % 60; break;
     case 5: c->sec = (c->sec + d + 60) % 60; break;
+    default: break;
     }
     int dim = time_days_in_month(c->year, c->month);
     if (c->day < 1) c->day = dim;
@@ -980,8 +983,9 @@ static void pin_submit(void)
         open_pin(P_CONFIRM, "Enter it again");
         break;
     case P_CONFIRM:
+        /* The length is public (the screen shows a dot per symbol). */
         if (ui.pin.len != ui.pin.first_len ||
-            memcmp(ui.pin.digits, ui.pin.first, (size_t)ui.pin.len) != 0) {
+            !ct_equal(ui.pin.digits, ui.pin.first, (size_t)ui.pin.len)) {
             crypto_wipe(ui.pin.first, sizeof(ui.pin.first));
             open_pin(P_NEW, "Didn't match. Choose again");
             return;

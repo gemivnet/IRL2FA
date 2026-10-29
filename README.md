@@ -117,13 +117,19 @@ Built one? Please [file a build report](https://github.com/gemivnet/IRL2FA/issue
 The hardware is open to modification, and people order straight from this repository. So every push runs:
 
 - ERC and DRC (with schematic parity)
+- every footprint checked against its manufacturer's land-pattern drawing, and its pins against the schematic
 - netlist checks against the pin map shared with the firmware
 - SPICE simulations of the coin cell, e-paper booster, power switch, reverse-battery protection and IR driver
 - the battery-life budget
 - a check that the committed Gerbers, BOM and placement files match the KiCad files
 - Gerber sanity checks
 - case-fit tests
-- firmware unit tests (RFC test vectors)
+- firmware unit tests (RFC test vectors) and UI flows, with a coverage minimum
+- a power cut after every flash operation of every store write, which must leave the old state or the new one
+- fuzzing of the IR parser, pairing, the encrypted store, base32 input and the whole app
+- constant-time checks of PIN verification, MAC compares and the pairing crypto
+- static analysis (cppcheck, clang-tidy) with zero findings
+- a formal model of the pairing protocol (Tamarin): the key stays secret and a man in the middle has to commit before he sees an honest key
 - the real firmware binary running on an emulated STM32 (Renode), where two virtual devices pair
 
 Details: [docs/hardware-testing.md](docs/hardware-testing.md).

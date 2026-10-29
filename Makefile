@@ -6,13 +6,24 @@ PY ?= $(if $(wildcard .venv/bin/python),.venv/bin/python,python3)
 HW_IMAGE ?= irl2fa-hw
 HW = docker run --rm -u $$(id -u):$$(id -g) -e HOME=/tmp -v "$(CURDIR)":/w -w /w $(HW_IMAGE)
 
-.PHONY: check firmware stm32 renode sim case hardware hw-image fab pins screens
+.PHONY: check firmware verify verify-image formal stm32 renode sim case hardware hw-image fab pins screens
 
-check: firmware stm32 renode sim case hardware
+check: firmware verify formal stm32 renode sim case hardware
 
 firmware:
 	$(MAKE) -C firmware test
 	$(PY) hardware/tools/gen_pins.py --check
+
+VERIFY_IMAGE ?= irl2fa-verify
+verify-image:
+	docker build -q -t $(VERIFY_IMAGE) firmware/verify
+
+# Static analysis, constant-time check, coverage gate and 60 s per fuzzer.
+verify: verify-image
+	docker run --rm -u $$(id -u):$$(id -g) -v "$(CURDIR)":/w -w /w/firmware $(VERIFY_IMAGE) make verify
+
+formal:
+	formal/run.sh
 
 stm32:
 	firmware/port/stm32u0/build.sh

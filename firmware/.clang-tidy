@@ -1,0 +1,28 @@
+# clang-tidy for firmware/core and vhal (run by `make -C firmware clang-tidy`;
+# CI requires zero findings). Disabled checks, and why:
+#   clang-analyzer-security.insecureAPI.DeprecatedOrUnsafeBufferHandling
+#     asks for C11 Annex K (memcpy_s, ...), which newlib and glibc do not
+#     provide; every buffer length here is checked or a compile-time size.
+#   bugprone-easily-swappable-parameters: style; flags every (x, y) pair.
+#   bugprone-narrowing-conversions, bugprone-implicit-widening-of-multiplication-result:
+#     fixed-width embedded arithmetic on known small ranges; -Wall -Wextra
+#     and UBSan in the unit tests and fuzzers cover real overflows.
+#   bugprone-assignment-in-if-condition, bugprone-branch-clone: style.
+#   cert-err33-c: snprintf into fixed buffers whose return value is unused
+#     on purpose (truncation is the wanted behaviour on a 250 px screen).
+Checks: >
+  -*,
+  clang-analyzer-*,
+  -clang-analyzer-security.insecureAPI.DeprecatedOrUnsafeBufferHandling,
+  bugprone-*,
+  -bugprone-easily-swappable-parameters,
+  -bugprone-narrowing-conversions,
+  -bugprone-implicit-widening-of-multiplication-result,
+  -bugprone-assignment-in-if-condition,
+  -bugprone-branch-clone,
+  cert-*,
+  -cert-err33-c,
+  misc-redundant-expression,
+  misc-misleading-indentation
+WarningsAsErrors: '*'
+HeaderFilterRegex: 'core/[^/]*\.h$|vhal/[^/]*\.h$'

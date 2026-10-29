@@ -1,0 +1,14 @@
+# valgrind suppressions for the constant-time check (ct_check.c).
+#
+# There is exactly one: Monocypher's crypto_aead_read() branches on the
+# result of crypto_verify16() to decide whether to decrypt. That result (tag
+# right or wrong) is public by design; the comparison that produces it is
+# constant time and is checked separately. monocypher.c is compiled with
+# -fno-inline for this check, so crypto_aead_read's own body contains no
+# other conditional than that one (its loops run over public lengths, and
+# everything else is a call into a separate function, which is checked).
+{
+   monocypher-aead-read-declassifies-tag-check
+   Memcheck:Cond
+   fun:crypto_aead_read
+}

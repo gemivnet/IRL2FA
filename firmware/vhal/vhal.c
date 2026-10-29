@@ -20,6 +20,9 @@ static struct {
     uint8_t flash[VHAL_FLASH_PAGES * HAL_FLASH_PAGE];
     uint32_t erases;
     int fail_after;
+    int fail_mode;
+    int tripped;
+    uint32_t ops;
     uint8_t rng_key[32];
     uint64_t rng_ctr;
 } v;
@@ -49,7 +52,14 @@ int vhal_sleeping(void) { return v.sleeping; }
 void vhal_wake(void) { v.sleeping = 0; }
 uint8_t *vhal_flash(void) { return v.flash; }
 uint32_t vhal_flash_erases(void) { return v.erases; }
-void vhal_fail_after(int n) { v.fail_after = n; }
+void vhal_fail_after(int n)
+{
+    v.fail_after = n;
+    v.tripped = 0;
+}
+void vhal_fail_mode(vhal_cut_t mode) { v.fail_mode = (int)mode; }
+int vhal_fail_tripped(void) { return v.tripped; }
+uint32_t vhal_flash_ops(void) { return v.ops; }
 
 size_t vhal_ir_take(uint8_t *buf, size_t cap)
 {
@@ -91,12 +101,37 @@ void hal_random(uint8_t *buf, size_t len)
     v.rng_ctr = crypto_chacha20_djb(buf, buf, len, v.rng_key, nonce, v.rng_ctr);
 }
 
+/* 1: do the operation; 0: drop it; -1: this is the operation the power
+ * cut interrupts. */
 static int flash_op_allowed(void)
 {
+    v.ops++;
     if (v.fail_after < 0) return 1;
-    if (v.fail_after == 0) return 0;
+    if (v.fail_after == 0) {
+        if (v.tripped) return 0;
+        v.tripped = 1;
+        return -1;
+    }
     v.fail_after--;
     return 1;
+}
+
+/* Leaves `len` bytes at `dst` as an interrupted operation would. */
+static void torn(uint8_t *dst, const uint8_t *src, size_t len)
+{
+    if (v.fail_mode == VHAL_CUT_HALF) {
+        size_t half = (len / 2) & ~(size_t)7;
+        if (src) memcpy(dst, src, half);
+        else memset(dst, 0xff, half);
+    } else if (v.fail_mode == VHAL_CUT_GARBAGE) {
+        uint32_t x = 0x9e3779b9u ^ v.ops;
+        for (size_t i = 0; i < len; i++) {
+            x ^= x << 13;
+            x ^= x >> 17;
+            x ^= x << 5;
+            dst[i] = (uint8_t)x;
+        }
+    }
 }
 
 void hal_flash_read(uint32_t off, void *buf, size_t len)
@@ -106,14 +141,19 @@ void hal_flash_read(uint32_t off, void *buf, size_t len)
 
 void hal_flash_erase(uint32_t page)
 {
-    if (page >= VHAL_FLASH_PAGES || !flash_op_allowed()) return;
+    if (page >= VHAL_FLASH_PAGES) return;
+    int ok = flash_op_allowed();
+    if (ok < 0) torn(v.flash + page * HAL_FLASH_PAGE, NULL, HAL_FLASH_PAGE);
+    if (ok <= 0) return;
     memset(v.flash + page * HAL_FLASH_PAGE, 0xff, HAL_FLASH_PAGE);
     v.erases++;
 }
 
 void hal_flash_write(uint32_t off, const void *buf, size_t len)
 {
-    if (!flash_op_allowed()) return;
+    int ok = flash_op_allowed();
+    if (ok < 0 && off + len <= sizeof(v.flash)) torn(v.flash + off, buf, len);
+    if (ok <= 0) return;
     /* Mirror the STM32's rules: 8-byte aligned double-words, each written
      * once after an erase. */
     if ((off & 7) || (len & 7) || off + len > sizeof(v.flash)) {
