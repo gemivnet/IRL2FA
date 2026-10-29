@@ -73,6 +73,12 @@ format, regenerate the seeds with `python3 firmware/fuzz/make_seeds.py`.
   noisy by a power cut (for example after a correct PIN, or while a new PIN's
   log was erased) counted as a wrong PIN, so an interrupted erase could even
   trigger a wipe. Only complete attempt entries count now.
+- **A man in the middle could make his failures look like glitches.** The
+  formal model showed that after finishing with one device he knows both SAS
+  values, and when they differ he can hold back his REVEAL to the other,
+  which then waited forever on "Exchanging keys...". It now gives up after
+  15 s and shows *Pairing failed*, and the SAS screen tells people to cancel
+  on both devices if the other shows no symbols (`test_app_pair_reveal_timeout`).
 - **PIN confirmation used `memcmp`.** It now uses a constant-time compare
   (`ct_equal` in `firmware/core/ct.h`).
 

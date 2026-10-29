@@ -473,3 +473,46 @@ TEST(test_app_first_boot)
     tap(BTN_CENTER);
     CHECK(on("menu"));
 }
+
+/* Regression (found with the formal model): a man in the middle who has
+ * finished with one device and sees that the SAS values will not match can
+ * hold back his REVEAL to the other. That device used to wait forever on
+ * "Exchanging keys..."; it now gives up and shows a failed pairing. */
+TEST(test_app_pair_reveal_timeout)
+{
+    boot(17);
+    pairing_t mitm;
+    start_peer(&mitm, 4);
+    taps(BTN_DOWN, 2);
+    tap(BTN_CENTER);
+    CHECK(on("pair"));
+    uint8_t buf[256], f[PAIR_FRAME_MAX];
+    size_t n = pairing_tx(&mitm, f, sizeof(f), 0); /* only ever a COMMIT */
+    for (int t = 0; t < 14000; t += 200) {
+        app_ir_rx(f, n);
+        app_poll();
+        vhal_advance(200);
+    }
+    while (vhal_ir_take(buf, sizeof(buf))) {
+    }
+    vhal_advance(400);
+    app_poll();
+    CHECK(vhal_ir_take(buf, sizeof(buf)) > 0); /* still trying at 14 s */
+    for (int t = 0; t < 2000; t += 200) {
+        app_ir_rx(f, n);
+        app_poll();
+        vhal_advance(200);
+    }
+    while (vhal_ir_take(buf, sizeof(buf))) {
+    }
+    vhal_advance(1000);
+    app_poll();
+    CHECK_EQ_INT(vhal_ir_take(buf, sizeof(buf)), 0); /* given up: failed */
+    CHECK(on("pair"));
+    tap(BTN_CENTER); /* centre retries, only from the failed state */
+    vhal_advance(400);
+    app_poll();
+    CHECK(vhal_ir_take(buf, sizeof(buf)) > 0);
+    tap(BTN_LEFT);
+    pairing_wipe(&mitm);
+}

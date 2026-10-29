@@ -252,14 +252,15 @@ SAS screen open, every retry is a fresh 1 in 15,625 chance against the same
 "it hung, try again", not as a sign of an attack, so the number of attempts
 the attacker gets is limited only by their patience.
 
-Suggested fix (firmware and UI, no protocol change):
+Fixed (firmware and UI, no protocol change):
 
-1. Give REVEALING a timeout of a few seconds after the peer's COMMIT, and
-   show it as **Pairing failed** (`PAIR_FAILED`), not a silent hang.
-2. When either device fails, make both start over. For example, the SAS
-   screen could say "If the other device did not show symbols, press ← and
-   start again on both"; a device in DONE should not stay on the SAS screen
-   while the other one restarts.
-3. Optionally count failed or abandoned pairings since the last success and
-   warn after two or three ("Pairing keeps failing. Someone nearby may be
-   interfering."), and say so in the user docs.
+1. REVEALING now times out 15 s after the peer's COMMIT and shows
+   **Pairing failed** (`pairing_abort`, `PAIR_REVEAL_TIMEOUT_MS` in
+   `app.c`; regression test `test_app_pair_reveal_timeout`). An honest
+   REVEAL follows the COMMIT within a second or two even at 50 % frame loss.
+2. The SAS screen now says "No symbols on the other? ← on both.", so the
+   device that did finish is cancelled too instead of waiting for a retry.
+
+Not done, and worth considering: counting failed or abandoned pairings since
+the last success and warning after two or three ("Pairing keeps failing.
+Someone nearby may be interfering.").

@@ -67,7 +67,10 @@ sequenceDiagram
   send a commitment to each side before seeing that side's key. So Mallory
   cannot grind keys until the two SAS values collide; the attack succeeds
   with probability 1/15,625 per attempt, and every attempt is visible as a
-  failed pairing. This is the same idea as ZRTP's hash commitment and
+  failed pairing: a device waiting more than 15 s for the other's REVEAL
+  gives up and shows *Pairing failed*, and the SAS screen tells people to
+  cancel on both devices if the other shows no symbols (see
+  [formal-verification.md](formal-verification.md#findings)). This is the same idea as ZRTP's hash commitment and
   Bluetooth's numeric comparison.
 - **Retransmission.** A device keeps sending COMMIT and REVEAL alternately
   until its owner confirms or cancels. That way the peer recovers from any

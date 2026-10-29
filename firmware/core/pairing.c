@@ -58,6 +58,13 @@ void pairing_wipe(pairing_t *p)
     crypto_wipe(p, sizeof(*p));
 }
 
+void pairing_abort(pairing_t *p)
+{
+    if (p->state != PAIR_SEARCHING && p->state != PAIR_REVEALING) return;
+    crypto_wipe(p->priv, sizeof(p->priv));
+    p->state = PAIR_FAILED;
+}
+
 static void finish(pairing_t *p)
 {
     uint8_t shared[32];
