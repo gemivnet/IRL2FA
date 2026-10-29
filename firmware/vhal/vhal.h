@@ -1,7 +1,6 @@
 /* Virtual board: a hal.h implementation backed by memory, driven by the
  * host. Used by the unit tests and compiled to WebAssembly for the browser
- * simulator. It also keeps the energy counters behind the simulator's
- * battery meter (see hardware/power/model.json).
+ * simulator. (The simulator's energy counters live in sim/sim_main.c.)
  * SPDX-License-Identifier: AGPL-3.0-or-later */
 #ifndef IRL2FA_VHAL_H
 #define IRL2FA_VHAL_H

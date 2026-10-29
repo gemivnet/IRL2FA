@@ -2,7 +2,6 @@
  * Written for IRL2FA; the IRQ order follows IRQn_Type in stm32u083xx.h.
  * SPDX-License-Identifier: AGPL-3.0-or-later */
 #include <stdint.h>
-#include <string.h>
 
 #include "stm32u0xx.h"
 
@@ -121,7 +120,7 @@ const vector_t vector_table[16 + 32] = {
 
 /* newlib-nano's snprintf never allocates, but keep the link honest: there is
  * no heap on this device. */
-void *_sbrk(int incr);
+__attribute__((used)) void *_sbrk(int incr);
 void *_sbrk(int incr)
 {
     (void)incr;

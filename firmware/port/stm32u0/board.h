@@ -27,6 +27,14 @@ void board_idle_until(uint32_t deadline);
 /* ---- GPIO ---- */
 #define PIN_PORT_INDEX(port) (((uint32_t)(port) - IOPORT_BASE) / 0x400u)
 
+/* PIN_MASK(JOY_UP) etc.: expand the argument first, then paste, so the
+ * aliases from pins.h (JOY_UP -> PIN_JOY_A) work. */
+#define PIN_CAT2_(a, b) a##b
+#define PIN_CAT_(a, b) PIN_CAT2_(a, b)
+#define PIN_PORT(p) PIN_CAT_(p, _PORT)
+#define PIN_NUM(p) PIN_CAT_(p, _NUM)
+#define PIN_MASK(p) PIN_CAT_(p, _MASK)
+
 static inline void pin_write(GPIO_TypeDef *port, uint32_t mask, bool high)
 {
     if (high) port->BSRR = mask;

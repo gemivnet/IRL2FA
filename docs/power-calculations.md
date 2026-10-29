@@ -17,17 +17,17 @@ Battery: **CR2450**, 540 mAh usable (620 mAh nominal), 1.0 %/year self-discharge
 
 ## One use
 
-Wake, look at a code or the words, sleep: 20 s awake, 2 full refreshes (3.0 s each: wake + the sleep screen) and 3 fast refreshes (0.6 s).
+Wake, look at a code or the words, sleep: 40 s awake, 2 full refreshes (3.0 s each: wake + the sleep screen) and 3 fast refreshes (0.6 s).
 
-Charge per use: **45.3 mA·s** typical, 69.0 mA·s worst case.
+Charge per use: **63.3 mA·s** typical, 99.0 mA·s worst case.
 
 ## Battery life
 
 | Profile | Uses/day | Typical: mAh/year | Typical: years | Worst: mAh/year | Worst: years |
 |-|-|-|-|-|-|
-| light | 5 | 33 | 14.0 | 89 | 5.7 |
-| normal | 20 | 102 | 5.0 | 194 | 2.7 |
-| heavy | 60 | 286 | 1.9 | 474 | 1.1 |
+| light | 5 | 42 | 11.3 | 104 | 4.9 |
+| normal | 20 | 139 | 3.7 | 255 | 2.1 |
+| heavy | 60 | 396 | 1.3 | 657 | 0.8 |
 
 Battery life is capped in practice by the cell's shelf life (about 10 years) and by the e-paper's 0 °C lower limit in cold pockets, not by the electronics.
 

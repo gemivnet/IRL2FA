@@ -6,7 +6,8 @@
 # SPDX-License-Identifier: CERN-OHL-S-2.0
 set -euo pipefail
 cd "$(dirname "$0")/../.."
-KICAD_IMAGE=${KICAD_IMAGE:-kicad/kicad:9.0}
+KICAD_IMAGE=${KICAD_IMAGE:-irl2fa-hw}
+docker image inspect "$KICAD_IMAGE" >/dev/null 2>&1 || docker build -t irl2fa-hw hardware/ci
 JAVA_IMAGE=${JAVA_IMAGE:-eclipse-temurin:25-jre}
 FR_VERSION=${FR_VERSION:-2.5.0}
 PASSES=${PASSES:-60}

@@ -1,0 +1,16 @@
+# Interactive start of one emulated IRL2FA:  renode firmware/renode/irl2fa.resc
+# (the tests in irl2fa.robot set things up the same way).
+# SPDX-License-Identifier: AGPL-3.0-or-later
+$name?="irl2fa"
+$elf?=@firmware/build/stm32u0/irl2fa.elf
+$rngseed?=1
+$unix?=1800000000
+
+include @firmware/renode/models/STM32U0_System.cs
+include @firmware/renode/models/SSD1680.cs
+include @firmware/renode/models/RV3032.cs
+
+mach create $name
+machine LoadPlatformDescription @firmware/renode/irl2fa.repl
+include @firmware/renode/board_init.resc
+sysbus LoadELF $elf

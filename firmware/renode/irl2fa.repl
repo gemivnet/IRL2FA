@@ -1,0 +1,49 @@
+// The IRL2FA board around the STM32U083: e-paper, RTC, joystick and the
+// wiring from hardware/pins.yaml (keep in sync; the tests would fail).
+// SPDX-License-Identifier: AGPL-3.0-or-later
+using "./stm32u083.repl"
+
+epd: Miscellaneous.SSD1680 @ spi1
+    fullRefreshMs: 3000
+    partialRefreshMs: 420
+    BUSY -> gpioPortB@1
+
+rtc: Miscellaneous.RV3032 @ i2c1 0x51
+    initialUnixTime: 946684800
+    INT -> gpioPortB@4
+
+// Joystick contacts: active low with pull-ups. pins.yaml `joystick:`:
+// JOY_A (PA1) left, JOY_B (PA2) up, JOY_C (PA3) down, JOY_D (PA15) right,
+// JOY_CENTER (PA0).
+joyCenter: Miscellaneous.Button @ gpioPortA 0
+    invert: true
+    -> gpioPortA@0
+joyLeft: Miscellaneous.Button @ gpioPortA 1
+    invert: true
+    -> gpioPortA@1
+joyUp: Miscellaneous.Button @ gpioPortA 2
+    invert: true
+    -> gpioPortA@2
+joyDown: Miscellaneous.Button @ gpioPortA 3
+    invert: true
+    -> gpioPortA@3
+joyRight: Miscellaneous.Button @ gpioPortA 15
+    invert: true
+    -> gpioPortA@15
+
+// Pin -> EXTI (input n = port * 16 + pin) and -> e-paper control inputs
+// (0 = D/C#, 1 = CS#, 2 = RES#, 3 = supply switch, low = on).
+gpioPortA:
+    0 -> exti@0
+    1 -> exti@1
+    2 -> exti@2
+    3 -> exti@3
+    4 -> exti@4 | epd@1
+    6 -> exti@6 | epd@0
+    8 -> exti@8 | epd@3
+    15 -> exti@15
+
+gpioPortB:
+    0 -> exti@16 | epd@2
+    1 -> exti@17
+    4 -> exti@20

@@ -200,11 +200,11 @@ PARTS += [
 ]
 for i, h in enumerate(BOARD["board"]["mounting_holes"]):
     PARTS.append(part(f"H{i + 1}", "Mechanical:MountingHole_Pad", "M2",
-                      "MountingHole:MountingHole_2.2mm_M2_Pad_Via", {"1": "GND"}, "mech",
+                      "MountingHole:MountingHole_2.2mm_M2_Pad", {"1": "GND"}, "mech",
                       desc="M2 mounting hole", bom=False, pcb=("F", h["x"], h["y"], 0)))
 
 # Nets that need a PWR_FLAG for ERC (driven only through passives or FETs).
-POWER_FLAGS = ["VBAT", "GND", "VBAT_RAW"]
+POWER_FLAGS = ["VBAT", "GND", "VBAT_RAW", "RTC_VBACKUP"]
 
 BLOCK_TITLES = {
     "power": "Power: CR2450, reverse protection, bulk capacitance",
@@ -215,3 +215,58 @@ BLOCK_TITLES = {
     "ir": "IR pairing link (4800 baud UART, inverted)",
     "mech": "Mechanical",
 }
+
+# ---------------------------------------------------------------------------
+# PCB placement (side, x, y, rotation), board coordinates seen from the front.
+# Back side, left to right: FPC connector and panel capacitors, booster (top
+# left, outside the cell's circle), the CR2450 holder in the middle (its body
+# spans x 26.4-53.6, y 9-25; the cell circle r=12.25 around (40, 17)), and
+# the MCU/RTC/SWD on the right. The joystick is the only front-side part.
+# rotation None = chosen by gen_pcb.py (see orient_fpc_connector).
+PLACEMENT = {
+    "BT1": ("B", 40.0, 17.0, 0),       # + terminal on the right (front view), next to Q1
+    "Q1": ("B", 59.0, 25.0, 90),
+    "C1": ("B", 60.5, 10.5, 90),
+    "C2": ("B", 61.2, 22.6, 90),
+    "TP1": ("B", 56.5, 31.6, 0),
+    "TP2": ("B", 59.3, 31.6, 0),
+    "U1": ("B", 66.5, 16.5, 0),
+    "C3": ("B", 62.4, 14.4, 90),
+    "C4": ("B", 69.8, 19.6, 90),
+    "C5": ("B", 62.4, 18.2, 90),
+    "C6": ("B", 64.8, 12.4, 0),
+    "C7": ("B", 67.4, 12.4, 0),
+    "C8": ("B", 69.8, 13.4, 90),
+    "R1": ("B", 67.6, 21.4, 0),
+    "J3": ("B", 66.5, 28.0, 0),
+    "U2": ("B", 66.0, 5.6, 90),
+    "C9": ("B", 63.6, 5.6, 90),
+    "R2": ("B", 68.2, 7.6, 0),
+    "R3": ("B", 68.6, 3.4, 0),
+    "R4": ("B", 70.8, 4.6, 90),
+    "SW1": ("F", 72.8, 17.0, 45),
+    "J1": ("B", 14.0, 16.8, None),
+    "Q2": ("B", 18.6, 28.6, 0),
+    "R5": ("B", 18.6, 31.4, 0),
+    "L1": ("B", 25.2, 6.6, 0),
+    "Q3": ("B", 21.4, 6.4, 0),
+    "R6": ("B", 18.6, 6.6, 90),
+    "R7": ("B", 21.4, 9.0, 0),
+    "D1": ("B", 29.0, 6.4, 0),
+    "D2": ("B", 28.4, 2.8, 0),
+    "D3": ("B", 33.4, 2.8, 0),
+    "C10": ("B", 17.6, 4.2, 0),
+    "C11": ("B", 24.4, 11.2, 90),
+    "D4": ("B", BOARD["ir"]["emitter"]["x"], BOARD["ir"]["emitter"]["y"], 0),
+    "R8": ("B", 54.6, 3.2, 90),
+    "Q4": ("B", 55.4, 6.8, 0),
+    "R9": ("B", 52.6, 6.8, 90),
+    "Q5": ("B", BOARD["ir"]["detector"]["x"], BOARD["ir"]["detector"]["y"], 0),
+    "R10": ("B", 25.0, 2.8, 0),
+    "DS1": ("F", 35.6, 17.0, 0),
+}
+for _i in range(8):  # panel capacitors C12..C19, a column beside J1
+    PLACEMENT[f"C{12 + _i}"] = ("B", 17.6, 9.0 + 2.0 * _i, 0)
+for _p in PARTS:
+    if _p["ref"] in PLACEMENT:
+        _p["pcb"] = PLACEMENT[_p["ref"]]

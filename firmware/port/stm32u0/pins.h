@@ -157,10 +157,10 @@
 #define PINS_EXTI_MASK 0x801Fu
 
 /* Joystick: which pin is which direction (pins.yaml `joystick:`). */
-#define JOY_UP PIN_JOY_A
+#define JOY_UP PIN_JOY_B
 #define JOY_DOWN PIN_JOY_C
-#define JOY_LEFT PIN_JOY_D
-#define JOY_RIGHT PIN_JOY_B
+#define JOY_LEFT PIN_JOY_A
+#define JOY_RIGHT PIN_JOY_D
 #define JOY_CENTER PIN_JOY_CENTER
 #define JOY_FOR_EACH(X) \
     X(JOY_UP, BTN_UP) \

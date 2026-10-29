@@ -228,18 +228,20 @@ export const POWER_DEFAULTS = Object.freeze({
   ir_mA: 6,
   battery_mAh: 540,
   battery: 'CR2450',
+  self_discharge_pct_per_year: 0,
   profile: {
     name: '20 uses/day',
     uses_per_day: 20,
     awake_s_per_use: 70,
     full_refreshes_per_use: 2,
     fast_refreshes_per_use: 6,
-    ir_s_per_use: 0,
+    pairings_per_year: 0,
+    pairing_s: 0,
   },
 });
 
 /** Merges a power model over the defaults, keeping only known keys with
- * numeric values so a differently shaped file cannot break the page. */
+ * values of the same type so a differently shaped file cannot break the page. */
 export function mergePowerModel(base, extra) {
   const out = JSON.parse(JSON.stringify(base));
   if (!extra || typeof extra !== 'object') return out;
@@ -251,6 +253,40 @@ export function mergePowerModel(base, extra) {
     }
   };
   walk(out, extra);
+  return out;
+}
+
+/** Converts hardware/power/model.json (the schema hardware/power/power.py
+ * reads: per-contributor sleep currents, typ/worst values, usage profiles)
+ * into the simulator's flat model, using the typical values and the
+ * "normal" profile. Returns null if `hw` is not in that shape. */
+export function fromHardwareModel(hw, base = POWER_DEFAULTS, profileName = 'normal', kase = 'typ') {
+  if (!hw || typeof hw.sleep_uA !== 'object' || !hw.awake || !hw.battery || !hw.usage_profiles) return null;
+  const a = hw.awake;
+  const p = hw.usage_profiles[profileName] || Object.values(hw.usage_profiles)[0];
+  const v = (x) => (typeof x === 'object' && x ? x[kase] : x);
+  const out = JSON.parse(JSON.stringify(base));
+  out.sleep_uA = Object.values(hw.sleep_uA).reduce((s, c) => s + (Number(v(c)) || 0), 0);
+  out.awake_mA = v(a.mcu_mA);
+  out.full_refresh = { mA: v(a.epd_mA), s: a.full_refresh_s };
+  out.fast_refresh = { mA: v(a.epd_mA), s: a.fast_refresh_s };
+  out.ir_mA = v(a.ir_mA);
+  out.battery_mAh = hw.battery.usable_mAh;
+  out.battery = hw.battery.part;
+  out.self_discharge_pct_per_year = hw.battery.self_discharge_pct_per_year || 0;
+  out.profile = {
+    name: `${profileName}, ${p.uses_per_day} uses/day`,
+    uses_per_day: p.uses_per_day,
+    awake_s_per_use: a.awake_s_per_use,
+    full_refreshes_per_use: a.full_refreshes_per_use,
+    fast_refreshes_per_use: a.fast_refreshes_per_use,
+    pairings_per_year: p.pairings_per_year || 0,
+    pairing_s: a.pairing_s || 0,
+  };
+  for (const [k, x] of Object.entries(out)) {
+    if (typeof x === 'number' && !Number.isFinite(x)) return null;
+    if (k === 'full_refresh' || k === 'fast_refresh') if (!Number.isFinite(x.mA) || !Number.isFinite(x.s)) return null;
+  }
   return out;
 }
 
@@ -270,18 +306,29 @@ export function lifeDays(model, avgMA) {
   return avgMA > 0 ? model.battery_mAh / avgMA / 24 : Infinity;
 }
 
-/** Average current (mA) of a daily usage profile. */
-export function profileAvgMA(model, p = model.profile) {
-  const day = 86400;
-  const awake = p.uses_per_day * p.awake_s_per_use;
-  const mAs = chargeMAs(model, {
-    awakeMs: awake * 1000,
-    asleepMs: Math.max(0, day - awake) * 1000,
-    irMs: p.uses_per_day * p.ir_s_per_use * 1000,
-    full: p.uses_per_day * p.full_refreshes_per_use,
-    fast: p.uses_per_day * p.fast_refreshes_per_use,
+/** mAh per year of a usage profile, the same way hardware/power/power.py
+ * counts it: sleep current all year, plus each use, plus pairings. */
+export function profileMAhPerYear(model, p = model.profile) {
+  const sleep = (model.sleep_uA / 1000) * 24 * 365;
+  const perUse = chargeMAs(model, {
+    awakeMs: p.awake_s_per_use * 1000, asleepMs: 0, irMs: 0,
+    full: p.full_refreshes_per_use, fast: p.fast_refreshes_per_use,
   });
-  return mAs / day;
+  const use = (perUse * p.uses_per_day * 365) / 3600;
+  const pair = ((model.ir_mA + model.awake_mA) * (p.pairing_s || 0) * (p.pairings_per_year || 0)) / 3600;
+  return sleep + use + pair;
+}
+
+/** Projected battery life of the model's usage profile, in days
+ * (self-discharge included). */
+export function profileLifeDays(model, p = model.profile) {
+  const perYear = profileMAhPerYear(model, p) + (model.battery_mAh * (model.self_discharge_pct_per_year || 0)) / 100;
+  return (model.battery_mAh / perYear) * 365;
+}
+
+/** Average current (mA) of the model's usage profile (without self-discharge). */
+export function profileAvgMA(model, p = model.profile) {
+  return profileMAhPerYear(model, p) / (24 * 365);
 }
 
 // ---- reference TOTP (RFC 6238, SHA-1) for comparing with a phone ----

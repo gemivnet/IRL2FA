@@ -1,0 +1,73 @@
+# Firmware CI: host unit tests (ASan/UBSan), generated pin header check,
+# STM32U083 cross build with size report, and the Renode emulation tests.
+# SPDX-License-Identifier: AGPL-3.0-or-later
+name: firmware
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+env:
+  RENODE_IMAGE: antmicro/renode:1.16.1
+
+jobs:
+  host-tests:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Unit tests (ASan + UBSan)
+        run: make -C firmware test
+
+  pins:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.12"
+      - run: pip install pyyaml==6.0.3
+      - name: Regenerate pins.h and docs/pin-assignments.md
+        run: python3 hardware/tools/gen_pins.py --docs
+      - name: Fail if they differ from the committed copies
+        run: |
+          git diff --exit-code -- firmware/port/stm32u0/pins.h docs/pin-assignments.md
+          test -z "$(git status --porcelain -- firmware/port/stm32u0/pins.h docs/pin-assignments.md)"
+
+  stm32-build:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Cross build (arm-none-eabi-gcc in Docker)
+        run: firmware/port/stm32u0/build.sh
+      - name: Size report
+        run: cat firmware/build/stm32u0/size-report.txt >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: irl2fa-stm32u083
+          path: |
+            firmware/build/stm32u0/irl2fa.elf
+            firmware/build/stm32u0/irl2fa.bin
+            firmware/build/stm32u0/irl2fa.hex
+            firmware/build/stm32u0/irl2fa.map
+            firmware/build/stm32u0/size-report.txt
+          if-no-files-found: error
+
+  renode:
+    runs-on: ubuntu-24.04
+    needs: stm32-build
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: irl2fa-stm32u083
+          path: firmware/build/stm32u0
+      - name: Emulation tests (the release image, two devices pairing over IR)
+        run: SKIP_BUILD=1 firmware/renode/run.sh
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: renode-results
+          path: firmware/build/renode

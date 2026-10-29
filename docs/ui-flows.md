@@ -10,7 +10,7 @@ The rules are the same on every screen:
 | ← | back (on the home menu: sleep now) |
 | ● | confirm / options |
 
-The device sleeps after 60 s without input. Before it does, it draws a
+The device sleeps after 30 s without input. Before it does, it draws a
 neutral sleep screen, so no code or word stays visible on the e-paper. Any
 press wakes it. If a PIN is set, it asks for the PIN first.
 

@@ -1,0 +1,19 @@
+# Per-machine state that a real chip has before the firmware runs: erased
+# flash, engineering bytes, an RTC whose time was set earlier, RNG seed.
+# Expects $rngseed and $unix. SPDX-License-Identifier: AGPL-3.0-or-later
+sysbus.flash SetRange 0x0 0x40000 0xFF
+sysbus.sysmem SetRange 0x0 0x8000 0xFF
+# UID (96 bits) at 0x1FFF6E50, flash size (KB) at 0x1FFF6EA0, VREFINT_CAL at 0x1FFF6EA4
+sysbus WriteDoubleWord 0x1FFF6E50 0x00420031
+sysbus WriteDoubleWord 0x1FFF6E54 $rngseed
+sysbus WriteDoubleWord 0x1FFF6E58 0x55303833
+sysbus WriteWord 0x1FFF6EA0 0x0100
+sysbus WriteWord 0x1FFF6EA4 0x0672
+sysbus.rng Seed $rngseed
+sysbus.i2c1.rtc SetUnixTime $unix
+sysbus.i2c1.rtc ClearPowerOnFlag
+# The firmware's "time valid" marker in the RTC user RAM (rv3032.c)
+sysbus.i2c1.rtc PokeRegister 0x40 0x49
+sysbus.i2c1.rtc PokeRegister 0x41 0x52
+sysbus.i2c1.rtc PokeRegister 0x42 0x4C
+sysbus.i2c1.rtc PokeRegister 0x43 0x54

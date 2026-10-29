@@ -99,6 +99,30 @@ def add_outline(board):
     arc(r, r, 180)
 
 
+def add_edge_keepout(board, band=0.45):
+    """Rule areas along the edges keep tracks and vias (not pads) 0.3 mm+
+    from the outline, so the autorouter respects the fab's edge clearance."""
+    w, h = B["width"], B["height"]
+    for x0, y0, x1, y1 in ((0, 0, w, band), (0, h - band, w, h), (0, 0, band, h), (w - band, 0, w, h)):
+        z = pcbnew.ZONE(board)
+        z.SetIsRuleArea(True)
+        z.SetDoNotAllowTracks(True)
+        z.SetDoNotAllowVias(True)
+        z.SetDoNotAllowPads(False)
+        z.SetDoNotAllowFootprints(False)
+        z.SetDoNotAllowCopperPour(False)
+        ls = pcbnew.LSET()
+        ls.AddLayer(pcbnew.F_Cu)
+        ls.AddLayer(pcbnew.B_Cu)
+        z.SetLayerSet(ls)
+        z.SetZoneName("edge keepout")
+        poly = z.Outline()
+        poly.NewOutline()
+        for x, y in ((x0, y0), (x1, y0), (x1, y1), (x0, y1)):
+            poly.Append(pt(x, y))
+        board.Add(z)
+
+
 def add_text(board, text, x, y, layer, size=1.0, mirror=False):
     t = pcbnew.PCB_TEXT(board)
     t.SetText(text)
@@ -116,6 +140,24 @@ def flip(fp):
         fp.Flip(fp.GetPosition(), pcbnew.FLIP_DIRECTION_LEFT_RIGHT)
     except (AttributeError, TypeError):
         fp.Flip(fp.GetPosition(), False)
+
+
+def orient_fpc_connector(fp):
+    """The display's FPC folds through the slot left of the connector, so the
+    connector must open towards -x and have pin 1 at the top (smaller y),
+    matching the panel's pin 1 (top when seen from the front). Try the four
+    orientations and keep the one that satisfies both."""
+    for angle in (0, 90, 180, 270):
+        fp.SetOrientationDegrees(angle)
+        pads = {p.GetNumber(): p.GetPosition() for p in fp.Pads()}
+        signal_x = pads["12"].x
+        mp = [p.GetPosition() for p in fp.Pads() if p.GetNumber() == "MP"]
+        opens_left = all(m.x < signal_x for m in mp)
+        pin1_top = pads["1"].y < pads["24"].y
+        if opens_left and pin1_top:
+            print(f"{fp.GetReference()}: orientation {angle}")
+            return
+    raise SystemExit("no orientation of the FPC connector puts pin 1 at the top opening left")
 
 
 def step_place(netlist):
@@ -168,13 +210,16 @@ def step_place(netlist):
         fp.SetPosition(pt(x, y))
         if side == "B":
             flip(fp)
-        fp.SetOrientationDegrees(rot)
+        fp.SetOrientationDegrees(rot if rot is not None else 0)
+        if rot is None:
+            orient_fpc_connector(fp)
         for pad in fp.Pads():
             key = (ref, pad.GetNumber())
             if key in nets:
                 pad.SetNet(net(nets[key]))
 
     add_outline(board)
+    add_edge_keepout(board)
     add_text(board, "IRL2FA", 40.0, 30.6, pcbnew.B_SilkS, 1.6, mirror=True)
     add_text(board, "v0.1  irl2fa.com", 40.0, 32.6, pcbnew.B_SilkS, 0.8, mirror=True)
     add_text(board, "CERN-OHL-S-2.0", 12.0, 31.8, pcbnew.B_SilkS, 0.7, mirror=True)
@@ -187,7 +232,8 @@ def step_dsn():
     dsn = HW / "build" / "irl2fa.dsn"
     dsn.parent.mkdir(exist_ok=True)
     for z in list(board.Zones()):
-        board.Remove(z)
+        if not z.GetIsRuleArea():
+            board.Remove(z)
     for t in list(board.GetTracks()):
         board.Remove(t)
     board.Save(str(PCB))

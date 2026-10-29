@@ -3,7 +3,7 @@
 import createIRL2FA from './irl2fa.mjs';
 import {
   BTN, Device, World, DISPLAY_W, DISPLAY_H, DISPLAY_STRIDE,
-  POWER_DEFAULTS, mergePowerModel, chargeMAs, lifeDays, profileAvgMA, base32Decode, totpWith,
+  POWER_DEFAULTS, mergePowerModel, fromHardwareModel, chargeMAs, lifeDays, profileAvgMA, profileLifeDays, base32Decode, totpWith,
 } from './irl2fa-device.js';
 
 const $ = (s, root = document) => root.querySelector(s);
@@ -459,14 +459,16 @@ function refreshEnergy() {
 function showModel() {
   const m = state.model;
   $('#profile-name').textContent = `Projection, ${m.profile.name}`;
-  const days = lifeDays(m, profileAvgMA(m));
+  const days = profileLifeDays(m);
   $('#profile-life').textContent = `${fmtLife(days)}`;
   $('#profile-life').title = `${days.toFixed(0)} days at ${fmtCurrent(profileAvgMA(m))} average`;
   $('#model-src').textContent = `Source: ${state.modelSrc}. A “use” is ${m.profile.awake_s_per_use} s awake ` +
-    `(including the idle time-out), ${m.profile.full_refreshes_per_use} full and ${m.profile.fast_refreshes_per_use} fast refreshes.`;
+    `with ${m.profile.full_refreshes_per_use} full and ${m.profile.fast_refreshes_per_use} fast refreshes` +
+    (m.profile.pairings_per_year ? `, plus ${m.profile.pairings_per_year} pairings a year` : '') +
+    (m.self_discharge_pct_per_year ? `, and ${m.self_discharge_pct_per_year}%/year self-discharge` : '') + '.';
   const list = $('#model-list');
   list.replaceChildren(...[
-    `sleep ${m.sleep_uA} µA`,
+    `sleep ${+m.sleep_uA.toFixed(3)} µA`,
     `awake (MCU) ${m.awake_mA} mA`,
     `full refresh ${m.full_refresh.mA} mA × ${m.full_refresh.s} s`,
     `fast refresh ${m.fast_refresh.mA} mA × ${m.fast_refresh.s} s`,
@@ -483,7 +485,12 @@ async function loadModel() {
   } catch { /* built-in defaults */ }
   try {
     const r = await fetch('power-model.json', { cache: 'no-cache' });
-    if (r.ok) { model = mergePowerModel(model, await r.json()); state.modelSrc = 'hardware/power/model.json'; }
+    if (r.ok) {
+      const hw = await r.json();
+      const conv = fromHardwareModel(hw, model);
+      if (conv) { model = conv; state.modelSrc = 'hardware/power/model.json (typical values)'; }
+      else { model = mergePowerModel(model, hw); state.modelSrc = 'power-model.json'; }
+    }
   } catch { /* none */ }
   state.model = model;
   showModel();

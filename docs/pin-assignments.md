@@ -49,8 +49,8 @@ screen upright the contacts map to:
 
 | Direction | Net | MCU pin |
 |-|-|-|
-| up | JOY_A | PA1 (pin 7) |
-| right | JOY_B | PA2 (pin 8) |
+| up | JOY_B | PA2 (pin 8) |
+| right | JOY_D | PA15 (pin 25) |
 | down | JOY_C | PA3 (pin 9) |
-| left | JOY_D | PA15 (pin 25) |
+| left | JOY_A | PA1 (pin 7) |
 | center | JOY_CENTER | PA0 (pin 6) |

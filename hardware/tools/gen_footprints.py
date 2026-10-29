@@ -306,9 +306,26 @@ def bs24():
     fp.text("F.SilkS", "+", px, -ph / 2 - 1.2, 1.5)
     fp.text("F.SilkS", "-", -px, -ph / 2 - 1.2, 1.5)
 
+    # Courtyard follows the real outline (terminal tabs + body + cell circle)
+    # rather than its bounding box, so small parts can use the corners the
+    # round cell leaves free.
     xc = px + pw / 2 + CRT_CLEAR
     yc = 24.5 / 2 + CRT_CLEAR
-    fp.courtyard_rect(-xc, -yc, xc, yc)
+    tx, ty = xc, 3.5 + CRT_CLEAR
+    rx, ry = bx + CRT_CLEAR, by + CRT_CLEAR
+    ax = math.sqrt(yc ** 2 - ry ** 2)
+    a0 = math.degrees(math.atan2(ry, ax))
+
+    def arc_pts(start, end, n=24):
+        return [(crt(yc * math.cos(math.radians(start + (end - start) * i / n))),
+                 crt(yc * math.sin(math.radians(start + (end - start) * i / n)))) for i in range(n + 1)]
+
+    pts = [(tx, -ty), (rx, -ty), (rx, -ry)]
+    pts += arc_pts(-a0, -180 + a0)            # over the top, right to left
+    pts += [(-rx, -ry), (-rx, -ty), (-tx, -ty), (-tx, ty), (-rx, ty), (-rx, ry)]
+    pts += arc_pts(180 - a0, a0)              # under the bottom, left to right
+    pts += [(rx, ry), (rx, ty), (tx, ty)]
+    fp.poly("F.CrtYd", [(crt(x), crt(y)) for x, y in pts])
     fp.ref_at, fp.val_at = (0, -yc - 0.9), (0, yc + 0.9)
     fp.write()
 

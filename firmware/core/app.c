@@ -16,10 +16,10 @@
 #include "words.h"
 
 /* ---- tunables ---- */
-#define IDLE_SLEEP_S_DEFAULT 60
+#define IDLE_SLEEP_S_DEFAULT 30
 #define REPEAT_DELAY_MS 450
 #define REPEAT_RATE_MS 90
-#define FULL_REFRESH_EVERY 20  /* fast refreshes before a full one */
+#define FULL_REFRESH_EVERY 5   /* GDEY0213B74 datasheet: full refresh after 5 fast/partial ones */
 #define PAIR_TX_MS 220
 #define TIME_VALID_AFTER 1767225600 /* 2026-01-01T00:00:00Z */
 #define TITLE_H 15

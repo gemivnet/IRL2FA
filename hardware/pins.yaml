@@ -44,12 +44,14 @@ pins:
   - {pin: 32, name: VSS,   net: GND}
   - {pin: 33, name: EP,    net: GND,         notes: "exposed pad"}
 
-# Joystick: the Alps SKRH directions sit at 45 degrees to its body, so the
-# footprint is rotated 45 degrees on the board. A and C are one axis, B and D
-# the other. Mapping as seen from the front with the screen upright:
+# Joystick: in the Alps SKRH footprint the four contacts sit at the body's
+# corners (A top-left, B top-right, C bottom-left, D bottom-right; A/D and B/C
+# are opposite). The footprint is rotated +45 degrees on the board, which
+# turns them into left/up/down/right as seen from the front with the screen
+# upright:
 joystick:
-  JOY_A: up
-  JOY_B: right
+  JOY_A: left
+  JOY_B: up
   JOY_C: down
-  JOY_D: left
+  JOY_D: right
   JOY_CENTER: center

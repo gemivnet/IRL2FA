@@ -1,0 +1,88 @@
+// STM32U083KC (Cortex-M0+, 256 KB flash, 40 KB SRAM) for Renode.
+// Renode ships no STM32U0 platform; this one is composed from Renode's
+// generic STM32 models (GPIO, USART, I2C, SPI) and the U0-specific models in
+// models/STM32U0_System.cs. Addresses and IRQ numbers: RM0503 memory map as
+// encoded in ST's stm32u083xx.h (firmware/port/stm32u0/vendor).
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
+flash: Memory.MappedMemory @ sysbus 0x08000000
+    size: 0x40000
+
+sram: Memory.MappedMemory @ sysbus 0x20000000
+    size: 0xA000
+
+// System memory, OTP, engineering bytes (UID at 0x1FFF6E50, flash size,
+// VREFINT_CAL at 0x1FFF6EA4) and option bytes. Filled in by irl2fa.resc.
+sysmem: Memory.MappedMemory @ sysbus 0x1FFF0000
+    size: 0x8000
+
+nvic: IRQControllers.NVIC @ sysbus 0xE000E000
+    priorityMask: 0xC0
+    systickFrequency: 16000000
+    IRQ -> cpu@0
+
+cpu: CPU.CortexM @ sysbus
+    cpuType: "cortex-m0+"
+    nvic: nvic
+    PerformanceInMips: 16
+
+rcc: Miscellaneous.STM32U0_RCC @ sysbus 0x40021000
+
+pwr: Miscellaneous.STM32U0_PWR @ sysbus 0x40007000
+
+flash_ctrl: Miscellaneous.STM32U0_FLASH @ sysbus 0x40022000
+    flash: flash
+
+exti: Miscellaneous.STM32U0_EXTI @ sysbus 0x40021800
+    [0-2] -> nvic@[5-7]
+
+rng: Miscellaneous.STM32U0_RNG @ sysbus 0x40025000
+
+adc: Miscellaneous.STM32U0_ADC @ sysbus 0x40012400
+
+gpioPortA: GPIOPort.STM32_GPIOPort @ sysbus <0x50000000, +0x400>
+    modeResetValue: 0xEBFFFFFF
+    pullUpPullDownResetValue: 0x24000000
+    numberOfAFs: 8
+
+gpioPortB: GPIOPort.STM32_GPIOPort @ sysbus <0x50000400, +0x400>
+    modeResetValue: 0xFFFFFFFF
+    pullUpPullDownResetValue: 0x00000000
+    numberOfAFs: 8
+
+gpioPortC: GPIOPort.STM32_GPIOPort @ sysbus <0x50000800, +0x400>
+    modeResetValue: 0xFFFFFFFF
+    pullUpPullDownResetValue: 0x00000000
+    numberOfAFs: 8
+
+gpioPortF: GPIOPort.STM32_GPIOPort @ sysbus <0x50001400, +0x400>
+    modeResetValue: 0xFFFFFFFF
+    pullUpPullDownResetValue: 0x00000000
+    numberOfAFs: 8
+
+usart1: UART.STM32F7_USART @ sysbus 0x40013800
+    frequency: 16000000
+    IRQ -> nvic@27
+
+i2c1: I2C.STM32F7_I2C @ sysbus 0x40005400
+    EventInterrupt -> nvic@23
+    ErrorInterrupt -> nvic@23
+
+spi1: SPI.STM32SPI @ sysbus 0x40013000
+    IRQ -> nvic@25
+
+sysbus:
+    init:
+        Tag <0x40000000, 0x400003FF> "TIM2"
+        Tag <0x40000400, 0x400007FF> "TIM3"
+        Tag <0x40002800, 0x40002BFF> "RTC"
+        Tag <0x40002C00, 0x40002FFF> "WWDG"
+        Tag <0x40003000, 0x400033FF> "IWDG"
+        Tag <0x40004400, 0x400047FF> "USART2"
+        Tag <0x40007C00, 0x40007FFF> "LPTIM1"
+        Tag <0x40008000, 0x400083FF> "LPUART1"
+        Tag <0x4000B000, 0x4000B3FF> "TAMP"
+        Tag <0x40010000, 0x400103FF> "SYSCFG"
+        Tag <0x40015800, 0x40015BFF> "DBGMCU"
+        Tag <0x40023000, 0x400233FF> "CRC"
+        Tag <0x40026000, 0x400263FF> "AES"

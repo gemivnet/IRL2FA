@@ -41,7 +41,7 @@ typedef enum {
 
 uint8_t hal_buttons(void); /* bitmask of currently held buttons */
 
-/* ---- IR link (half duplex, ~9600 baud SIR) ---- */
+/* ---- IR link (half duplex, 4800 baud plain UART, inverted so idle = LED off) ---- */
 void hal_ir_enable(bool on);                 /* powers the IR transceiver */
 void hal_ir_send(const uint8_t *buf, size_t len);
 /* Received bytes are pushed to the core with app_ir_rx(). */

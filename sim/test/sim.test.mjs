@@ -5,7 +5,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createHmac, randomBytes } from 'node:crypto';
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
 const dist = new URL('../dist/', import.meta.url);
@@ -15,7 +16,7 @@ if (!existsSync(fileURLToPath(new URL('irl2fa.mjs', dist)))) {
 const { default: createIRL2FA } = await import(new URL('irl2fa.mjs', dist));
 const {
   BTN, Device, World, FONT, DISPLAY_STRIDE, DISPLAY_H,
-  POWER_DEFAULTS, chargeMAs, profileAvgMA, lifeDays, base32Decode, totpWith,
+  POWER_DEFAULTS, chargeMAs, profileLifeDays, fromHardwareModel, base32Decode, totpWith,
 } = await import(new URL('irl2fa-device.js', dist));
 
 const CS_LABEL = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789 -_.@+&\'#';
@@ -267,9 +268,30 @@ test('energy accounting and battery projection', async () => {
   assert.equal(Math.round(e.awakeMs + e.asleepMs), w.elapsedMs - 50);
   const mAs = chargeMAs(POWER_DEFAULTS, e);
   assert.ok(mAs > 0);
-  const days = lifeDays(POWER_DEFAULTS, profileAvgMA(POWER_DEFAULTS));
+  const days = profileLifeDays(POWER_DEFAULTS);
   assert.ok(days > 300 && days < 3000, `20 uses/day projection ${days.toFixed(0)} days`);
   console.log(`  20 uses/day: ${days.toFixed(0)} days on ${POWER_DEFAULTS.battery_mAh} mAh`);
+});
+
+test('battery projection agrees with hardware/power/power.py', (t) => {
+  const root = new URL('../../', import.meta.url);
+  const modelPath = fileURLToPath(new URL('hardware/power/model.json', root));
+  if (!existsSync(modelPath)) return t.skip('no hardware/power/model.json');
+  const hw = JSON.parse(readFileSync(modelPath, 'utf8'));
+  let out;
+  try {
+    out = execFileSync('python3', [fileURLToPath(new URL('hardware/power/power.py', root))], { encoding: 'utf8' });
+  } catch {
+    return t.skip('python3 not available');
+  }
+  for (const name of Object.keys(hw.usage_profiles)) {
+    const m = new RegExp(`^${name}\\s+typical\\s+([0-9.]+) y\\s+worst\\s+([0-9.]+) y`, 'm').exec(out);
+    assert.ok(m, `power.py prints ${name}`);
+    const typ = fromHardwareModel(hw, POWER_DEFAULTS, name, 'typ');
+    const worst = fromHardwareModel(hw, POWER_DEFAULTS, name, 'worst');
+    assert.equal((profileLifeDays(typ) / 365).toFixed(1), m[1], `${name} typical`);
+    assert.equal((profileLifeDays(worst) / 365).toFixed(1), m[2], `${name} worst`);
+  }
 });
 
 test('reference TOTP matches RFC 6238 test vector', async () => {
