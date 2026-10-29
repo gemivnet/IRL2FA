@@ -10,7 +10,14 @@ Regenerate the footprints and models with:
     python3 hardware/tools/gen_models.py          # -> irl2fa.3dshapes/ (needs CadQuery)
 
 All footprints are drawn from the manufacturer's land-pattern drawing. No
-third-party CAD library file is copied. Models use
+third-party CAD library file is copied.
+
+`hardware/tests/footprints.yaml` records the datasheet land pattern, pin 1,
+holes and body of every footprint on the board, stock KiCad ones included,
+with the source page and tolerances. `hardware/tests/test_footprints.py`
+checks the footprints embedded in the board and their library copies
+against it, and the symbol pins against the pads. A footprint on the board
+with no entry fails the test, so a new part needs an entry. Models use
 `${KIPRJMOD}/lib/irl2fa.3dshapes/<footprint>.step` with zero offset and rotation.
 
 ## Footprints and models
