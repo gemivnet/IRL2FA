@@ -18,7 +18,9 @@
 #   holes               non-plated holes: at, drill [min, max]
 #   pin1                sign of pad 1's x and y (-1, 0, +1): which side/corner pin 1 is on
 #   pitch               centre distance between two named pads
-#   body                package body outline on F.Fab: size [w, h], at [x, y] (default 0, 0)
+#                       (a list of them when pad 1 is several pads, e.g. a clip's two legs)
+#   body                package body outline on F.Fab: size [w, h], at [x, y] (default 0, 0);
+#                       curved: true checks the outline's extremes, for rounded sides
 #   envelope            extra extents [x0, y0, x1, y1] the courtyard must enclose (lens, cell...)
 #   edge_cuts           bounding box of the footprint's own Edge.Cuts graphics
 #   tol                 per-dimension tolerances (mm), defaults below:
@@ -93,21 +95,28 @@ footprints:
     body: {size: [13.38, 3.8], at: [0, 1.15]}
     tol: {body: 0.3}
 
-  irl2fa:BatteryHolder_MYOUNG_BS-24-B4AA016_CR2450:
-    part: MYOUNG BS-24-B4AA016 (LCSC C964809)
-    datasheet: https://datasheet.lcsc.com/datasheet/pdf/c9cb77eac3a2dd701f0eab845ea63528.pdf?productCode=C964809
+  irl2fa:BatteryHolder_MYOUNG_MY-2450-01_CR2450:
+    part: MYOUNG MY-2450-01, "CR2450-W" (LCSC C964845)
+    datasheet: https://datasheet.lcsc.com/datasheet/pdf/26b02de8ee838f915c56d5652dea3d54.pdf?productCode=C964845
     source: >-
-      MYOUNG drawing MY-CP-0138 rev A/0 (single sheet), "PCB Layout Diagram, Top View":
-      pads 3.62 x 4.50, outer span 37.00, inner span 29.75; + on the right, - on the left.
-      Body 27.00 x 16.00 (top view), terminals 36.0 overall, cell 24.50 dia centred.
-      Drawing tolerance X.XX +-0.20; the Fab outline is 27.2 wide (within it).
+      MYOUNG drawing MY-CP-0106 rev A/0 (single sheet), "PCB Layout Diagram, Top View":
+      pads 2-6.15 x 2-6.00, outer span 36.80, pad top 9.20 from the closed end and 8.00
+      from the pad bottom to the open end (9.20 + 6.00 + 8.00 = the 23.20 +-0.3 plate
+      depth). Top view: plate 25.50 +-0.3 wide, 23.20 deep, closed end 7.50 wide;
+      height 5.70. Drawing tolerance X.XX +-0.20. Both legs are the + terminal (pad 1).
+      The footprint origin is the cell centre, 12.50 from the closed end (a design
+      choice: the cell rests against the 0.25 stop flap), so the pads sit at
+      y = -12.50 + 9.20 + 3.00 = -0.30. Pad 2 (-) is our own 12.0 mm bare copper disc
+      under the cell: the clip has no - contact (the cell's - face rests on the PCB),
+      so it has no datasheet and is checked as designed, centred on the cell.
     pads:
-      - {num: "1", at: [16.6875, 0], size: [3.625, 4.5]}
-      - {num: "2", at: [-16.6875, 0], size: [3.625, 4.5]}
-    pin1: [1, 0]
-    body: {size: [27.0, 16.0]}
-    envelope: [-12.25, -12.25, 12.25, 12.25]   # the CR2450 cell overhangs the body
-    tol: {body: 0.2}
+      - {num: "1", at: [15.325, -0.3], size: [6.15, 6.0]}
+      - {num: "1", at: [-15.325, -0.3], size: [6.15, 6.0]}
+      - {num: "2", at: [0, 0], size: [12.0, 12.0], shape: circle}
+    pin1: [[1, -1], [-1, -1]]                   # + on both legs, 0.3 towards the closed end
+    body: {size: [25.5, 23.2], at: [0, -0.9], curved: true}   # lobed open end
+    envelope: [-12.25, -12.25, 12.25, 12.25]   # the CR2450 cell
+    tol: {body: 0.3}
 
   irl2fa:LED_Vishay_VSMB2948SL_SideView:
     part: Vishay VSMB2948SL (LCSC C6604342)

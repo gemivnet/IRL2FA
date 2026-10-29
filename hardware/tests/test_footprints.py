@@ -204,11 +204,14 @@ def check_footprint(entry, geo):
         if not p1:
             errors.append("no pad 1")
         else:
-            sx, sy = entry["pin1"]
-            x, y = p1[0]["at"]
+            # one [sx, sy], or a list of them when pad 1 is several pads (each must be there)
+            want = entry["pin1"] if isinstance(entry["pin1"][0], list) else [entry["pin1"]]
             sgn = lambda v: 0 if abs(v) < 1e-3 else (1 if v > 0 else -1)
-            if (sgn(x), sgn(y)) != (sx, sy):
-                errors.append(f"pad 1 at {(x, y)}: datasheet puts pin 1 at sign {(sx, sy)}")
+            have = {(sgn(g["at"][0]), sgn(g["at"][1])) for g in p1}
+            for sx, sy in want:
+                if (sx, sy) not in have:
+                    errors.append(f"pad 1 at {[g['at'] for g in p1]}: datasheet puts pin 1 at "
+                                  f"sign {(sx, sy)}")
     if "pitch" in entry:
         a, b = (next((g for g in got if g["num"] == n), None) for n in entry["pitch"]["pads"])
         if a and b:
@@ -228,6 +231,13 @@ def check_footprint(entry, geo):
         segs = geo["segs"].get("F.Fab", [])
         vert = [s for s in segs if abs(s[0][0] - s[1][0]) < 1e-3 and abs(s[0][1] - s[1][1]) > 0.1]
         horz = [s for s in segs if abs(s[0][1] - s[1][1]) < 1e-3 and abs(s[0][0] - s[1][0]) > 0.1]
+        if body.get("curved"):
+            # rounded sides (lobes, arcs): a vertex of the outline on each side of the
+            # body, within tolerance and within the body's extent along that side
+            pts = {p for sg in segs for p in sg}
+            near = lambda v, lo, hi: lo - t - EPS <= v <= hi + t + EPS
+            vert = [((x, y), (x, y + 1)) for x, y in pts if near(y, by0, by1)]
+            horz = [((x, y), (x + 1, y)) for x, y in pts if near(x, bx0, bx1)]
         for name, ok in (
                 ("left", any(abs(s[0][0] - bx0) <= t + EPS for s in vert)),
                 ("right", any(abs(s[0][0] - bx1) <= t + EPS for s in vert)),
