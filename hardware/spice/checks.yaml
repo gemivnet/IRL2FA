@@ -1,0 +1,21 @@
+# Pass/fail limits for the SPICE benches in this folder. Each bench prints
+# "RESULT <name> <value>"; hardware/tests/test_spice.py compares them here.
+# SPDX-License-Identifier: CERN-OHL-S-2.0
+battery_pulse.cir:
+  fresh_vmin:    {min: 2.40, unit: V, why: "SSD1680 VCI min 2.2 V plus margin, fresh CR2450 (15 ohm)"}
+  halfused_vmin: {min: 2.20, unit: V, why: "still refreshes with a half-used cell (40 ohm)"}
+epd_boost.cir:
+  vgh_end:   {min: 20.5, unit: V, why: "PREVGH must exceed VGH (20 V)"}
+  vgl_end:   {max: -20.5, unit: V, why: "PREVGL must be below VGL (-20 V)"}
+  t_vgh:     {max: 0.030, unit: s, why: "booster up within the soft-start budget"}
+  il_peak:   {max: 0.45, unit: A, why: "L1 rated 500 mA"}
+  vds_max:   {max: 27.0, unit: V, why: "Si1308EDL and MBR0530 rated 30 V (10 % margin)"}
+load_switch.cir:
+  vbat_min:  {min: 2.40, unit: V, why: "panel inrush must not brown out the MCU"}
+  vepd_end:  {min: 2.70, unit: V, why: "panel supply after switch-on"}
+reverse_battery.cir:
+  vbat_min:  {min: -0.30, unit: V, why: "reversed cell blocked"}
+  ileak:     {max: 1.0e-6, unit: A, why: "reverse current (model is ideal; AO3401A IDSS is 1 uA max)"}
+ir_led.cir:
+  iled_fresh: {max: 0.025, unit: A, why: "IR LED current, fresh cell"}
+  iled_flat:  {min: 0.010, unit: A, why: "IR LED current, nearly flat cell (2.5 V)"}

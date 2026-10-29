@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!-- IRL2FA: an 80 x 34 mm device with e-paper and joystick. SPDX-License-Identifier: AGPL-3.0-or-later -->
+  <rect x="2" y="18" width="60" height="26" rx="4" fill="#2b2e33"/>
+  <rect x="7" y="22" width="36" height="18" rx="1.5" fill="#e8e4d8"/>
+  <rect x="11" y="27" width="16" height="3" fill="#2a2a27"/>
+  <rect x="11" y="33" width="24" height="3" fill="#2a2a27"/>
+  <circle cx="53" cy="31" r="5.5" fill="#15171a"/>
+  <circle cx="53" cy="31" r="2.6" fill="#c9cdd2"/>
+  <path d="M20 14 Q32 4 44 14" fill="none" stroke="#e5484d" stroke-width="3" stroke-linecap="round"/>
+</svg>

@@ -1,0 +1,218 @@
+(footprint "PhotoTransistor_Vishay_VEMT2523SLX01_SideView"
+	(version 20241229)
+	(generator "irl2fa_gen_footprints")
+	(generator_version "1.0")
+	(layer "F.Cu")
+	(descr "Vishay VEMT2523SLX01 side-looking NPN phototransistor detector, 2.3x2.55x2.3 mm MiniLED side-view package (LCSC C511451). Pads 0.9x1.2, 4.2 mm outer span (Vishay IPC-7351 pad proposal). Pad 1=C, pad 2=E. Optical axis is parallel to the PCB along -Y, i.e. the TOP edge of the footprint faces the board edge: lens tip at y=-1.37, lens base / body front face at y=-0.42, body back at y=+1.18, optical axis 1.15 mm above the PCB. Place the origin 1.37 mm inside the board edge for a flush lens.")
+	(tags "Vishay VEMT2523SLX01 side looking side view MiniLED infrared")
+	(property "Reference" "REF**"
+		(at 0 2.3 0)
+		(layer "F.SilkS")
+		(effects
+			(font
+				(size 1 1)
+				(thickness 0.15)
+			)
+		)
+	)
+	(property "Value" "PhotoTransistor_Vishay_VEMT2523SLX01_SideView"
+		(at 0 3.4 0)
+		(layer "F.Fab")
+		(effects
+			(font
+				(size 1 1)
+				(thickness 0.15)
+			)
+		)
+	)
+	(property "Datasheet" "https://www.vishay.com/docs/84167/vemt2523slx01.pdf"
+		(at 0 0 0)
+		(layer "F.Fab")
+		(hide yes)
+		(effects
+			(font
+				(size 1 1)
+				(thickness 0.15)
+			)
+		)
+	)
+	(property "Description" "Vishay VEMT2523SLX01 side-looking NPN phototransistor detector, 2.3x2.55x2.3 mm MiniLED side-view package (LCSC C511451). Pads 0.9x1.2, 4.2 mm outer span (Vishay IPC-7351 pad proposal). Pad 1=C, pad 2=E. Optical axis is parallel to the PCB along -Y, i.e. the TOP edge of the footprint faces the board edge: lens tip at y=-1.37, lens base / body front face at y=-0.42, body back at y=+1.18, optical axis 1.15 mm above the PCB. Place the origin 1.37 mm inside the board edge for a flush lens."
+		(at 0 0 0)
+		(layer "F.Fab")
+		(hide yes)
+		(effects
+			(font
+				(size 1 1)
+				(thickness 0.15)
+			)
+		)
+	)
+	(attr smd)
+	(pad "1" smd roundrect
+		(at 1.65 0)
+		(size 0.9 1.2)
+		(layers "F.Cu" "F.Paste" "F.Mask")
+		(roundrect_rratio 0.25)
+	)
+	(pad "2" smd roundrect
+		(at -1.65 0)
+		(size 0.9 1.2)
+		(layers "F.Cu" "F.Paste" "F.Mask")
+		(roundrect_rratio 0.25)
+	)
+	(fp_rect
+		(start -1.1 -0.42)
+		(end 1.1 1.18)
+		(stroke
+			(width 0.1)
+			(type solid)
+		)
+		(fill no)
+		(layer "F.Fab")
+	)
+	(fp_line
+		(start -0.9 -0.42)
+		(end -0.9 -0.47)
+		(stroke
+			(width 0.1)
+			(type solid)
+		)
+		(layer "F.Fab")
+	)
+	(fp_line
+		(start 0.9 -0.42)
+		(end 0.9 -0.47)
+		(stroke
+			(width 0.1)
+			(type solid)
+		)
+		(layer "F.Fab")
+	)
+	(fp_arc
+		(start -0.9 -0.47)
+		(mid 0 -1.37)
+		(end 0.9 -0.47)
+		(stroke
+			(width 0.1)
+			(type solid)
+		)
+		(layer "F.Fab")
+	)
+	(fp_rect
+		(start -1.1 -0.4)
+		(end -1.9 0.4)
+		(stroke
+			(width 0.1)
+			(type solid)
+		)
+		(fill no)
+		(layer "F.Fab")
+	)
+	(fp_rect
+		(start 1.1 -0.4)
+		(end 1.9 0.4)
+		(stroke
+			(width 0.1)
+			(type solid)
+		)
+		(fill no)
+		(layer "F.Fab")
+	)
+	(fp_line
+		(start 0 -2.57)
+		(end 0 0.6)
+		(stroke
+			(width 0.1)
+			(type solid)
+		)
+		(layer "F.Fab")
+	)
+	(fp_line
+		(start 0 0.6)
+		(end -0.2 0.2536)
+		(stroke
+			(width 0.1)
+			(type solid)
+		)
+		(layer "F.Fab")
+	)
+	(fp_line
+		(start 0 0.6)
+		(end 0.2 0.2536)
+		(stroke
+			(width 0.1)
+			(type solid)
+		)
+		(layer "F.Fab")
+	)
+	(fp_text user "IR IN"
+		(at 1.6 -2.07 0)
+		(layer "F.Fab")
+		(effects
+			(font
+				(size 0.5 0.5)
+				(thickness 0.075)
+			)
+		)
+	)
+	(fp_text user "C"
+		(at 1.65 0.95 0)
+		(layer "F.Fab")
+		(effects
+			(font
+				(size 0.5 0.5)
+				(thickness 0.075)
+			)
+		)
+	)
+	(fp_line
+		(start -1.1 1.29)
+		(end 1.1 1.29)
+		(stroke
+			(width 0.12)
+			(type solid)
+		)
+		(layer "F.SilkS")
+	)
+	(fp_line
+		(start 2.35 -0.6)
+		(end 2.35 0.6)
+		(stroke
+			(width 0.12)
+			(type solid)
+		)
+		(layer "F.SilkS")
+	)
+	(fp_rect
+		(start -2.35 -1.62)
+		(end 2.35 1.43)
+		(stroke
+			(width 0.05)
+			(type solid)
+		)
+		(fill no)
+		(layer "F.CrtYd")
+	)
+	(fp_text user "${REFERENCE}"
+		(at 0 0.4 0)
+		(layer "F.Fab")
+		(effects
+			(font
+				(size 0.5 0.5)
+				(thickness 0.08)
+			)
+		)
+	)
+	(embedded_fonts no)
+	(model "${KIPRJMOD}/lib/irl2fa.3dshapes/PhotoTransistor_Vishay_VEMT2523SLX01_SideView.step"
+		(offset
+			(xyz 0 0 0)
+		)
+		(scale
+			(xyz 1 1 1)
+		)
+		(rotate
+			(xyz 0 0 0)
+		)
+	)
+)

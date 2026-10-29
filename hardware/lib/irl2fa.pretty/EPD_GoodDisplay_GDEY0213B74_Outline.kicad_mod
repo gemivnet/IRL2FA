@@ -1,0 +1,242 @@
+(footprint "EPD_GoodDisplay_GDEY0213B74_Outline"
+	(version 20241229)
+	(generator "irl2fa_gen_footprints")
+	(generator_version "1.0")
+	(layer "F.Cu")
+	(descr "Good Display GDEY0213B74 2.13in e-paper (SSD1680), mechanical outline only, front side. Origin = glass centre. Glass 59.2x29.2x1.0, active area 48.55x23.70 starting 7.95 mm from the FPC-side glass edge (centred in Y). FPC 12.5 wide, 14.3 long, 0.3 thick, leaves the left short edge 8.15 mm from the top glass edge. Edge.Cuts: 1.4x14.0 rounded FPC fold slot per hardware/board.yaml (slot centre x=-32.3 rel. glass centre). 3D model: glass on 0.2 mm adhesive, FPC folded 180 deg through the slot to the back side.")
+	(tags "e-paper EPD Good Display GDEY0213B74 2.13 outline")
+	(property "Reference" "REF**"
+		(at 0 -15.8 0)
+		(layer "F.SilkS")
+		(effects
+			(font
+				(size 1 1)
+				(thickness 0.15)
+			)
+		)
+	)
+	(property "Value" "EPD_GoodDisplay_GDEY0213B74_Outline"
+		(at 0 0 0)
+		(layer "F.Fab")
+		(effects
+			(font
+				(size 1 1)
+				(thickness 0.15)
+			)
+		)
+	)
+	(property "Datasheet" "https://v4.cecdn.yun300.cn/100001_1909185148/GDEY0213B74.pdf"
+		(at 0 0 0)
+		(layer "F.Fab")
+		(hide yes)
+		(effects
+			(font
+				(size 1 1)
+				(thickness 0.15)
+			)
+		)
+	)
+	(property "Description" "Good Display GDEY0213B74 2.13in e-paper (SSD1680), mechanical outline only, front side. Origin = glass centre. Glass 59.2x29.2x1.0, active area 48.55x23.70 starting 7.95 mm from the FPC-side glass edge (centred in Y). FPC 12.5 wide, 14.3 long, 0.3 thick, leaves the left short edge 8.15 mm from the top glass edge. Edge.Cuts: 1.4x14.0 rounded FPC fold slot per hardware/board.yaml (slot centre x=-32.3 rel. glass centre). 3D model: glass on 0.2 mm adhesive, FPC folded 180 deg through the slot to the back side."
+		(at 0 0 0)
+		(layer "F.Fab")
+		(hide yes)
+		(effects
+			(font
+				(size 1 1)
+				(thickness 0.15)
+			)
+		)
+	)
+	(attr exclude_from_pos_files exclude_from_bom)
+	(fp_rect
+		(start -29.6 -14.6)
+		(end 29.6 14.6)
+		(stroke
+			(width 0.1)
+			(type solid)
+		)
+		(fill no)
+		(layer "F.Fab")
+	)
+	(fp_rect
+		(start -21.65 -11.8523)
+		(end 26.9 11.8523)
+		(stroke
+			(width 0.1)
+			(type solid)
+		)
+		(fill no)
+		(layer "F.Fab")
+	)
+	(fp_text user "ACTIVE AREA 48.55 x 23.70"
+		(at 2.625 2 0)
+		(layer "F.Fab")
+		(effects
+			(font
+				(size 1 1)
+				(thickness 0.15)
+			)
+		)
+	)
+	(fp_rect
+		(start -32.3 -6.45)
+		(end -29.6 6.05)
+		(stroke
+			(width 0.1)
+			(type solid)
+		)
+		(fill no)
+		(layer "F.Fab")
+	)
+	(fp_text user "FPC"
+		(at -30.65 2.3 0)
+		(layer "F.Fab")
+		(effects
+			(font
+				(size 0.5 0.5)
+				(thickness 0.075)
+			)
+		)
+	)
+	(fp_line
+		(start -29.75 -14.75)
+		(end -26.75 -14.75)
+		(stroke
+			(width 0.12)
+			(type solid)
+		)
+		(layer "F.SilkS")
+	)
+	(fp_line
+		(start -29.75 -14.75)
+		(end -29.75 -11.75)
+		(stroke
+			(width 0.12)
+			(type solid)
+		)
+		(layer "F.SilkS")
+	)
+	(fp_line
+		(start 29.75 -14.75)
+		(end 26.75 -14.75)
+		(stroke
+			(width 0.12)
+			(type solid)
+		)
+		(layer "F.SilkS")
+	)
+	(fp_line
+		(start 29.75 -14.75)
+		(end 29.75 -11.75)
+		(stroke
+			(width 0.12)
+			(type solid)
+		)
+		(layer "F.SilkS")
+	)
+	(fp_line
+		(start 29.75 14.75)
+		(end 26.75 14.75)
+		(stroke
+			(width 0.12)
+			(type solid)
+		)
+		(layer "F.SilkS")
+	)
+	(fp_line
+		(start 29.75 14.75)
+		(end 29.75 11.75)
+		(stroke
+			(width 0.12)
+			(type solid)
+		)
+		(layer "F.SilkS")
+	)
+	(fp_line
+		(start -29.75 14.75)
+		(end -26.75 14.75)
+		(stroke
+			(width 0.12)
+			(type solid)
+		)
+		(layer "F.SilkS")
+	)
+	(fp_line
+		(start -29.75 14.75)
+		(end -29.75 11.75)
+		(stroke
+			(width 0.12)
+			(type solid)
+		)
+		(layer "F.SilkS")
+	)
+	(fp_line
+		(start -33 -6.3)
+		(end -33 6.3)
+		(stroke
+			(width 0.05)
+			(type solid)
+		)
+		(layer "Edge.Cuts")
+	)
+	(fp_line
+		(start -31.6 -6.3)
+		(end -31.6 6.3)
+		(stroke
+			(width 0.05)
+			(type solid)
+		)
+		(layer "Edge.Cuts")
+	)
+	(fp_arc
+		(start -33 -6.3)
+		(mid -32.3 -7)
+		(end -31.6 -6.3)
+		(stroke
+			(width 0.05)
+			(type solid)
+		)
+		(layer "Edge.Cuts")
+	)
+	(fp_arc
+		(start -31.6 6.3)
+		(mid -32.3 7)
+		(end -33 6.3)
+		(stroke
+			(width 0.05)
+			(type solid)
+		)
+		(layer "Edge.Cuts")
+	)
+	(fp_poly
+		(pts (xy -29.85 -14.85) (xy 29.85 -14.85) (xy 29.85 14.85) (xy -29.85 14.85) (xy -29.85 7.25) (xy -33.25 7.25) (xy -33.25 -7.25) (xy -29.85 -7.25))
+		(stroke
+			(width 0.05)
+			(type solid)
+		)
+		(fill no)
+		(layer "F.CrtYd")
+	)
+	(fp_text user "${REFERENCE}"
+		(at 0 -4 0)
+		(layer "F.Fab")
+		(effects
+			(font
+				(size 0.5 0.5)
+				(thickness 0.08)
+			)
+		)
+	)
+	(embedded_fonts no)
+	(model "${KIPRJMOD}/lib/irl2fa.3dshapes/EPD_GoodDisplay_GDEY0213B74_Outline.step"
+		(offset
+			(xyz 0 0 0)
+		)
+		(scale
+			(xyz 1 1 1)
+		)
+		(rotate
+			(xyz 0 0 0)
+		)
+	)
+)

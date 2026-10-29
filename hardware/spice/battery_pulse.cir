@@ -1,0 +1,28 @@
+* E-paper refresh on a CR2450: VBAT must stay above the SSD1680's 2.2 V
+* minimum (VCI) and the MCU brown-out with a fresh and a half-used cell.
+* Assumed load: MCU 1 mA + panel 3.5 mA average with 40 mA, 1 ms peaks every
+* 10 ms (the wide-temperature GDEM0213B74WT datasheet's 40 mA typical peak).
+* Bulk: 2 x 47 uF X5R 0805, derated to 25 uF each at 3 V bias.
+.include models.lib
+.param rint=15
+X1 vraw 0 CELL voc=3.0 rint={rint}
+XQ1 vraw 0 vbat PFET
+C1 vbat 0 25u
+C2 vbat 0 25u
+C3 vbat 0 4.7u
+Imcu vbat 0 1m
+Ipanel vbat 0 3.5m
+Ipeak vbat 0 PULSE(0 40m 5m 10u 10u 1m 10m)
+.tran 10u 60m
+.control
+run
+meas tran vmin MIN v(vbat) from=5m to=60m
+echo "RESULT fresh_vmin $&vmin"
+alterparam rint=40
+reset
+run
+meas tran vmin2 MIN v(vbat) from=5m to=60m
+echo "RESULT halfused_vmin $&vmin2"
+quit
+.endc
+.end

@@ -1,0 +1,6 @@
+{
+  "private": true,
+  "type": "module",
+  "main": "sim.test.mjs",
+  "description": "Lets `node --test sim/test` run the simulator tests (Node treats a directory argument as a module and loads its main)."
+}

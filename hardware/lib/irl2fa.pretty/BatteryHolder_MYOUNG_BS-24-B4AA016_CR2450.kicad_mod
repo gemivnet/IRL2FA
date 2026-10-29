@@ -1,0 +1,203 @@
+(footprint "BatteryHolder_MYOUNG_BS-24-B4AA016_CR2450"
+	(version 20241229)
+	(generator "irl2fa_gen_footprints")
+	(generator_version "1.0")
+	(layer "F.Cu")
+	(descr "MYOUNG BS-24-B4AA016 (BS-2450-2 Au) SMT CR2450 holder, open frame, gold contacts (LCSC C964809), drawing MY-CP-0138 rev A/0. Pads 3.62x4.50, outer span 37.00, inner span 29.75. Pad 1 = + (right), pad 2 = - (left); both contacts are end terminals, the holder has no PCB-side contact pad (the - spring presses the cell's bottom face from the holder floor). Body 27.2x16.0, 36.0 over the terminals, height 7.50 above the PCB. The 24.5 mm cell overhangs the body by 4.25 mm on each long side.")
+	(tags "CR2450 coin cell battery holder SMD MYOUNG BS-24")
+	(property "Reference" "REF**"
+		(at 0 -13.4 0)
+		(layer "F.SilkS")
+		(effects
+			(font
+				(size 1 1)
+				(thickness 0.15)
+			)
+		)
+	)
+	(property "Value" "BatteryHolder_MYOUNG_BS-24-B4AA016_CR2450"
+		(at 0 13.4 0)
+		(layer "F.Fab")
+		(effects
+			(font
+				(size 1 1)
+				(thickness 0.15)
+			)
+		)
+	)
+	(property "Datasheet" "https://www.lcsc.com/datasheet/C964809.pdf"
+		(at 0 0 0)
+		(layer "F.Fab")
+		(hide yes)
+		(effects
+			(font
+				(size 1 1)
+				(thickness 0.15)
+			)
+		)
+	)
+	(property "Description" "MYOUNG BS-24-B4AA016 (BS-2450-2 Au) SMT CR2450 holder, open frame, gold contacts (LCSC C964809), drawing MY-CP-0138 rev A/0. Pads 3.62x4.50, outer span 37.00, inner span 29.75. Pad 1 = + (right), pad 2 = - (left); both contacts are end terminals, the holder has no PCB-side contact pad (the - spring presses the cell's bottom face from the holder floor). Body 27.2x16.0, 36.0 over the terminals, height 7.50 above the PCB. The 24.5 mm cell overhangs the body by 4.25 mm on each long side."
+		(at 0 0 0)
+		(layer "F.Fab")
+		(hide yes)
+		(effects
+			(font
+				(size 1 1)
+				(thickness 0.15)
+			)
+		)
+	)
+	(attr smd)
+	(pad "1" smd rect
+		(at 16.6875 0)
+		(size 3.625 4.5)
+		(layers "F.Cu" "F.Paste" "F.Mask")
+	)
+	(pad "2" smd rect
+		(at -16.6875 0)
+		(size 3.625 4.5)
+		(layers "F.Cu" "F.Paste" "F.Mask")
+	)
+	(fp_rect
+		(start -13.6 -8)
+		(end 13.6 8)
+		(stroke
+			(width 0.1)
+			(type solid)
+		)
+		(fill no)
+		(layer "F.Fab")
+	)
+	(fp_circle
+		(center 0 0)
+		(end 12.25 0)
+		(stroke
+			(width 0.1)
+			(type solid)
+		)
+		(fill no)
+		(layer "F.Fab")
+	)
+	(fp_rect
+		(start -18 -3.5)
+		(end -13.6 3.5)
+		(stroke
+			(width 0.1)
+			(type solid)
+		)
+		(fill no)
+		(layer "F.Fab")
+	)
+	(fp_rect
+		(start 13.6 -3.5)
+		(end 18 3.5)
+		(stroke
+			(width 0.1)
+			(type solid)
+		)
+		(fill no)
+		(layer "F.Fab")
+	)
+	(fp_text user "+"
+		(at 11 0 0)
+		(layer "F.Fab")
+		(effects
+			(font
+				(size 2 2)
+				(thickness 0.3)
+			)
+		)
+	)
+	(fp_text user "-"
+		(at -11 0 0)
+		(layer "F.Fab")
+		(effects
+			(font
+				(size 2 2)
+				(thickness 0.3)
+			)
+		)
+	)
+	(fp_rect
+		(start -13.71 -8.11)
+		(end 13.71 8.11)
+		(stroke
+			(width 0.12)
+			(type solid)
+		)
+		(fill no)
+		(layer "F.SilkS")
+	)
+	(fp_arc
+		(start -9.3272 -8.11)
+		(mid 0 -12.36)
+		(end 9.3272 -8.11)
+		(stroke
+			(width 0.12)
+			(type solid)
+		)
+		(layer "F.SilkS")
+	)
+	(fp_arc
+		(start 9.3272 8.11)
+		(mid 0 12.36)
+		(end -9.3272 8.11)
+		(stroke
+			(width 0.12)
+			(type solid)
+		)
+		(layer "F.SilkS")
+	)
+	(fp_text user "+"
+		(at 16.6875 -3.45 0)
+		(layer "F.SilkS")
+		(effects
+			(font
+				(size 1.5 1.5)
+				(thickness 0.225)
+			)
+		)
+	)
+	(fp_text user "-"
+		(at -16.6875 -3.45 0)
+		(layer "F.SilkS")
+		(effects
+			(font
+				(size 1.5 1.5)
+				(thickness 0.225)
+			)
+		)
+	)
+	(fp_rect
+		(start -18.75 -12.5)
+		(end 18.75 12.5)
+		(stroke
+			(width 0.05)
+			(type solid)
+		)
+		(fill no)
+		(layer "F.CrtYd")
+	)
+	(fp_text user "${REFERENCE}"
+		(at 0 0 0)
+		(layer "F.Fab")
+		(effects
+			(font
+				(size 0.5 0.5)
+				(thickness 0.08)
+			)
+		)
+	)
+	(embedded_fonts no)
+	(model "${KIPRJMOD}/lib/irl2fa.3dshapes/BatteryHolder_MYOUNG_BS-24-B4AA016_CR2450.step"
+		(offset
+			(xyz 0 0 0)
+		)
+		(scale
+			(xyz 1 1 1)
+		)
+		(rotate
+			(xyz 0 0 0)
+		)
+	)
+)

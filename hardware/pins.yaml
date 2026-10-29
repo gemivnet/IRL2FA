@@ -1,0 +1,55 @@
+# STM32U083KCU6 (UFQFPN32) pin assignment: the single source of truth.
+#
+#   firmware/port/stm32u0/pins.h  is generated from this file (hardware/tools/gen_pins.py)
+#   hardware/tests/test_netlist.py checks the schematic netlist against it
+#   docs/pin-assignments.md       is generated from it
+#
+# pin: package pin number; net: schematic net name; af: alternate function
+# number (null = GPIO); notes are copied into the docs.
+# SPDX-License-Identifier: CERN-OHL-S-2.0
+mcu: STM32U083KCU6
+package: UFQFPN32
+pins:
+  - {pin: 1,  name: VDD,   net: VBAT}
+  - {pin: 2,  name: PC14,  net: null,        notes: "spare (LSE pins unused; RTC is external)"}
+  - {pin: 3,  name: PC15,  net: null,        notes: spare}
+  - {pin: 4,  name: PF2,   net: NRST,        notes: "NRST, 100 nF to GND, Tag-Connect"}
+  - {pin: 5,  name: VDDA,  net: VBAT,        notes: "battery voltage measured via VREFINT"}
+  - {pin: 6,  name: PA0,   net: JOY_CENTER,  mode: input_pullup, exti: true, symbol: JOY_CENTER, notes: "joystick push (WKUP1)"}
+  - {pin: 7,  name: PA1,   net: JOY_A,       mode: input_pullup, exti: true, symbol: JOY_A, notes: "joystick direction A"}
+  - {pin: 8,  name: PA2,   net: JOY_B,       mode: input_pullup, exti: true, symbol: JOY_B, notes: "joystick direction B"}
+  - {pin: 9,  name: PA3,   net: JOY_C,       mode: input_pullup, exti: true, symbol: JOY_C, notes: "joystick direction C"}
+  - {pin: 10, name: PA4,   net: EPD_CS,      mode: output, symbol: EPD_CS, notes: "e-paper chip select (GPIO)"}
+  - {pin: 11, name: PA5,   net: EPD_SCK,     mode: af, af: 5, symbol: EPD_SCK, notes: SPI1_SCK}
+  - {pin: 12, name: PA6,   net: EPD_DC,      mode: output, symbol: EPD_DC, notes: "e-paper data/command"}
+  - {pin: 13, name: PA7,   net: EPD_SDI,     mode: af, af: 5, symbol: EPD_SDI, notes: SPI1_MOSI}
+  - {pin: 14, name: PB0,   net: EPD_RST,     mode: output, symbol: EPD_RST, notes: "e-paper reset, active low"}
+  - {pin: 15, name: PB1,   net: EPD_BUSY,    mode: input, symbol: EPD_BUSY, notes: "e-paper busy, high = busy (SSD1680)"}
+  - {pin: 16, name: VSS,   net: GND}
+  - {pin: 17, name: VDD,   net: VBAT,        notes: "VDD/VDDUSB, own 100 nF"}
+  - {pin: 18, name: PA8,   net: EPD_PWR_N,   mode: output, symbol: EPD_PWR_N, notes: "e-paper load switch, low = on"}
+  - {pin: 19, name: PA9,   net: IR_TX,       mode: af, af: 7, symbol: IR_TX, notes: "USART1_TX, inverted (idle = LED off)"}
+  - {pin: 20, name: PA10,  net: IR_RX,       mode: af, af: 7, symbol: IR_RX, notes: "USART1_RX, inverted"}
+  - {pin: 21, name: PA11,  net: IR_RX_PWR,   mode: output, symbol: IR_RX_PWR, notes: "powers the phototransistor"}
+  - {pin: 22, name: PA12,  net: null,        notes: spare}
+  - {pin: 23, name: PA13,  net: SWDIO,       mode: af, af: 0, notes: "SWD, Tag-Connect"}
+  - {pin: 24, name: PA14,  net: SWCLK,       mode: af, af: 0, notes: "SWD, Tag-Connect"}
+  - {pin: 25, name: PA15,  net: JOY_D,       mode: input_pullup, exti: true, symbol: JOY_D, notes: "joystick direction D"}
+  - {pin: 26, name: PB3,   net: null,        notes: spare}
+  - {pin: 27, name: PB4,   net: RTC_INT,     mode: input_pullup, exti: true, symbol: RTC_INT, notes: "RV-3032 INT, open drain"}
+  - {pin: 28, name: PB5,   net: null,        notes: spare}
+  - {pin: 29, name: PB6,   net: I2C_SCL,     mode: af, af: 4, symbol: I2C_SCL, notes: "I2C1_SCL, 4.7k pull-up"}
+  - {pin: 30, name: PB7,   net: I2C_SDA,     mode: af, af: 4, symbol: I2C_SDA, notes: "I2C1_SDA, 4.7k pull-up"}
+  - {pin: 31, name: PF3,   net: BOOT0,       notes: "BOOT0, 10k pull-down"}
+  - {pin: 32, name: VSS,   net: GND}
+  - {pin: 33, name: EP,    net: GND,         notes: "exposed pad"}
+
+# Joystick: the Alps SKRH directions sit at 45 degrees to its body, so the
+# footprint is rotated 45 degrees on the board. A and C are one axis, B and D
+# the other. Mapping as seen from the front with the screen upright:
+joystick:
+  JOY_A: up
+  JOY_B: right
+  JOY_C: down
+  JOY_D: left
+  JOY_CENTER: center

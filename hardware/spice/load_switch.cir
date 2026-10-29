@@ -1,0 +1,29 @@
+* Q2 (AO3401A) switching the e-paper on: the inrush into the panel's
+* capacitors must not pull VBAT below the MCU's brown-out level (1.71 V min
+* supply; we require 2.4 V) with a half-used cell.
+.include models.lib
+X1 vraw 0 CELL voc=2.9 rint=40
+XQ1 vraw 0 vbat PFET
+C1 vbat 0 25u
+C2 vbat 0 25u
+C5 vbat 0 4.7u
+R5 gate vbat 100k
+* MCU pin pulls the gate low at 1 ms (push-pull, ~40 ohm)
+Vpin pin 0 PULSE(2.9 0 1m 1u 1u 50m 100m)
+Rpin pin gate 40
+XQ2 vepd gate vbat PFET
+* panel side: C4 4.7u + VCI 1u + VDDIO/VDD ~1u, derated
+C10 vepd 0 3.5u
+C14 vepd 0 0.8u
+Rpanel vepd 0 1k
+.tran 1u 5m
+.control
+run
+meas tran vbat_min MIN v(vbat) from=0.9m to=5m
+meas tran inrush MAX i(Vpin) from=0 to=5m
+meas tran vepd_end AVG v(vepd) from=4m to=5m
+echo "RESULT vbat_min $&vbat_min"
+echo "RESULT vepd_end $&vepd_end"
+quit
+.endc
+.end

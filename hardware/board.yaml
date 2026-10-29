@@ -1,0 +1,50 @@
+# Mechanical contract shared by the PCB generator, the case (case/board_dims.scad
+# is generated from this) and the fit test. Units: mm. Origin: board top-left
+# corner seen from the FRONT (screen side), x right, y down. "front" = the
+# screen side = KiCad F.Cu; "back" = B.Cu.
+# SPDX-License-Identifier: CERN-OHL-S-2.0
+board:
+  width: 80.0
+  height: 34.0
+  thickness: 1.0
+  corner_radius: 3.0
+  mounting_holes:            # M2, plated, GND
+    - {x: 3.0,  y: 3.0}      # NOTE: inside the corner radius; see pcb-design.md
+    - {x: 77.0, y: 3.0}
+    - {x: 3.0,  y: 31.0}
+    - {x: 77.0, y: 31.0}
+  mounting_hole_drill: 2.2
+
+display:                     # Good Display GDEY0213B74, front side
+  part: GDEY0213B74
+  glass: {x: 6.0, y: 2.4, w: 59.2, h: 29.2, t: 1.0}
+  active: {x: 11.3, y: 4.2, w: 48.55, h: 23.70}   # visible area, approx.
+  fpc_exit: left             # FPC leaves the left short edge, centred
+  fpc_width: 12.5
+  adhesive: 0.2
+
+fpc_slot:                    # FPC folds through this slot to the back
+  {x: 2.6, y: 10.0, w: 1.4, h: 14.0}
+
+joystick:                    # Alps SKRHABE010, front side, rotated 45 deg
+  part: SKRHABE010
+  x: 72.8
+  y: 17.0
+  body: 7.5
+  body_height: 1.8
+  stem_diameter: 3.0
+  stem_top: 3.8              # stem top above the PCB front surface
+
+ir:                          # side-looking, back side, aimed through the TOP edge (y = 0)
+  emitter:  {x: 58.0, y: 1.3}
+  detector: {x: 22.0, y: 1.3}   # x mirrors the emitter about the centre line
+
+battery:                     # CR2450 in an SMT holder, back side
+  part: BS-24-B4AA016
+  x: 40.0
+  y: 17.0
+  cell_diameter: 24.5
+  cell_thickness: 5.0
+  holder_height: 6.0         # PCB back surface to top of holder (confirm from drawing)
+
+back_keepout_height: 6.2     # tallest back-side part above the PCB back surface

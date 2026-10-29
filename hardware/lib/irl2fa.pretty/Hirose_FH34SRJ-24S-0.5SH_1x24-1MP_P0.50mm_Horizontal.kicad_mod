@@ -1,0 +1,373 @@
+(footprint "Hirose_FH34SRJ-24S-0.5SH_1x24-1MP_P0.50mm_Horizontal"
+	(version 20241229)
+	(generator "irl2fa_gen_footprints")
+	(generator_version "1.0")
+	(layer "F.Cu")
+	(descr "Hirose FH34SRJ-24S-0.5SH(50), 24 pos, 0.5 mm pitch, 1.0 mm high, top+bottom contact, back-flip actuator, 0.3 mm FPC (LCSC C324726). Recommended PCB mounting pattern from the Hirose FH34SRJ datasheet: signal pads 0.3x0.8, B=11.5, fitting nails 0.4x0.8 with E=13.1 / F=13.9, 3.3 from signal-pad outer edge to nail outer edge. Pad 1 at +X (right, as in the Hirose top view). The FPC inserts from +Y (the side away from the signal pads); the signal pads are under the actuator side. Body outline on Fab is approximate (A=14.0, D=13.38, depth 3.8).")
+	(tags "Hirose FH34 FH34SRJ FPC FFC 0.5mm 24P horizontal")
+	(property "Reference" "REF**"
+		(at 0 -1.75 0)
+		(layer "F.SilkS")
+		(effects
+			(font
+				(size 1 1)
+				(thickness 0.15)
+			)
+		)
+	)
+	(property "Value" "Hirose_FH34SRJ-24S-0.5SH_1x24-1MP_P0.50mm_Horizontal"
+		(at 0 6.45 0)
+		(layer "F.Fab")
+		(effects
+			(font
+				(size 1 1)
+				(thickness 0.15)
+			)
+		)
+	)
+	(property "Datasheet" "https://www.hirose.com/en/product/series/FH34S"
+		(at 0 0 0)
+		(layer "F.Fab")
+		(hide yes)
+		(effects
+			(font
+				(size 1 1)
+				(thickness 0.15)
+			)
+		)
+	)
+	(property "Description" "Hirose FH34SRJ-24S-0.5SH(50), 24 pos, 0.5 mm pitch, 1.0 mm high, top+bottom contact, back-flip actuator, 0.3 mm FPC (LCSC C324726). Recommended PCB mounting pattern from the Hirose FH34SRJ datasheet: signal pads 0.3x0.8, B=11.5, fitting nails 0.4x0.8 with E=13.1 / F=13.9, 3.3 from signal-pad outer edge to nail outer edge. Pad 1 at +X (right, as in the Hirose top view). The FPC inserts from +Y (the side away from the signal pads); the signal pads are under the actuator side. Body outline on Fab is approximate (A=14.0, D=13.38, depth 3.8)."
+		(at 0 0 0)
+		(layer "F.Fab")
+		(hide yes)
+		(effects
+			(font
+				(size 1 1)
+				(thickness 0.15)
+			)
+		)
+	)
+	(attr smd)
+	(pad "1" smd roundrect
+		(at 5.75 0)
+		(size 0.3 0.8)
+		(layers "F.Cu" "F.Paste" "F.Mask")
+		(roundrect_rratio 0.25)
+	)
+	(pad "2" smd roundrect
+		(at 5.25 0)
+		(size 0.3 0.8)
+		(layers "F.Cu" "F.Paste" "F.Mask")
+		(roundrect_rratio 0.25)
+	)
+	(pad "3" smd roundrect
+		(at 4.75 0)
+		(size 0.3 0.8)
+		(layers "F.Cu" "F.Paste" "F.Mask")
+		(roundrect_rratio 0.25)
+	)
+	(pad "4" smd roundrect
+		(at 4.25 0)
+		(size 0.3 0.8)
+		(layers "F.Cu" "F.Paste" "F.Mask")
+		(roundrect_rratio 0.25)
+	)
+	(pad "5" smd roundrect
+		(at 3.75 0)
+		(size 0.3 0.8)
+		(layers "F.Cu" "F.Paste" "F.Mask")
+		(roundrect_rratio 0.25)
+	)
+	(pad "6" smd roundrect
+		(at 3.25 0)
+		(size 0.3 0.8)
+		(layers "F.Cu" "F.Paste" "F.Mask")
+		(roundrect_rratio 0.25)
+	)
+	(pad "7" smd roundrect
+		(at 2.75 0)
+		(size 0.3 0.8)
+		(layers "F.Cu" "F.Paste" "F.Mask")
+		(roundrect_rratio 0.25)
+	)
+	(pad "8" smd roundrect
+		(at 2.25 0)
+		(size 0.3 0.8)
+		(layers "F.Cu" "F.Paste" "F.Mask")
+		(roundrect_rratio 0.25)
+	)
+	(pad "9" smd roundrect
+		(at 1.75 0)
+		(size 0.3 0.8)
+		(layers "F.Cu" "F.Paste" "F.Mask")
+		(roundrect_rratio 0.25)
+	)
+	(pad "10" smd roundrect
+		(at 1.25 0)
+		(size 0.3 0.8)
+		(layers "F.Cu" "F.Paste" "F.Mask")
+		(roundrect_rratio 0.25)
+	)
+	(pad "11" smd roundrect
+		(at 0.75 0)
+		(size 0.3 0.8)
+		(layers "F.Cu" "F.Paste" "F.Mask")
+		(roundrect_rratio 0.25)
+	)
+	(pad "12" smd roundrect
+		(at 0.25 0)
+		(size 0.3 0.8)
+		(layers "F.Cu" "F.Paste" "F.Mask")
+		(roundrect_rratio 0.25)
+	)
+	(pad "13" smd roundrect
+		(at -0.25 0)
+		(size 0.3 0.8)
+		(layers "F.Cu" "F.Paste" "F.Mask")
+		(roundrect_rratio 0.25)
+	)
+	(pad "14" smd roundrect
+		(at -0.75 0)
+		(size 0.3 0.8)
+		(layers "F.Cu" "F.Paste" "F.Mask")
+		(roundrect_rratio 0.25)
+	)
+	(pad "15" smd roundrect
+		(at -1.25 0)
+		(size 0.3 0.8)
+		(layers "F.Cu" "F.Paste" "F.Mask")
+		(roundrect_rratio 0.25)
+	)
+	(pad "16" smd roundrect
+		(at -1.75 0)
+		(size 0.3 0.8)
+		(layers "F.Cu" "F.Paste" "F.Mask")
+		(roundrect_rratio 0.25)
+	)
+	(pad "17" smd roundrect
+		(at -2.25 0)
+		(size 0.3 0.8)
+		(layers "F.Cu" "F.Paste" "F.Mask")
+		(roundrect_rratio 0.25)
+	)
+	(pad "18" smd roundrect
+		(at -2.75 0)
+		(size 0.3 0.8)
+		(layers "F.Cu" "F.Paste" "F.Mask")
+		(roundrect_rratio 0.25)
+	)
+	(pad "19" smd roundrect
+		(at -3.25 0)
+		(size 0.3 0.8)
+		(layers "F.Cu" "F.Paste" "F.Mask")
+		(roundrect_rratio 0.25)
+	)
+	(pad "20" smd roundrect
+		(at -3.75 0)
+		(size 0.3 0.8)
+		(layers "F.Cu" "F.Paste" "F.Mask")
+		(roundrect_rratio 0.25)
+	)
+	(pad "21" smd roundrect
+		(at -4.25 0)
+		(size 0.3 0.8)
+		(layers "F.Cu" "F.Paste" "F.Mask")
+		(roundrect_rratio 0.25)
+	)
+	(pad "22" smd roundrect
+		(at -4.75 0)
+		(size 0.3 0.8)
+		(layers "F.Cu" "F.Paste" "F.Mask")
+		(roundrect_rratio 0.25)
+	)
+	(pad "23" smd roundrect
+		(at -5.25 0)
+		(size 0.3 0.8)
+		(layers "F.Cu" "F.Paste" "F.Mask")
+		(roundrect_rratio 0.25)
+	)
+	(pad "24" smd roundrect
+		(at -5.75 0)
+		(size 0.3 0.8)
+		(layers "F.Cu" "F.Paste" "F.Mask")
+		(roundrect_rratio 0.25)
+	)
+	(pad "MP" smd rect
+		(at -6.75 2.5)
+		(size 0.4 0.8)
+		(layers "F.Cu" "F.Paste" "F.Mask")
+	)
+	(pad "MP" smd rect
+		(at 6.75 2.5)
+		(size 0.4 0.8)
+		(layers "F.Cu" "F.Paste" "F.Mask")
+	)
+	(fp_line
+		(start -6.69 -0.75)
+		(end 6.69 -0.75)
+		(stroke
+			(width 0.1)
+			(type solid)
+		)
+		(layer "F.Fab")
+	)
+	(fp_line
+		(start 6.69 -0.75)
+		(end 6.69 3.05)
+		(stroke
+			(width 0.1)
+			(type solid)
+		)
+		(layer "F.Fab")
+	)
+	(fp_line
+		(start 6.69 3.05)
+		(end -6.69 3.05)
+		(stroke
+			(width 0.1)
+			(type solid)
+		)
+		(layer "F.Fab")
+	)
+	(fp_line
+		(start -6.69 3.05)
+		(end -6.69 -0.75)
+		(stroke
+			(width 0.1)
+			(type solid)
+		)
+		(layer "F.Fab")
+	)
+	(fp_poly
+		(pts (xy 5.75 0.6) (xy 5.45 1.1) (xy 6.05 1.1))
+		(stroke
+			(width 0.1)
+			(type solid)
+		)
+		(fill yes)
+		(layer "F.Fab")
+	)
+	(fp_line
+		(start 0 5.25)
+		(end 0 3.25)
+		(stroke
+			(width 0.1)
+			(type solid)
+		)
+		(layer "F.Fab")
+	)
+	(fp_line
+		(start 0 3.25)
+		(end 0.3 3.7696)
+		(stroke
+			(width 0.1)
+			(type solid)
+		)
+		(layer "F.Fab")
+	)
+	(fp_line
+		(start 0 3.25)
+		(end -0.3 3.7696)
+		(stroke
+			(width 0.1)
+			(type solid)
+		)
+		(layer "F.Fab")
+	)
+	(fp_text user "FPC IN"
+		(at 2.2 4.35 0)
+		(layer "F.Fab")
+		(effects
+			(font
+				(size 0.7 0.7)
+				(thickness 0.105)
+			)
+		)
+	)
+	(fp_line
+		(start -6.35 3.15)
+		(end 6.35 3.15)
+		(stroke
+			(width 0.12)
+			(type solid)
+		)
+		(layer "F.SilkS")
+	)
+	(fp_line
+		(start -7.1 -0.75)
+		(end -7.1 1.9)
+		(stroke
+			(width 0.12)
+			(type solid)
+		)
+		(layer "F.SilkS")
+	)
+	(fp_line
+		(start -7.1 -0.75)
+		(end -6.1 -0.75)
+		(stroke
+			(width 0.12)
+			(type solid)
+		)
+		(layer "F.SilkS")
+	)
+	(fp_line
+		(start 7.1 -0.75)
+		(end 7.1 1.9)
+		(stroke
+			(width 0.12)
+			(type solid)
+		)
+		(layer "F.SilkS")
+	)
+	(fp_line
+		(start 7.1 -0.75)
+		(end 6.1 -0.75)
+		(stroke
+			(width 0.12)
+			(type solid)
+		)
+		(layer "F.SilkS")
+	)
+	(fp_line
+		(start 5.75 -0.75)
+		(end 5.75 -1.05)
+		(stroke
+			(width 0.12)
+			(type solid)
+		)
+		(layer "F.SilkS")
+	)
+	(fp_rect
+		(start -7.25 -1)
+		(end 7.25 3.3)
+		(stroke
+			(width 0.05)
+			(type solid)
+		)
+		(fill no)
+		(layer "F.CrtYd")
+	)
+	(fp_text user "${REFERENCE}"
+		(at 0 1.25 0)
+		(layer "F.Fab")
+		(effects
+			(font
+				(size 0.5 0.5)
+				(thickness 0.08)
+			)
+		)
+	)
+	(embedded_fonts no)
+	(model "${KIPRJMOD}/lib/irl2fa.3dshapes/Hirose_FH34SRJ-24S-0.5SH_1x24-1MP_P0.50mm_Horizontal.step"
+		(offset
+			(xyz 0 0 0)
+		)
+		(scale
+			(xyz 1 1 1)
+		)
+		(rotate
+			(xyz 0 0 0)
+		)
+	)
+)

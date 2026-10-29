@@ -1,0 +1,51 @@
+* GDEY0213B74 booster (reference circuit): L1 47 uH, Si1308EDL (modelled as a
+* switch with its 185 mohm Rds(on)), 3x MBR0530.
+* The SSD1680 regulates VGH at 20 V; its loop is modelled as a gate enable
+* that stops switching above 22 V on PREVGH. Checks: PREVGH/PREVGL reach
+* +/-20 V within the soft-start budget, the inductor peak current stays
+* inside L1's 500 mA rating and the switch never sees more than 30 V.
+* Assumed switching: 2.5 us on / 8 us off (about 95 kHz), starting 1 ms after
+* the panel is powered. Assumed regulator loads: 0.5 mA on each rail.
+.include models.lib
+* VEPD ramps up through the load switch (Q2) in about 200 us
+Vin vepd 0 PWL(0 0 200u 3.0)
+C4 vepd 0 4.7u
+L1 vepd lx 47u
+RL1 lx sw 0.6
+Csw sw 0 60p
+S1 sw rese gdr 0 SWM
+.model SWM SW(Ron=0.185 Roff=10Meg Vt=1.5 Vh=0.3)
+Db rese sw DBODY
+R2 rese 0 2.2
+Vpwm pwm 0 PULSE(0 3 1m 50n 50n 2.5u 10.5u)
+Bgate gdr 0 V = V(pwm) * (V(prevgh) < 22 ? 1 : 0)
+Rg gdr 0 1Meg
+* positive rail
+D3 sw prevgh MBR0530
+C5 prevgh 0 0.7u
+Ivgh prevgh 0 0.5m
+* negative charge pump
+C3 sw nn 3u
+D2 nn 0 MBR0530
+D1 prevgl nn MBR0530
+C11 prevgl 0 0.7u
+Ivgl 0 prevgl 0.5m
+.options method=gear
+.tran 50n 30m uic
+.control
+run
+meas tran vgh_end AVG v(prevgh) from=25m to=30m
+meas tran vgl_end AVG v(prevgl) from=25m to=30m
+meas tran t_vgh WHEN v(prevgh)=20 RISE=1
+meas tran ilpk MAX i(L1) from=1m to=30m
+meas tran ilin MAX i(L1) from=0 to=1m
+meas tran vds_max MAX v(sw) from=0 to=30m
+echo "RESULT vgh_end $&vgh_end"
+echo "RESULT vgl_end $&vgl_end"
+echo "RESULT t_vgh $&t_vgh"
+echo "RESULT il_peak $&ilpk"
+echo "RESULT il_poweron $&ilin"
+echo "RESULT vds_max $&vds_max"
+quit
+.endc
+.end

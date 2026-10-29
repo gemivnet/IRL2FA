@@ -1,0 +1,60 @@
+# Browser simulator: build the firmware to WebAssembly, test it, and publish
+# it to GitHub Pages from main.
+# SPDX-License-Identifier: AGPL-3.0-or-later
+name: sim
+
+on:
+  push:
+    paths: ['firmware/**', 'sim/**', 'hardware/power/**', '.github/workflows/sim.yml']
+  pull_request:
+    paths: ['firmware/**', 'sim/**', 'hardware/power/**', '.github/workflows/sim.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sim-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Firmware host tests
+        run: make -C firmware test
+
+      - name: Build (emscripten/emsdk:3.1.74 in docker)
+        run: sim/build.sh
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Simulator tests
+        run: node --test sim/test
+
+      - name: Custom domain (only if sim/web/CNAME exists)
+        run: |
+          if [ -f sim/web/CNAME ]; then cp sim/web/CNAME sim/dist/CNAME; else rm -f sim/dist/CNAME; fi
+
+      - uses: actions/upload-pages-artifact@v3
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        with:
+          path: sim/dist
+
+  deploy:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: build
+    runs-on: ubuntu-24.04
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

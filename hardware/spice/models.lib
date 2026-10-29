@@ -1,0 +1,37 @@
+* IRL2FA behavioural models. Fitted to datasheet headline figures only; they
+* are good enough for the margins checked in the benches, not for detailed
+* analysis. SPDX-License-Identifier: CERN-OHL-S-2.0
+
+* MBR0530 Schottky (30 V, 0.5 A, Vf ~0.38 V @ 100 mA)
+.model MBR0530 D(Is=2.6u Rs=0.15 N=1.0 Cjo=170p M=0.5 Bv=30 Ibv=20u)
+* Si1308EDL N-FET (Vth 0.6-1.5 V, Rds(on) 185 mohm @ 2.5 V); body diode added in subckt
+.model SI1308 NMOS(Level=1 VTO=1.0 KP=3.6 CGSO=1n CGDO=0.2n)
+* AO3401A P-FET (Vth -0.9 V, Rds(on) 85 mohm @ -2.5 V)
+.model AO3401 PMOS(Level=1 VTO=-0.9 KP=7.4)
+* AO3400A N-FET (Vth 1.05 V, Rds(on) 48 mohm @ 2.5 V)
+.model AO3400 NMOS(Level=1 VTO=1.05 KP=14.4)
+* Body diodes
+.model DBODY D(Is=1e-12 N=1.2 Rs=0.05)
+* VSMB2948SL IR emitter (Vf ~1.25 V @ 20 mA)
+.model IRLED D(Is=2e-16 N=1.5 Rs=1.0)
+
+* P-FET with body diode: drain gate source
+.subckt PFET d g s
+M1 d g s s AO3401
+Db d s DBODY
+.ends
+* N-FET with body diode: drain gate source
+.subckt NFET_SW d g s
+M1 d g s s SI1308
+Db s d DBODY
+.ends
+.subckt NFET_LED d g s
+M1 d g s s AO3400
+Db s d DBODY
+.ends
+
+* CR2450 coin cell: open-circuit voltage and internal resistance as params
+.subckt CELL p n params: voc=3.0 rint=15
+V1 x n {voc}
+R1 x p {rint}
+.ends

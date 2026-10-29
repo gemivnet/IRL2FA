@@ -1,0 +1,232 @@
+<!doctype html>
+<!-- IRL2FA browser simulator. SPDX-License-Identifier: AGPL-3.0-or-later -->
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>IRL2FA simulator</title>
+  <meta name="description" content="Try IRL2FA in your browser: two simulated air-gapped 2FA devices running the real firmware, pairing over IR and showing verification words and TOTP codes.">
+  <meta name="color-scheme" content="light dark">
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="style.css">
+  <script type="module" src="app.js"></script>
+</head>
+<body>
+  <header class="top">
+    <div class="wrap top-inner">
+      <a class="brand" href="#" aria-label="IRL2FA simulator">
+        <img src="favicon.svg" alt="" width="28" height="28">
+        <span>IRL2FA <em>simulator</em></span>
+      </a>
+      <nav class="top-links" aria-label="Project links">
+        <a href="#about">About</a>
+        <a href="https://irl2fa.com">irl2fa.com</a>
+        <a href="https://github.com/gemivnet/IRL2FA">GitHub</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <p class="lede">
+      Two devices running the <strong>real IRL2FA firmware</strong>, compiled to WebAssembly.
+      Pair them over infrared, compare the six symbols, then watch each one show the word the other
+      expects to hear. Everything is driven by the 5-way joystick, just like the hardware.
+    </p>
+
+    <noscript><p class="notice">The simulator needs JavaScript and WebAssembly.</p></noscript>
+    <p class="notice" id="load-error" hidden></p>
+
+    <section class="stage" id="stage" aria-label="Simulated devices">
+      <canvas class="beam" id="beam" aria-hidden="true"></canvas>
+      <div class="devices">
+        <div class="unit" data-dev="0">
+          <div class="unit-head">
+            <h2>Your device</h2>
+            <span class="chips"><span class="chip" data-role="screen">Starting…</span><span class="chip ir" data-role="ir" hidden>IR on</span></span>
+          </div>
+          <div class="shell">
+            <div class="device" tabindex="0" role="group" aria-roledescription="device"
+                 aria-label="Your device. Focus and use the arrow keys and Enter to work the joystick.">
+              <span class="irwin rx" title="IR receiver"></span>
+              <span class="irwin tx" title="IR emitter"></span>
+              <div class="window"><canvas class="epd" width="250" height="122" role="img" aria-label="E-paper display"></canvas></div>
+              <div class="joy" aria-label="Joystick">
+                <span class="joy-marks" aria-hidden="true"></span>
+                <button type="button" class="dir up" data-btn="UP" tabindex="-1" aria-label="Joystick up"></button>
+                <button type="button" class="dir right" data-btn="RIGHT" tabindex="-1" aria-label="Joystick right"></button>
+                <button type="button" class="dir down" data-btn="DOWN" tabindex="-1" aria-label="Joystick down"></button>
+                <button type="button" class="dir left" data-btn="LEFT" tabindex="-1" aria-label="Joystick left"></button>
+                <button type="button" class="cap" data-btn="CENTER" tabindex="-1" aria-label="Joystick press (centre)"><span></span></button>
+              </div>
+              <span class="mark" aria-hidden="true">IRL2FA</span>
+            </div>
+          </div>
+          <div class="pad" aria-label="Touch joystick for your device">
+            <button type="button" data-btn="UP" aria-label="Up">▲</button>
+            <button type="button" data-btn="LEFT" aria-label="Left">◀</button>
+            <button type="button" data-btn="CENTER" aria-label="Press">●</button>
+            <button type="button" data-btn="RIGHT" aria-label="Right">▶</button>
+            <button type="button" data-btn="DOWN" aria-label="Down">▼</button>
+          </div>
+          <label class="skew">
+            <span>Clock skew <output data-role="skew-out">0 s</output></span>
+            <input type="range" min="-60" max="60" step="1" value="0" data-role="skew" aria-label="Clock skew of your device in seconds">
+          </label>
+        </div>
+
+        <div class="unit" data-dev="1">
+          <div class="unit-head">
+            <h2>Their device</h2>
+            <span class="chips"><span class="chip" data-role="screen">Starting…</span><span class="chip ir" data-role="ir" hidden>IR on</span></span>
+          </div>
+          <div class="shell">
+            <div class="device" tabindex="0" role="group" aria-roledescription="device"
+                 aria-label="Their device. Focus and use the arrow keys and Enter to work the joystick.">
+              <span class="irwin rx" title="IR receiver"></span>
+              <span class="irwin tx" title="IR emitter"></span>
+              <div class="window"><canvas class="epd" width="250" height="122" role="img" aria-label="E-paper display"></canvas></div>
+              <div class="joy" aria-label="Joystick">
+                <span class="joy-marks" aria-hidden="true"></span>
+                <button type="button" class="dir up" data-btn="UP" tabindex="-1" aria-label="Joystick up"></button>
+                <button type="button" class="dir right" data-btn="RIGHT" tabindex="-1" aria-label="Joystick right"></button>
+                <button type="button" class="dir down" data-btn="DOWN" tabindex="-1" aria-label="Joystick down"></button>
+                <button type="button" class="dir left" data-btn="LEFT" tabindex="-1" aria-label="Joystick left"></button>
+                <button type="button" class="cap" data-btn="CENTER" tabindex="-1" aria-label="Joystick press (centre)"><span></span></button>
+              </div>
+              <span class="mark" aria-hidden="true">IRL2FA</span>
+            </div>
+          </div>
+          <div class="pad" aria-label="Touch joystick for their device">
+            <button type="button" data-btn="UP" aria-label="Up">▲</button>
+            <button type="button" data-btn="LEFT" aria-label="Left">◀</button>
+            <button type="button" data-btn="CENTER" aria-label="Press">●</button>
+            <button type="button" data-btn="RIGHT" aria-label="Right">▶</button>
+            <button type="button" data-btn="DOWN" aria-label="Down">▼</button>
+          </div>
+          <label class="skew">
+            <span>Clock skew <output data-role="skew-out">0 s</output></span>
+            <input type="range" min="-60" max="60" step="1" value="0" data-role="skew" aria-label="Clock skew of their device in seconds">
+          </label>
+        </div>
+      </div>
+
+      <div class="linkbar">
+        <label class="switch big">
+          <input type="checkbox" id="together">
+          <span class="track" aria-hidden="true"></span>
+          <span>Hold devices together <small>(top edge to top edge, so IR can pass)</small></span>
+        </label>
+        <label class="switch">
+          <input type="checkbox" id="noisy">
+          <span class="track" aria-hidden="true"></span>
+          <span>Noisy link <small>(drop 10% of frames)</small></span>
+        </label>
+        <span class="irstats" id="irstats" aria-live="off">IR idle</span>
+      </div>
+      <p class="hint" id="kbd-hint">Click a device (or Tab to it) and use <kbd>←</kbd> <kbd>↑</kbd> <kbd>→</kbd> <kbd>↓</kbd> and <kbd>Enter</kbd>. Hold a direction to repeat.</p>
+    </section>
+
+    <section class="try" aria-label="Things to try">
+      <ol>
+        <li>On <b>both</b> devices choose <b>Pair with someone</b>, then switch on <b>Hold devices together</b>.</li>
+        <li>Check the six symbols match on both screens and press the joystick on each.</li>
+        <li>Name the contact. Now one device's <b>SAY</b> word is the other's <b>HEAR</b> word.</li>
+      </ol>
+    </section>
+
+    <div class="panels">
+      <section class="panel" aria-labelledby="time-h">
+        <h3 id="time-h">Time</h3>
+        <div class="clock" id="clock" aria-live="off">--</div>
+        <div class="seg" role="radiogroup" aria-label="Simulation speed">
+          <button type="button" role="radio" aria-checked="true" data-warp="1">Real time</button>
+          <button type="button" role="radio" aria-checked="false" data-warp="10">×10</button>
+          <button type="button" role="radio" aria-checked="false" data-warp="60">×60</button>
+        </div>
+        <button type="button" class="btn ghost" id="now-btn">Back to the real clock</button>
+        <p class="small">Both devices share this UTC clock. Use the skew sliders under each device to
+          drift one clock by up to a minute: words change every 15 s, and each device also accepts the
+          previous word (“or …”), so small skews still verify. While you hold a button the simulation runs
+          in real time.</p>
+      </section>
+
+      <section class="panel" aria-labelledby="totp-h">
+        <h3 id="totp-h">Reference TOTP</h3>
+        <label class="field">
+          <span>Base32 secret</span>
+          <input type="text" id="totp-secret" value="JBSWY3DPEHPK3PXP" autocomplete="off" spellcheck="false" autocapitalize="characters">
+        </label>
+        <div class="totp-out">
+          <div><span class="totp-code" id="totp-real">------</span><span class="small">real clock</span></div>
+          <div class="ring" id="totp-ring" aria-hidden="true"></div>
+        </div>
+        <p class="small" id="totp-sim"></p>
+        <div class="row">
+          <button type="button" class="btn" id="demo-btn">Load demo data</button>
+          <button type="button" class="btn ghost" id="reset-btn">Reset both devices</button>
+        </div>
+        <p class="small">Demo data adds two codes to <b>your device</b>, including
+          <code>JBSWY3DPEHPK3PXP</code>: add the same secret to a phone authenticator and the codes match.
+          Computed here with Web Crypto HMAC-SHA1; nothing is stored or sent anywhere.</p>
+      </section>
+
+      <section class="panel" aria-labelledby="bat-h">
+        <h3 id="bat-h">Battery</h3>
+        <table class="energy" id="energy">
+          <thead><tr><th scope="col"></th><th scope="col">Yours</th><th scope="col">Theirs</th></tr></thead>
+          <tbody>
+            <tr><th scope="row">Used</th><td data-e="0:used">–</td><td data-e="1:used">–</td></tr>
+            <tr><th scope="row">Awake / asleep</th><td data-e="0:split">–</td><td data-e="1:split">–</td></tr>
+            <tr><th scope="row">Refreshes full / fast</th><td data-e="0:ref">–</td><td data-e="1:ref">–</td></tr>
+            <tr><th scope="row">IR on</th><td data-e="0:ir">–</td><td data-e="1:ir">–</td></tr>
+            <tr><th scope="row">Average</th><td data-e="0:avg">–</td><td data-e="1:avg">–</td></tr>
+            <tr><th scope="row">Life at this pace</th><td data-e="0:life">–</td><td data-e="1:life">–</td></tr>
+          </tbody>
+        </table>
+        <div class="profile">
+          <span id="profile-name">20 uses/day</span>
+          <strong id="profile-life">–</strong>
+        </div>
+        <label class="field inline">
+          <span>Cell voltage <output id="mv-out">3.00 V</output></span>
+          <input type="range" id="mv" min="2300" max="3100" step="10" value="3000" aria-label="Simulated cell voltage">
+        </label>
+        <details class="small">
+          <summary>Power model</summary>
+          <p id="model-src"></p>
+          <ul id="model-list"></ul>
+        </details>
+      </section>
+    </div>
+
+    <section class="about" id="about" aria-labelledby="about-h">
+      <h3 id="about-h">About IRL2FA</h3>
+      <div class="about-grid">
+        <div>
+          <p><strong>IRL2FA</strong> is an open-source, air-gapped hardware token the size of a stick of gum:
+            a 2.13″ e-paper screen, a 5-way joystick, an infrared link and a CR2450 coin cell. It has no USB data,
+            no radio and no network.</p>
+          <p><strong>Person-to-person verification.</strong> Two people pair their devices once, in person, over IR
+            (an X25519 key agreement checked by comparing six symbols on both screens). From then on each device shows a
+            pair of words that changes every 15 seconds: the word you <em>say</em> and the word you should
+            <em>hear</em>. When a call or message claims to be from them, ask for the word. A voice clone or a
+            hijacked account can't know it.</p>
+        </div>
+        <div>
+          <p><strong>Standard TOTP.</strong> It is also an ordinary authenticator for the 6- or 8-digit codes websites
+            use (RFC 6238), entered by hand from the base32 secret and kept encrypted on the device.</p>
+          <p><strong>Joystick only.</strong> Up, down, left, right and press are the whole interface, PIN included.</p>
+          <p>This simulator runs the same C firmware as the device (AGPL-3.0), compiled to WebAssembly, on a
+            virtual board. Nothing you do here leaves your browser.</p>
+          <p class="links"><a class="btn" href="https://irl2fa.com">irl2fa.com</a>
+            <a class="btn ghost" href="https://github.com/gemivnet/IRL2FA">Source on GitHub</a></p>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="foot wrap">
+    <span>IRL2FA · firmware and simulator AGPL-3.0 · hardware CERN-OHL-S-2.0</span>
+  </footer>
+</body>
+</html>

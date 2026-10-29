@@ -1,0 +1,19 @@
+* A CR2450 inserted backwards: Q1 must block it. Checks the reverse current
+* drawn from the cell and the most negative voltage the circuit sees.
+.include models.lib
+X1 vcell 0 CELL voc=-3.0 rint=15
+Vsense vcell vraw 0
+XQ1 vraw 0 vbat PFET
+C1 vbat 0 50u
+Rload vbat 0 3k
+.tran 10u 20m
+.control
+run
+meas tran vbat_min MIN v(vbat) from=1m to=20m
+let iabs = abs(i(Vsense))
+meas tran ileak MAX iabs from=10m to=20m
+echo "RESULT vbat_min $&vbat_min"
+echo "RESULT ileak $&ileak"
+quit
+.endc
+.end

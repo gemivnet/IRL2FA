@@ -1,0 +1,86 @@
+# Hardware CI: every change to the electronics is simulated and checked
+# before it can reach the Gerbers people order.
+#   ERC / DRC (with schematic parity) against JLCPCB-capable rules
+#   netlist checks against hardware/pins.yaml (and so against the firmware)
+#   SPICE benches for the power, booster, reverse-battery and IR circuits
+#   battery-life budget >= 1 year worst case
+#   fabrication outputs regenerated and compared with hardware/fab/
+#   Gerber/drill/BOM/CPL sanity checks
+# SPDX-License-Identifier: CERN-OHL-S-2.0
+name: hardware
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build the KiCad + test-tools image
+        run: docker build -t irl2fa-hw hardware/ci
+
+      - name: ERC
+        run: |
+          docker run --rm -u "$(id -u):$(id -g)" -e HOME=/tmp -v "$PWD":/w -w /w irl2fa-hw \
+            kicad-cli sch erc --severity-error --exit-code-violations -o /tmp/erc.rpt hardware/irl2fa.kicad_sch \
+            || { docker run --rm -u "$(id -u):$(id -g)" -e HOME=/tmp -v "$PWD":/w -w /w irl2fa-hw \
+                   bash -c 'kicad-cli sch erc --severity-error -o /tmp/erc.rpt hardware/irl2fa.kicad_sch; cat /tmp/erc.rpt'; exit 1; }
+
+      - name: DRC (with schematic parity)
+        run: |
+          docker run --rm -u "$(id -u):$(id -g)" -e HOME=/tmp -v "$PWD":/w -w /w irl2fa-hw bash -c '
+            kicad-cli pcb drc --schematic-parity --severity-error --exit-code-violations -o /tmp/drc.rpt hardware/irl2fa.kicad_pcb \
+            || { cat /tmp/drc.rpt; exit 1; }'
+
+      - name: Netlist, SPICE, power budget and fabrication checks
+        run: |
+          docker run --rm -u "$(id -u):$(id -g)" -e HOME=/tmp -v "$PWD":/w -w /w irl2fa-hw \
+            python3 -m pytest -v hardware/tests
+
+      - name: Board renders and fresh fabrication outputs
+        if: always()
+        run: |
+          mkdir -p out
+          docker run --rm -u "$(id -u):$(id -g)" -e HOME=/tmp -v "$PWD":/w -w /w irl2fa-hw bash -c '
+            python3 hardware/tools/fab.py --out out/fab &&
+            kicad-cli pcb render --side top --quality high -w 1600 -h 900 -o out/pcb-top.png hardware/irl2fa.kicad_pcb &&
+            kicad-cli pcb render --side bottom --quality high -w 1600 -h 900 -o out/pcb-bottom.png hardware/irl2fa.kicad_pcb'
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: hardware-outputs
+          path: out/
+
+  diff:
+    # Before/after schematic and PCB renders for pull requests, for visual review.
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Render before/after
+        run: |
+          docker build -t irl2fa-hw hardware/ci
+          mkdir -p diff/before diff/after
+          git worktree add ../base "${{ github.event.pull_request.base.sha }}"
+          for side in before after; do
+            src=$PWD; [ "$side" = before ] && src=$(realpath ../base)
+            docker run --rm -u "$(id -u):$(id -g)" -e HOME=/tmp -v "$src":/w -v "$PWD/diff/$side":/o -w /w irl2fa-hw bash -c '
+              [ -f hardware/irl2fa.kicad_pcb ] || exit 0
+              kicad-cli sch export svg -o /o hardware/irl2fa.kicad_sch
+              kicad-cli pcb export svg --mode-single -l F.Cu,F.SilkS,Edge.Cuts -o /o/pcb-front.svg hardware/irl2fa.kicad_pcb
+              kicad-cli pcb export svg --mode-single -l B.Cu,B.SilkS,Edge.Cuts --mirror -o /o/pcb-back.svg hardware/irl2fa.kicad_pcb'
+          done
+      - uses: actions/upload-artifact@v4
+        with:
+          name: hardware-visual-diff
+          path: diff/
