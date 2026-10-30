@@ -10,7 +10,7 @@
 | Size | 77 × 31 mm, corner radius 2.6 mm, 0.8 mm FR-4, ENIG finish (the cell's negative contact is a bare pad) |
 | Layers | 2, with a ground pour on both |
 | Rules | 0.15 mm signal / 0.4 mm power tracks, 0.15 mm clearance, 0.6/0.3 mm vias. Within JLCPCB's standard 2-layer process (board minimum set to their 0.1 mm capability) |
-| Assembly | both sides: the joystick on the front, everything else on the back |
+| Assembly | both sides: the joystick on the front, everything else on the back. JLCPCB Standard PCBA as a 1 × 2 panel with edge rails; see [assembly-review.md](assembly-review.md) |
 | Files | `hardware/irl2fa.kicad_sch`, `hardware/irl2fa.kicad_pcb` (KiCad 9) |
 
 ## Layout
@@ -53,6 +53,8 @@ The first version of the schematic and PCB was generated from
 
 **Back-side placement mirrors parts top to bottom.** A part placed on the back at rotation 0 has its footprint's top edge at the bottom. That matters for any part with a direction the copper doesn't show. The side-looking IR LED and phototransistor are placed at 180° so their lenses face out through the top edge, and `hardware/tests/test_orientation.py` checks it. (Up to this change they were placed at 0°, facing into the board; the symmetric pads hid it from ERC, DRC and the footprint checks.)
 
+**The placement file is not KiCad's.** JLCPCB places parts from its own library footprints and reads back-side angles as seen from the back, so `hardware/tools/fab.py` turns KiCad's angle `a` into `180 - a` on the back and adds a per-part correction where JLCPCB's footprint is drawn differently from ours (SOT-23 and SC-70 by 180°, the RV-3032 by 270°, the FPC connector's origin by 1.25 mm). The table is `fab.JLC`, with the evidence for each part; `hardware/tests/test_assembly.py` places JLCPCB's pads with the generated file and checks each lands on ours. A new part needs an entry there. See [assembly-review.md](assembly-review.md).
+
 **From now on, the KiCad files are the source.** Open them in KiCad 9 and edit them like any project. Hand-tidy the autorouted tracks if you like: CI checks the result, not how it was made. `build_pcb.sh` overwrites both files, so only re-run it if you want to start again from `design.py`.
 
 Footprints, symbols and 3D models for the parts KiCad doesn't ship were drawn from the manufacturers' datasheets by `hardware/tools/gen_footprints.py` and `gen_models.py`. See [hardware/lib/README.md](../hardware/lib/README.md) for sources and dimensions.
@@ -64,6 +66,7 @@ Every push runs the following. Details are in [hardware-testing.md](hardware-tes
 - ERC
 - DRC with schematic parity, with silkscreen overlaps, silkscreen on pads and silkscreen at the board edge as errors
 - the IR parts facing out through the top edge
+- JLCPCB's own footprints, placed with the CPL, landing on ours pin for pin; fine-pitch mask dams, paste, tenting and stock
 - netlist against `pins.yaml`
 - SPICE benches
 - the power budget

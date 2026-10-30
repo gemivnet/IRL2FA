@@ -96,11 +96,15 @@ It behaves like the hardware, not just like the firmware:
 
 You need a PCB, a display, a coin cell, a printed case and four screws. Everything to order is committed and kept current by CI.
 
-1. **Order the assembled board.**
-   - At [JLCPCB](https://jlcpcb.com), upload [`hardware/fab/irl2fa-gerbers.zip`](hardware/fab/irl2fa-gerbers.zip).
-   - Choose 0.8 mm thickness, the **ENIG** surface finish (a bare pad is the coin cell's negative contact) and PCB Assembly on **both sides**.
-   - Add [`irl2fa-bom-jlcpcb.csv`](hardware/fab/irl2fa-bom-jlcpcb.csv) and [`irl2fa-cpl-jlcpcb.csv`](hardware/fab/irl2fa-cpl-jlcpcb.csv).
-   - Every part has an LCSC number. The [BOM](docs/bill-of-materials.md) lists prices, stock and alternatives.
+1. **Order the assembled board** from [JLCPCB](https://jlcpcb.com). The form has a few answers that would spoil the boards; [docs/assembly-review.md](docs/assembly-review.md#ordering-at-jlcpcb) explains each one.
+   - Upload [`hardware/fab/irl2fa-gerbers.zip`](hardware/fab/irl2fa-gerbers.zip) and keep the detected size (77 × 31 mm) and 2 layers.
+   - **Delivery format: Panel by JLCPCB**, 1 column × 2 rows, with **edge rails** on the long sides, joined by **stamp holes (mouse bites), not V-cut**. Assembling both sides needs Standard PCBA, which only takes boards or panels of at least 70 × 70 mm.
+   - **PCB thickness 0.8 mm**, **surface finish ENIG** (a bare pad is the coin cell's negative contact), **via covering Tented**, 1 oz copper, any colour.
+   - **Remove order number: Yes**: the board has no spot reserved for it.
+   - Turn on **PCB Assembly**: **PCBA type Standard**, **assembly side Both sides** (the joystick is on the front, everything else on the back), **tooling holes added by JLCPCB**, **Confirm Parts Placement: Yes**.
+   - Add [`irl2fa-bom-jlcpcb.csv`](hardware/fab/irl2fa-bom-jlcpcb.csv) and [`irl2fa-cpl-jlcpcb.csv`](hardware/fab/irl2fa-cpl-jlcpcb.csv). Every part has an LCSC number. The [BOM](docs/bill-of-materials.md) lists JLCPCB's stock, Basic/Extended parts and alternatives. The MCU and the RTC are often short, so check them before paying.
+   - The placement file is already corrected for JLCPCB's own footprints. On the placement preview, check the polarised parts against the [expected-view table](docs/assembly-review.md#what-the-placement-preview-must-show), especially the IR LED and phototransistor (lenses at the top edge) and the coin-cell clip (open end at the bottom edge).
+   - Paste the [order remark](docs/assembly-review.md#order-remark) into the remark box.
    - To solder it yourself, use the [interactive BOM](https://irl2fa.com/ibom.html).
 2. **Buy the display.** A [Good Display GDEY0213B74](https://www.good-display.com/product/391.html) (about $5), or the GDEM0213B74WT if it has to work below 0 °C.
 3. **Print the case.**

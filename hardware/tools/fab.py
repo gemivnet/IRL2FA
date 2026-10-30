@@ -22,6 +22,7 @@ SPDX-License-Identifier: CERN-OHL-S-2.0
 import argparse
 import csv
 import io
+import math
 import re
 import shutil
 import subprocess
@@ -39,6 +40,99 @@ LAYERS = "F.Cu,B.Cu,F.Paste,B.Paste,F.SilkS,B.SilkS,F.Mask,B.Mask,Edge.Cuts"
 VOLATILE = re.compile(r"(CreationDate|GenerationSoftware|^; ?DRILL file|^;.*date|Date:|"
                       r"^%TF\.ProjectId|^G04 Created by|^; #@! TF\.CreationDate|/CreationDate|"
                       r"/ModDate|^\s*<dc:date>|\"date\")", re.I)
+
+
+# --------------------------------------------------------------------------
+# JLCPCB placement corrections (docs/assembly-review.md, findings A-01..A-03)
+#
+# JLCPCB does not use our footprints. It places each part from the footprint in
+# its own library (the EasyEDA/LCSC one for that LCSC number), turned by the CPL
+# rotation and centred on the CPL position. So the CPL has to describe *their*
+# footprint, not ours:
+#
+#   rotation  top:    (kicad + rot) % 360
+#             bottom: (180 - kicad + rot) % 360
+#   position  our footprint anchor moved by `origin`, the point of our
+#             footprint (library frame, mm, y down) where JLCPCB's footprint
+#             has its origin.
+#
+# `rot` is the angle that turns JLCPCB's footprint onto ours (both unrotated, top
+# view, counter-clockwise positive). The bottom-side rule is JLCPCB's current
+# convention, as used by kicad-jlcpcb-tools (fabrication.py, "bottom angles need
+# to be mirrored on Y-axis": 180 - rotation), JLCKicadTools (cpl_fix_rotations.py,
+# "(-rotation + 180) % 360", noting JLCPCB changed it in 2020 and twice in 2022)
+# and KiBot (rot_footprint mirror_bottom: "180 - component rot + angle"). It is
+# what you get by looking at the back of the board (mirrored left-right): KiCad
+# flips a back-side footprint top-to-bottom, so a back part at KiCad angle a is
+# seen from the back unmirrored at 180 - a. KiCad's own position file writes `a`
+# unchanged, which is right for parts whose JLCPCB footprint is symmetric or
+# was placed at 90/270 deg, and wrong by 180 deg for everything else.
+#
+# Evidence: pad centres of each EasyEDA footprint were fetched from
+# easyeda.com/api/products/<LCSC>/components on 2026-10-30 and matched to our
+# library footprint pad by pad (hardware/tests/jlc_footprints.yaml keeps the
+# fetched pads, and hardware/tests/test_assembly.py places them with this CPL
+# and checks they land on our pads).
+JLC = {
+    # LCSC: (rot, origin, evidence)
+    "C964845": (0, (0.0, 0.0), "MY-2450-01 clip: EasyEDA BAT-SMD_MY-2450-01, legs (+) at x=+-15.33, "
+                "centre pad (-) at the origin, chamfered closed end at +y like ours. "
+                "Pads are symmetric: only the body says which way the cell goes in."),
+    "C16780": (0, (0.0, 0.0), "0805 capacitor, EasyEDA C0805, pad 1 at -x like KiCad"),
+    "C1525": (0, (0.0, 0.0), "0402 capacitor, EasyEDA C0402, pad 1 at -x"),
+    "C19666": (0, (0.0, 0.0), "0603 capacitor, EasyEDA C0603, pad 1 at -x"),
+    "C52923": (0, (0.0, 0.0), "0402 capacitor, EasyEDA C0402, pad 1 at -x"),
+    "C15195": (0, (0.0, 0.0), "0402 capacitor, EasyEDA C0402, pad 1 at -x"),
+    "C1779": (0, (0.0, 0.0), "0805 capacitor, EasyEDA C0805, pad 1 at -x"),
+    "C15849": (0, (0.0, 0.0), "0603 capacitor, EasyEDA C0603, pad 1 at -x"),
+    "C77336": (0, (0.0, 0.0), "MBR0530 SOD-123: EasyEDA SOD-123_L2.8-W1.8-LS3.7-RD, pad 1 = cathode "
+               "(symbol pin C) at -x with the cathode bar, as KiCad D_SOD-123"),
+    "C6604342": (0, (0.0, 0.0), "VSMB2948SL: NO EasyEDA footprint (API 404). Assumed drawn like "
+                 "C511451, the same Vishay side-view package: pad 1 at +x, lens towards +y, as ours. "
+                 "Check it in JLCPCB's placement preview (finding A-05)."),
+    "C324726": (0, (0.0, 1.25), "FH34SRJ-24S-0.5SH(50): EasyEDA FFC-SMD_24P-P0.50_FH34SRJ-24S-0.5SH, "
+                "pad 1 at +x as ours, but its origin is the pad-field centre, midway between the "
+                "signal row and the fitting nails: 1.25 mm from our anchor (finding A-02)"),
+    "C7427088": (0, (0.0, 0.0), "ANR3015T470M: NO EasyEDA footprint (API 404). Unpolarised 3x3 mm; "
+                 "assumed centred with terminals along x like ours"),
+    "C15127": (180, (0.0, 0.0), "AO3401A SOT-23: EasyEDA SOT-23_L2.9-W1.3-P1.90-LS2.4-BR has pins 1,2 "
+               "at +x and pin 3 at -x; KiCad SOT-23 has pins 1,2 at -x. The well-known SOT-23 180"),
+    "C469327": (180, (0.0, 0.0), "Si1308EDL SC-70: EasyEDA SOT-323_L2.0-W1.3-P1.30-LS2.1-BR, pins 1,2 at "
+                "+x, pin 3 at -x; KiCad SOT-323_SC-70 is the other way round"),
+    "C20917": (180, (0.0, 0.0), "AO3400A SOT-23: EasyEDA SOT-23-3_L2.9-W1.3-P1.90-LS2.4-BR, pins 1,2 at +x"),
+    "C511451": (0, (0.0, 0.0), "VEMT2523SLX01: EasyEDA SENSOR-SMD_VEMT2523SLX01, pad 1 (C) at +x, lens "
+                "arc on the silkscreen at +y; ours has pad 1 = C at +x, lens at -y in KiCad's y-down "
+                "frame, i.e. the same way up"),
+    "C25744": (0, (0.0, 0.0), "0402 resistor, EasyEDA R0402"),
+    "C25900": (0, (0.0, 0.0), "0402 resistor, EasyEDA R0402"),
+    "C25741": (0, (0.0, 0.0), "0402 resistor, EasyEDA R0402"),
+    "C26083": (0, (0.0, 0.0), "0402 resistor, EasyEDA R0402"),
+    "C25101": (0, (0.0, 0.0), "0402 resistor, EasyEDA R0402"),
+    "C25076": (0, (0.0, 0.0), "0402 resistor, EasyEDA R0402"),
+    "C139794": (0, (0.0, 0.0), "SKRHABE010: EasyEDA SW-SMD_SKRHABE010, pads 1-3 at -x (1 at top), 4-6 at "
+                "+x (4 at top), small guide boss at the top, as ours"),
+    "C22459164": (0, (0.0, 0.0), "STM32U083KCU6 UFQFPN-32: EasyEDA UFQFPN-32_L5.0-W5.0-P0.50-TL-EP3.5, "
+                  "pin 1 top of the left column with the dot beside it, as KiCad"),
+    "C5127802": (270, (0.0, 0.0), "RV-3032-C7: EasyEDA OSC-SMD_8P-L3.2-W1.5-P0.90-BL is drawn landscape "
+                 "with pin 1 bottom-left; KiCad MicroCrystal_C7_SON-8 is portrait with pin 1 top-left: "
+                 "turning theirs 270 (90 clockwise) lands every pin on ours"),
+}
+
+
+def jlc_placement(lcsc, x, y, rot, side):
+    """Our footprint anchor (CPL frame: mm, y up) and KiCad angle -> JLCPCB's
+    (x, y, rotation) for the part."""
+    if lcsc not in JLC:
+        raise SystemExit(f"fab.py: no JLCPCB placement correction for {lcsc}; "
+                         "add it to JLC after checking its EasyEDA footprint")
+    corr, (ox, oy), _ = JLC[lcsc]
+    if side == "Bottom":
+        oy = -oy                      # KiCad flips back-side footprints top to bottom
+    a = math.radians(rot)             # KiCad: counter-clockwise on screen, y down
+    dx = ox * math.cos(a) + oy * math.sin(a)
+    dy = -ox * math.sin(a) + oy * math.cos(a)
+    r = (rot + corr) % 360 if side == "Top" else (180 - rot + corr) % 360
+    return x + dx, y - dy, round(r, 6) % 360
 
 
 def run(*args):
@@ -117,13 +211,16 @@ def generate(out):
     tmp = out / "_pos.csv"
     run("kicad-cli", "pcb", "export", "pos", "-o", str(tmp), "--format", "csv", "--units", "mm",
         "--side", "both", "--use-drill-file-origin", "--exclude-dnp", str(PCB))
+    lcsc_of = {ref.strip(): row[3] for row in jlc for ref in row[1].split(",")}
     placed = []
     for r in csv.DictReader(tmp.open()):
-        placed.append([r["Ref"], f"{float(r['PosX']):.4f}mm", f"{float(r['PosY']):.4f}mm",
-                       "Top" if r["Side"] == "top" else "Bottom", f"{float(r['Rot']):.1f}"])
+        if r["Ref"] not in lcsc_of:
+            continue
+        side = "Top" if r["Side"] == "top" else "Bottom"
+        x, y, rot = jlc_placement(lcsc_of[r["Ref"]], float(r["PosX"]), float(r["PosY"]),
+                                  float(r["Rot"]), side)
+        placed.append([r["Ref"], f"{x:.4f}mm", f"{y:.4f}mm", side, f"{rot:.1f}"])
     tmp.unlink()
-    in_bom = {ref.strip() for row in jlc for ref in row[1].split(",")}
-    placed = [p for p in placed if p[0] in in_bom]
     write_csv(out / "irl2fa-cpl-jlcpcb.csv", ["Designator", "Mid X", "Mid Y", "Layer", "Rotation"],
               sorted(placed, key=lambda p: (re.sub(r"\d", "", p[0]), int(re.sub(r"\D", "", p[0]) or 0))))
 

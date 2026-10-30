@@ -1,0 +1,160 @@
+# JLCPCB's own footprints for the parts whose orientation matters, used by
+# test_assembly.py to place them the way JLCPCB will (from irl2fa-cpl-jlcpcb.csv)
+# and check every pad lands on ours.
+#
+# Source: the EasyEDA/LCSC library footprint JLCPCB assembles each LCSC part with
+# (JLCEDA/EasyEDA official library, https://easyeda.com, https://lceda.cn),
+# fetched from https://easyeda.com/api/products/<LCSC>/components on 2026-10-30.
+# Pad centres only, in mm, footprint origin at (0, 0), y UP, unrotated, seen from
+# the part's own top side (EasyEDA stores 10 mil units with y down; converted).
+# pad_map: their pad number -> ours where the numbering differs.
+# toward_top_edge: a direction in their frame that must end up pointing at the
+# board's top (IR) edge, for parts whose pads are symmetric.
+#
+# C6604342 (VSMB2948SL, D4) and C7427088 (ANR3015, L1) have no EasyEDA footprint
+# (the API answers 404); D4 is checked against C511451's, the same Vishay
+# side-view package, as an assumption (docs/assembly-review.md A-05).
+# SPDX-License-Identifier: CERN-OHL-S-2.0
+parts:
+  C964845:
+    refs: BT1
+    footprint: BAT-SMD_MY-2450-01
+    body: closed (chamfered) end of the clip at +y; the cell enters from -y
+    toward_top_edge: [0, 1]
+    pads:
+      - ["1", -15.325, 0]
+      - ["1", 15.325, 0]
+      - ["2", 0, 0]
+  C77336:
+    refs: D1 D2 D3
+    footprint: SOD-123_L2.8-W1.8-LS3.7-RD
+    body: cathode bar at -x (pad 1 = cathode)
+    pads:
+      - ["1", -1.692, 0]
+      - ["2", 1.692, 0]
+  C15127:
+    refs: Q1 Q2
+    footprint: SOT-23_L2.9-W1.3-P1.90-LS2.4-BR
+    pads:
+      - ["1", 1.15, -0.95]
+      - ["2", 1.15, 0.95]
+      - ["3", -1.15, 0]
+  C469327:
+    refs: Q3
+    footprint: SOT-323_L2.0-W1.3-P1.30-LS2.1-BR
+    pads:
+      - ["1", 0.8, -0.65]
+      - ["2", 0.8, 0.65]
+      - ["3", -0.8, 0]
+  C20917:
+    refs: Q4
+    footprint: SOT-23-3_L2.9-W1.3-P1.90-LS2.4-BR
+    pads:
+      - ["1", 1, -0.95]
+      - ["2", 1, 0.95]
+      - ["3", -1, 0]
+  C511451:
+    refs: Q5
+    footprint: SENSOR-SMD_VEMT2523SLX01
+    body: lens arc at +y (silkscreen ARC above the body)
+    toward_top_edge: [0, 1]
+    pads:
+      - ["1", 1.65, 0]
+      - ["2", -1.65, 0]
+  C324726:
+    refs: J1
+    footprint: FFC-SMD_24P-P0.50_FH34SRJ-24S-0.5SH
+    pad_map: {"25": MP, "26": MP}
+    pads:
+      - ["1", 5.75, 1.25]
+      - ["2", 5.25, 1.25]
+      - ["3", 4.75, 1.25]
+      - ["4", 4.25, 1.25]
+      - ["5", 3.75, 1.25]
+      - ["6", 3.25, 1.25]
+      - ["7", 2.75, 1.25]
+      - ["8", 2.25, 1.25]
+      - ["9", 1.75, 1.25]
+      - ["10", 1.25, 1.25]
+      - ["11", 0.75, 1.25]
+      - ["12", 0.25, 1.25]
+      - ["13", -0.25, 1.25]
+      - ["14", -0.75, 1.25]
+      - ["15", -1.25, 1.25]
+      - ["16", -1.75, 1.25]
+      - ["17", -2.25, 1.25]
+      - ["18", -2.75, 1.25]
+      - ["19", -3.25, 1.25]
+      - ["20", -3.75, 1.25]
+      - ["21", -4.25, 1.25]
+      - ["22", -4.75, 1.25]
+      - ["23", -5.25, 1.25]
+      - ["24", -5.75, 1.25]
+      - ["25", -6.75, -1.25]
+      - ["26", 6.75, -1.25]
+  C139794:
+    refs: SW1
+    footprint: SW-SMD_SKRHABE010
+    pad_map: {"7": MP, "8": MP}
+    pads:
+      - ["1", -3.6, 1.43]
+      - ["2", -3.6, 0]
+      - ["3", -3.6, -1.43]
+      - ["4", 3.6, 1.43]
+      - ["5", 3.6, 0]
+      - ["6", 3.6, -1.43]
+      - ["7", 0, 4.05]
+      - ["8", 0, -4.05]
+  C22459164:
+    refs: U1
+    footprint: UFQFPN-32_L5.0-W5.0-P0.50-TL-EP3.5
+    pads:
+      - ["1", -2.49, 1.75]
+      - ["2", -2.49, 1.25]
+      - ["3", -2.49, 0.75]
+      - ["4", -2.49, 0.25]
+      - ["5", -2.49, -0.25]
+      - ["6", -2.49, -0.75]
+      - ["7", -2.49, -1.25]
+      - ["8", -2.49, -1.75]
+      - ["9", -1.75, -2.49]
+      - ["10", -1.25, -2.49]
+      - ["11", -0.75, -2.49]
+      - ["12", -0.25, -2.49]
+      - ["13", 0.25, -2.49]
+      - ["14", 0.75, -2.49]
+      - ["15", 1.25, -2.49]
+      - ["16", 1.75, -2.49]
+      - ["17", 2.49, -1.75]
+      - ["18", 2.49, -1.25]
+      - ["19", 2.49, -0.75]
+      - ["20", 2.49, -0.25]
+      - ["21", 2.49, 0.25]
+      - ["22", 2.49, 0.75]
+      - ["23", 2.49, 1.25]
+      - ["24", 2.49, 1.75]
+      - ["25", 1.75, 2.49]
+      - ["26", 1.25, 2.49]
+      - ["27", 0.75, 2.49]
+      - ["28", 0.25, 2.49]
+      - ["29", -0.25, 2.49]
+      - ["30", -0.75, 2.49]
+      - ["31", -1.25, 2.49]
+      - ["32", -1.75, 2.49]
+      - ["33", 0, 0]
+  C5127802:
+    refs: U2
+    footprint: OSC-SMD_8P-L3.2-W1.5-P0.90-BL
+    pads:
+      - ["1", -1.35, -0.658]
+      - ["2", -0.45, -0.658]
+      - ["3", 0.45, -0.658]
+      - ["4", 1.35, -0.658]
+      - ["5", 1.35, 0.658]
+      - ["6", 0.45, 0.658]
+      - ["7", -0.45, 0.658]
+      - ["8", -1.35, 0.658]
+  C6604342:
+    refs: D4
+    footprint: none in EasyEDA; assumed as C511451
+    assumed_from: C511451
