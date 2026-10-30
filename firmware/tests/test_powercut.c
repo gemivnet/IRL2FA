@@ -18,6 +18,10 @@
 static const uint8_t PIN_A[] = {1, 2, 3, 4, 1, 2};
 static const uint8_t PIN_B[] = {4, 4, 3, 3};
 static const uint8_t PIN_BAD[] = {2, 2, 2, 2};
+static const uint8_t FAMILY[] = {1, 1, 2, 2, 3, 3};
+static const uint8_t FAMILY_BAD[] = {4, 4, 4, 4, 4, 4};
+#define FAMILY_T 1900000000      /* RTC time of the family PIN tries */
+#define FAMILY_CHECK_T 2100000000 /* long after any wait */
 
 /* Everything observable after a reboot. */
 typedef struct {
@@ -25,6 +29,8 @@ typedef struct {
     uint8_t fails;     /* wrong-PIN count before we unlock */
     int corrupt;       /* a slot that is marked used but does not decrypt */
     uint8_t digest[32];/* settings + every slot's type and plaintext */
+    uint8_t ffails;    /* wrong family PINs (simple mode) */
+    int family;        /* 0 simple mode off, 1 on and FAMILY leaves it */
 } view_t;
 
 static view_t view(void)
@@ -44,6 +50,7 @@ static view_t view(void)
     hash_update(&h, &s->tz_quarters, 1);
     hash_update(&h, &s->sleep_s, 1);
     hash_update(&h, &s->pin_set, 1);
+    hash_update(&h, &s->simple, 1);
     for (uint16_t i = 0; i < STORE_MAX_SLOTS; i++) {
         uint8_t t = (uint8_t)store_slot_type(i);
         hash_update(&h, &t, 1);
@@ -58,13 +65,21 @@ static view_t view(void)
         }
     }
     hash_final(&h, w.digest);
+    w.ffails = store_family_fails();
+    if (store_settings()->simple && store_unlocked()) {
+        /* The flag and its verifier change together: the PIN that was set
+         * must open it (a verifier that does not open would turn it off). */
+        bool ok = store_check_family_pin(FAMILY, sizeof(FAMILY), FAMILY_CHECK_T) == STORE_OK;
+        if (ok && store_settings()->simple) w.family = 1;
+        else w.corrupt = 1;
+    }
     return w;
 }
 
-/* Same settings, records and PIN (the failure count is compared apart). */
+/* Same settings, records and PINs (the failure counts are compared apart). */
 static bool same(const view_t *a, const view_t *b)
 {
-    return a->pin == b->pin && !a->corrupt && !b->corrupt &&
+    return a->pin == b->pin && a->family == b->family && !a->corrupt && !b->corrupt &&
            memcmp(a->digest, b->digest, sizeof(a->digest)) == 0;
 }
 
@@ -153,6 +168,77 @@ static void setup_nine_fails(void)
     for (int i = 0; i < STORE_PIN_TRIES - 1; i++) store_unlock(PIN_BAD, sizeof(PIN_BAD));
 }
 
+static void setup_simple(void)
+{
+    setup_records();
+    store_set_simple(FAMILY, sizeof(FAMILY));
+}
+
+/* Simple mode on, two wrong family PINs counted. */
+static void setup_simple_fails(void)
+{
+    setup_simple();
+    store_check_family_pin(FAMILY_BAD, sizeof(FAMILY_BAD), FAMILY_T);
+    store_check_family_pin(FAMILY_BAD, sizeof(FAMILY_BAD), FAMILY_T);
+}
+
+static int log_used(void)
+{
+    const uint8_t *p = vhal_flash() + 3 * HAL_FLASH_PAGE;
+    int n = 0;
+    while (n < (int)(HAL_FLASH_PAGE / 8)) {
+        uint64_t v;
+        memcpy(&v, p + n * 8, 8);
+        if (v == UINT64_MAX) break;
+        n++;
+    }
+    return n;
+}
+
+/* Simple mode on with PIN_A, three family failures and the attempt log
+ * filled to `used` entries. */
+static void setup_simple_log(int used)
+{
+    setup_pin_a();
+    store_set_simple(FAMILY, sizeof(FAMILY));
+    for (int i = 0; i < 3; i++)
+        store_check_family_pin(FAMILY_BAD, sizeof(FAMILY_BAD), FAMILY_T);
+    if ((used - log_used()) % 2) {
+        store_lock();
+        store_unlock(PIN_BAD, sizeof(PIN_BAD));
+        store_unlock(PIN_A, sizeof(PIN_A)); /* leaves the last OK last */
+    }
+    while (log_used() < used) {
+        store_lock();
+        store_unlock(PIN_A, sizeof(PIN_A));
+    }
+}
+
+/* The scenario's restore adds a TRY and an OK (unlocking with PIN_A); the
+ * family PIN try that follows finds the log full and compacts it. */
+static void setup_simple_log_family(void) { setup_simple_log(HAL_FLASH_PAGE / 8 - 3); }
+/* Locked: the next device PIN try compacts. */
+static void setup_simple_log_device(void) { setup_simple_log(HAL_FLASH_PAGE / 8 - 1); }
+
+static void op_simple_on(void) { store_set_simple(FAMILY, sizeof(FAMILY)); }
+static void op_simple_off(void) { store_set_simple(NULL, 0); }
+
+static void op_wrong_family(void)
+{
+    store_check_family_pin(FAMILY_BAD, sizeof(FAMILY_BAD), FAMILY_T + 1000);
+}
+
+static void op_right_family(void)
+{
+    store_check_family_pin(FAMILY, sizeof(FAMILY), FAMILY_T + 1000);
+}
+
+static void op_family_clock_back(void)
+{
+    store_check_family_pin(FAMILY_BAD, sizeof(FAMILY_BAD), FAMILY_T + 1000);
+    store_family_wait_s(FAMILY_T - 86400); /* a battery change reset the RTC */
+}
+
 static void op_add_totp(void)
 {
     totp_rec_t t = totp_named("New");
@@ -209,25 +295,39 @@ typedef struct {
      * unlock "the attempt happened but its result was not recorded" is a
      * legitimate third state: failures = old + 1. */
     bool unlock;
+    /* The same for a family PIN check: the try is logged before checking. */
+    bool family;
 } scenario_t;
 
 static const scenario_t SCENARIOS[] = {
-    {"add code", setup_records, op_add_totp, false},
-    {"add contact", setup_records, op_add_contact, false},
-    {"rename (overwrite)", setup_records, op_rename, false},
-    {"delete", setup_records, op_delete, false},
-    {"delete, 2nd page", setup_records, op_delete_far, false},
-    {"settings", setup_records, op_settings, false},
-    {"set PIN", setup_records, op_set_pin, false},
-    {"change PIN", setup_pin_a, op_change_pin, false},
-    {"remove PIN", setup_pin_a, op_remove_pin, false},
-    {"wipe", setup_pin_a, op_wipe, false},
-    {"add code with PIN", setup_pin_a, op_add_totp, false},
-    {"wrong PIN", setup_pin_a, op_wrong_pin, true},
-    {"right PIN", setup_pin_a, op_right_pin, true},
-    {"wrong PIN, log compaction", setup_log_full, op_wrong_pin, true},
-    {"right PIN, log compaction", setup_log_full, op_right_pin, true},
-    {"10th wrong PIN wipes", setup_nine_fails, op_wrong_pin, true},
+    {"add code", setup_records, op_add_totp, false, false},
+    {"add contact", setup_records, op_add_contact, false, false},
+    {"rename (overwrite)", setup_records, op_rename, false, false},
+    {"delete", setup_records, op_delete, false, false},
+    {"delete, 2nd page", setup_records, op_delete_far, false, false},
+    {"settings", setup_records, op_settings, false, false},
+    {"set PIN", setup_records, op_set_pin, false, false},
+    {"change PIN", setup_pin_a, op_change_pin, false, false},
+    {"remove PIN", setup_pin_a, op_remove_pin, false, false},
+    {"wipe", setup_pin_a, op_wipe, false, false},
+    {"add code with PIN", setup_pin_a, op_add_totp, false, false},
+    {"wrong PIN", setup_pin_a, op_wrong_pin, true, false},
+    {"right PIN", setup_pin_a, op_right_pin, true, false},
+    {"wrong PIN, log compaction", setup_log_full, op_wrong_pin, true, false},
+    {"right PIN, log compaction", setup_log_full, op_right_pin, true, false},
+    {"10th wrong PIN wipes", setup_nine_fails, op_wrong_pin, true, false},
+    {"simple mode on", setup_records, op_simple_on, false, false},
+    {"simple mode on, with PIN", setup_pin_a, op_simple_on, false, false},
+    {"simple mode off", setup_simple, op_simple_off, false, false},
+    {"add contact in simple mode", setup_simple, op_add_contact, false, false},
+    {"set PIN in simple mode", setup_simple, op_set_pin, false, false},
+    {"wipe in simple mode", setup_simple, op_wipe, false, false},
+    {"wrong family PIN", setup_simple, op_wrong_family, false, true},
+    {"wrong family PIN, 3rd (wait)", setup_simple_fails, op_wrong_family, false, true},
+    {"right family PIN", setup_simple_fails, op_right_family, false, true},
+    {"family PIN, clock back", setup_simple_fails, op_family_clock_back, false, true},
+    {"family PIN, log compaction", setup_simple_log_family, op_wrong_family, false, true},
+    {"PIN with family fails, compaction", setup_simple_log_device, op_wrong_pin, true, false},
 };
 
 static uint8_t snapshot[VHAL_FLASH_PAGES * HAL_FLASH_PAGE];
@@ -259,7 +359,7 @@ static void run_scenario(const scenario_t *sc, int *cuts)
     view_t after = view();
     CHECK(!before.corrupt && !after.corrupt);
     CHECK(nops > 0);
-    if (getenv("PC_DEBUG")) fprintf(stderr, "%s: %d ops, fails %u -> %u, pin %d -> %d\n", sc->name, nops, before.fails, after.fails, before.pin, after.pin);
+    if (getenv("PC_DEBUG")) fprintf(stderr, "%s: %d ops, fails %u -> %u, family fails %u -> %u, pin %d -> %d\n", sc->name, nops, before.fails, after.fails, before.ffails, after.ffails, before.pin, after.pin);
 
     for (int cut = 0; cut < nops; cut++) {
         for (int mode = VHAL_CUT_DROP; mode <= VHAL_CUT_GARBAGE; mode++) {
@@ -272,12 +372,17 @@ static void run_scenario(const scenario_t *sc, int *cuts)
             view_t got = view();
             /* exactly the old state or exactly the new one, failure count
              * included; for an unlock also "old state, attempt counted" */
-            bool ok = (same(&got, &before) && got.fails == before.fails) ||
-                      (same(&got, &after) && got.fails == after.fails) ||
-                      (sc->unlock && same(&got, &before) && got.fails == before.fails + 1);
+            bool ok = (same(&got, &before) && got.fails == before.fails &&
+                       got.ffails == before.ffails) ||
+                      (same(&got, &after) && got.fails == after.fails && got.ffails == after.ffails) ||
+                      (sc->unlock && same(&got, &before) && got.fails == before.fails + 1 &&
+                       got.ffails == before.ffails) ||
+                      (sc->family && same(&got, &before) && got.fails == before.fails &&
+                       got.ffails == before.ffails + 1);
             if (!ok)
-                fprintf(stderr, "  %s: cut at op %d/%d (mode %d): pin %d fails %u corrupt %d\n",
-                        sc->name, cut, nops, mode, got.pin, got.fails, got.corrupt);
+                fprintf(stderr, "  %s: cut at op %d/%d (mode %d): pin %d fails %u ffails %u "
+                        "family %d corrupt %d\n", sc->name, cut, nops, mode, got.pin, got.fails,
+                        got.ffails, got.family, got.corrupt);
             CHECK(ok);
             check_usable(sc->name, cut);
             (*cuts)++;

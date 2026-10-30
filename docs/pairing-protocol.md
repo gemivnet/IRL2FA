@@ -126,6 +126,12 @@ The contact key and its name are stored in an encrypted record (see
 master key held in the MCU's read-protected flash. If you set a PIN, the
 master key is also wrapped with Argon2i(PIN). Ten wrong PINs erase the store.
 
+Simple mode ([ui-flows.md](ui-flows.md#vulnerable-simple-mode)) changes
+nothing here: same key, same words, no protocol change. A device in simple
+mode only ever shows its HEAR word, so it checks the caller but cannot prove
+itself; the family PIN that leaves the mode is kept as an Argon2i verifier
+sealed under the master key, and wrong ones cost waits rather than a wipe.
+
 ## Limits
 
 - A device's clock must be within about ±15 s of the other's. The RV-3032

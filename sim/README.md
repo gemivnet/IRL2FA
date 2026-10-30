@@ -51,6 +51,13 @@ check one device's SAY word is the other's HEAR word, both in the store and as
 drawn on the panels. They add `JBSWY3DPEHPK3PXP` through the character wheel
 and compare the code on screen with an RFC 6238 reference from `node:crypto`,
 and cover sleep/wake, a PIN being required after wake, and the energy counters.
+One device is turned into a simple-mode device through its own Settings: the
+test checks it shows the other device's SAY word large and its own SAY word
+nowhere on the panel (in any firmware font), that ← → ● do nothing (not even
+a redraw), that it wakes into simple mode, and that a 10 s centre hold and
+the family PIN (wrong, then right) lead back to the menus.
+
+![Simple mode in the simulator](../docs/images/sim/sim-simple.png)
 
 ## Run
 

@@ -57,6 +57,20 @@ It is also a standard **TOTP authenticator** (the 6-digit codes from Google Auth
 
 The full design is in [docs/pairing-protocol.md](docs/pairing-protocol.md) and [docs/ui-flows.md](docs/ui-flows.md).
 
+## For family members
+
+<p align="center">
+  <img src="docs/images/screens/simple.png" alt="Simple mode: Susan will say: material" width="375" />
+</p>
+
+Setting one up for a parent, grandparent or child who should only check who is calling? Use **simple mode** (the docs call it vulnerable mode). The device then shows one thing: the name of the person, and in big letters the word that person will say. "If they don't say this word, hang up and call them back." Up and down go to the next person. Nothing else does anything: no menus, no codes, no settings.
+
+1. Pair the device in person with everyone who might call, and give each contact a name they will recognise ("Susan", "Grandpa Joe").
+2. **Settings → Simple mode**, then choose a **family PIN** of 6 or more joystick moves and enter it three times. Write it down: it cannot be reset.
+3. Give them the device. When you call, open their contact on your own device and say your **SAY** word.
+
+To change anything later, hold the centre of the joystick for 10 seconds and enter the family PIN. Wrong family PINs never erase the device; they make the next try wait longer, up to an hour. Details and the security trade-offs are in [docs/ui-flows.md](docs/ui-flows.md#vulnerable-simple-mode).
+
 ## Try the simulator
 
 The firmware's portable core is compiled to WebAssembly and runs two devices side by side in your browser: pair them over a simulated IR link, compare words, add a TOTP secret and check it against your phone.

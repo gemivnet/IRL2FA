@@ -30,6 +30,9 @@ FONTS = [
     ("font_large", "DejaVuSans-Bold.ttf", 22, None),
     ("font_mono", "DejaVuSansMono-Bold.ttf", 15, None),
     ("font_digits", "DejaVuSansMono-Bold.ttf", 44, "0123456789 "),
+    # Simple mode's word: BIP-39 words are lower case a-z, up to 8 letters
+    # ("mushroom" is the widest at 203 px of the panel's 250).
+    ("font_huge", "DejaVuSans-Bold.ttf", 34, "abcdefghijklmnopqrstuvwxyz "),
 ]
 ASCII = "".join(chr(c) for c in range(32, 127))
 

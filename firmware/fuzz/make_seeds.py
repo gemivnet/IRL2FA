@@ -18,6 +18,9 @@ PEER, ECHO, FLIP, TRUNC = 0xB0, 0xB1, 0xB2, 0xB3
 # fuzz_app ops: press index: 0 up, 1 down, 2 left, 3 right, 4 centre
 UP, DOWN, LEFT, RIGHT, CENTER = (i << 3 for i in range(5))
 PEER_STEP, REBOOT, SLEEP = 5, 6 | 8, 6
+SIMPLE = 6 | 16  # simple mode on, family PIN up up right right down down
+HOLD_CENTER_11S = [2 | (4 << 3), 64 | 44]  # 44 x 250 ms
+FAMILY = [UP, UP, RIGHT, RIGHT, DOWN, DOWN, CENTER]
 
 
 def write(target, name, data):
@@ -65,6 +68,8 @@ def store():
     # a PIN log full of tries
     tries = struct.pack("<Q", 0xF0F0F0F0) * 12
     off = 0x800000 | (3 * 2048)
+    write("store", "simple-mode", [16])
+    write("store", "simple-mode-pin-two-fails", [17, 0, 0, 0, 0])
     write("store", "pin-log-full-of-tries", [1] + list(off.to_bytes(3, "big")) + [len(tries)] + list(tries))
 
 
@@ -88,6 +93,13 @@ def app():
                                                             DOWN, DOWN, DOWN, CENTER, LEFT])
     write("app", "power-cut-while-saving", [clock] + nav_add + label + secret + [7, 3, CENTER, REBOOT])
     write("app", "sleep-and-wake", [clock, SLEEP, CENTER, 3 | 8, 2, CENTER])
+    pair_named = [clock] + pair + [3, 100]
+    write("app", "simple-mode-leave-with-family-pin",
+          pair_named + [SIMPLE, UP, DOWN, LEFT, RIGHT, CENTER] + HOLD_CENTER_11S + FAMILY + [DOWN, CENTER])
+    write("app", "simple-mode-wrong-family-pins",
+          pair_named + [SIMPLE] + HOLD_CENTER_11S + [DOWN] * 6 + [CENTER] + [DOWN] * 6 + [CENTER]
+          + [DOWN] * 6 + [CENTER] + [3 | 8, 1, LEFT, SLEEP, CENTER] + HOLD_CENTER_11S + FAMILY)
+    write("app", "simple-mode-empty-reboot", [clock, SIMPLE, DOWN, REBOOT, UP] + HOLD_CENTER_11S + [LEFT])
     write("app", "ir-noise", [clock, DOWN, DOWN, CENTER, 4, 12] + list(b"I2\x01\x20" + bytes(8)) + [PEER_STEP])
 
 

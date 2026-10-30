@@ -6,7 +6,9 @@
  * the top offset bit set, a run of bytes copied in), so the fuzzer can both
  * flip bits anywhere and write whole forged headers. Then the store is
  * mounted, unlocked, every slot listed and read, a record written, read
- * back, deleted, the PIN changed and the store remounted. Any memory error,
+ * back, deleted, the PIN changed and the store remounted. With byte 0 bit
+ * 4, simple mode is turned on and family PINs checked, right and wrong, at
+ * RTC times from the input (before, at and after the waits). Any memory error,
  * undefined behaviour, write to unerased flash (vhal traps) or broken
  * invariant is a crash.
  * SPDX-License-Identifier: AGPL-3.0-or-later */
@@ -22,6 +24,7 @@
 #define FLASH_SIZE (VHAL_FLASH_PAGES * HAL_FLASH_PAGE)
 
 static const uint8_t PIN[] = {1, 2, 3, 4};
+static const uint8_t FAMILY[] = {1, 1, 2, 2, 3, 3};
 static uint8_t images[4][FLASH_SIZE];
 static int ready;
 
@@ -147,6 +150,24 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size)
     settings_t s = *store_settings();
     s.tz_quarters = 8;
     store_save_settings(&s);
+    if (data[0] & 16) {
+        ASSERT(store_set_simple(FAMILY, sizeof(FAMILY)) == STORE_OK);
+        ASSERT(store_settings()->simple);
+        int64_t now = 1800000000 + (int64_t)(size > 1 ? data[size - 1] : 0) * 1000;
+        for (int k = 0; k < 5; k++) {
+            store_status_t r = store_check_family_pin(PIN, sizeof(PIN), now);
+            ASSERT(r == STORE_BAD_PIN || r == STORE_WAIT);
+            now += (k & 1) ? 7 : -3; /* forwards and, once in a while, back */
+        }
+        uint32_t w = store_family_wait_s(now);
+        ASSERT(w <= 3600);
+        if (store_check_family_pin(FAMILY, sizeof(FAMILY), now + w) == STORE_OK)
+            ASSERT(store_family_fails() == 0);
+        store_mount();
+        unlock_if_needed();
+        ASSERT(store_settings()->simple || !store_unlocked());
+        if (store_unlocked()) store_set_simple(NULL, 0);
+    }
     if (data[0] & 4) store_set_pin(PIN, sizeof(PIN));
     if (data[0] & 8) store_set_pin(NULL, 0);
     store_mount();

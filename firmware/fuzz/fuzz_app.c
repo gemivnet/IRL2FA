@@ -3,8 +3,11 @@
  * The input is a program of steps for the virtual board: joystick presses
  * and holds, time passing, raw bytes on the IR receiver, a whole exchange
  * with an honest peer device (so pairing can complete and the SAS and naming
- * screens are reached), sleep and wake, reboots, and power cuts after a
- * chosen number of flash operations (followed by a reboot). Every screen is
+ * screens are reached), sleep and wake, reboots, power cuts after a chosen
+ * number of flash operations (followed by a reboot), and simple mode turned
+ * on with the family PIN FAMILY (as the settings screens would, then a
+ * reboot; the fuzzer then has to find the 10 s centre hold and that PIN to
+ * get out). Every screen is
  * drawn on every poll, so the fuzzer also covers rendering of whatever the
  * store and the input produce.
  * SPDX-License-Identifier: AGPL-3.0-or-later */
@@ -15,11 +18,13 @@
 #include "../core/app.h"
 #include "../core/hal.h"
 #include "../core/pairing.h"
+#include "../core/store.h"
 #include "../vhal/vhal.h"
 
 #define ASSERT(c) do { if (!(c)) abort(); } while (0)
 #define MAX_STEPS 600
 
+static const uint8_t FAMILY[] = {1, 1, 2, 2, 3, 3}; /* up up right right down down */
 static pairing_t peer;
 static unsigned peer_seq;
 
@@ -78,11 +83,11 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size)
             press(B[(op >> 3) & 7]);
             break;
         }
-        case 2: /* hold a direction for a while (auto-repeat) */
+        case 2: /* hold a direction for a while (auto-repeat; arg bit 6: up to 16 s) */
             vhal_set_buttons((uint8_t)(1u << ((op >> 3) % 5)));
             for (int k = 0; k < (arg & 63); k++) {
                 poll();
-                vhal_advance(50);
+                vhal_advance(arg & 64 ? 250 : 50);
             }
             vhal_set_buttons(0);
             poll();
@@ -112,8 +117,13 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size)
             poll();
             break;
         }
-        case 6: /* reboot, or sleep until woken */
+        case 6: /* reboot, simple mode on, or sleep until woken */
             if (op & 8) {
+                reboot();
+            } else if (op & 16) {
+                /* As if set in Settings, then a reset: the app is never
+                 * woken while awake (that would leave a pairing's IR on). */
+                if (store_unlocked()) store_set_simple(FAMILY, sizeof(FAMILY));
                 reboot();
             } else {
                 vhal_advance(10u * 60u * 1000u);

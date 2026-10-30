@@ -15,6 +15,7 @@ const SCREEN_LABEL = {
   menu: 'Menu', codes: 'Codes', code: 'Code', contacts: 'Contacts', contact: 'Contact words',
   pair: 'Pairing', sas: 'Compare symbols', text: 'Typing', code_opts: 'Code options',
   confirm: 'Confirm', time: 'Set time', tz: 'Time zone', pin: 'PIN', message: 'Message', about: 'About',
+  simple: 'Simple mode', simple_intro: 'Simple mode: about',
 };
 
 const state = {

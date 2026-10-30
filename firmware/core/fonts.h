@@ -21,5 +21,6 @@ extern const font_t font_medium; /* 14px bold menus */
 extern const font_t font_large;  /* 22px bold words */
 extern const font_t font_mono;   /* 15px bold mono text entry */
 extern const font_t font_digits; /* 44px bold mono, digits only */
+extern const font_t font_huge;   /* 34px bold, lower case a-z: simple mode's word */
 
 #endif

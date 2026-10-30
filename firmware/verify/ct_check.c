@@ -46,6 +46,7 @@ static volatile int sink;
 /* Offsets in the meta page (store.c meta_t): MAC and wrapped master key. */
 #define META_MAC 48
 #define META_MK 64
+#define META_FAM_MAC 128 /* simple mode: verifier's tag, then the sealed verifier */
 
 int main(void)
 {
@@ -136,6 +137,29 @@ int main(void)
         int ok = store_read_totp(0, &back);
         sink = ok;
         failures += !ok;
+    });
+
+    /* 4b. Family PIN (simple mode): Argon2i over a secret PIN, the
+     * verifier unsealed under a secret master key, compared with ct_equal. */
+    static const uint8_t FAM[] = {1, 1, 2, 2, 3, 3};
+    vhal_reset(8);
+    store_mount();
+    store_set_simple(FAM, sizeof(FAM));
+    CHECK_CT("store_check_family_pin: wrong, then right", 0, {
+        uint8_t pin[sizeof(FAM)];
+        CT_SECRET(vhal_flash() + META_MK, 32);           /* plain master key (no device PIN) */
+        CT_SECRET(vhal_flash() + META_FAM_MAC, 16 + 48); /* tag and sealed verifier */
+        store_mount();
+        memcpy(pin, FAM, sizeof(pin));
+        pin[2] ^= 1;
+        CT_SECRET(pin, sizeof(pin));
+        int r1 = store_check_family_pin(pin, sizeof(pin), 1800000000);
+        memcpy(pin, FAM, sizeof(pin));
+        CT_SECRET(pin, sizeof(pin));
+        int r2 = store_check_family_pin(pin, sizeof(pin), 1800000000);
+        sink = r1 * 10 + r2;
+        printf("  (family PIN results: wrong=%d right=%d)\n", r1, r2);
+        failures += !(r1 == STORE_BAD_PIN && r2 == STORE_OK);
     });
 
     /* 5. Pairing: X25519, commitment, HKDF and the SAS derivation, with

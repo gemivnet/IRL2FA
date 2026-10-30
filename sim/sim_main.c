@@ -188,6 +188,7 @@ API char *sim_str_buf(void) { return str_buf; }
 API uint32_t sim_str_cap(void) { return sizeof(str_buf); }
 API int sim_unlocked(void) { return store_unlocked(); }
 API int sim_pin_set(void) { return store_settings()->pin_set; }
+API int sim_simple_mode(void) { return store_settings()->simple; }
 
 /* Adds a SHA1/6-digit/30 s code. Label and base32 secret are passed as
  * "label\0secret\0" in str_buf. Returns the slot, or -1 (locked, invalid
@@ -285,12 +286,12 @@ API const char *sim_word(int index) { return words_word((uint16_t)(index & 2047)
 /* Draws str_buf into the core's scratch framebuffer (not the panel) with
  * one of the firmware fonts so a test can compare it with what the panel
  * shows. align: 0 left at x, 1 centred on x, 2 right edge at x.
- * font: 0 small, 1 medium, 2 large, 3 mono, 4 digits. */
+ * font: 0 small, 1 medium, 2 large, 3 mono, 4 digits, 5 huge (simple mode). */
 API const uint8_t *sim_probe_text(int font, int x, int y, int align)
 {
-    static const font_t *const F[5] = {&font_small, &font_medium, &font_large, &font_mono,
-                                       &font_digits};
-    const font_t *f = F[(unsigned)font % 5];
+    static const font_t *const F[6] = {&font_small, &font_medium, &font_large, &font_mono,
+                                       &font_digits, &font_huge};
+    const font_t *f = F[(unsigned)font % 6];
     gfx_clear();
     if (align == 1) gfx_text_centered(f, x, y, str_buf);
     else if (align == 2) gfx_text_right(f, x, y, str_buf);

@@ -10,7 +10,7 @@ export const BTN = Object.freeze({ UP: 1, DOWN: 2, LEFT: 4, RIGHT: 8, CENTER: 16
 export const DISPLAY_W = 250;
 export const DISPLAY_H = 122;
 export const DISPLAY_STRIDE = 32;
-export const FONT = Object.freeze({ SMALL: 0, MEDIUM: 1, LARGE: 2, MONO: 3, DIGITS: 4 });
+export const FONT = Object.freeze({ SMALL: 0, MEDIUM: 1, LARGE: 2, MONO: 3, DIGITS: 4, HUGE: 5 });
 
 export class Device {
   constructor(mod, name) {
@@ -87,6 +87,8 @@ export class Device {
   irOn() { return !!this.m._sim_ir_on(); }
   unlocked() { return !!this.m._sim_unlocked(); }
   pinSet() { return !!this.m._sim_pin_set(); }
+  /** Simple ("vulnerable") mode is on: turned on through the device's own Settings. */
+  simpleMode() { return !!this.m._sim_simple_mode(); }
 
   /** A copy of the panel's current 1-bpp image. */
   framebuffer() {

@@ -134,5 +134,60 @@ int main(int argc, char **argv)
         vhal_advance(100);
     }
     dump("sleep");
+
+    /* Simple mode: the intro from Settings, on a device with no contacts. */
+    vhal_reset(43);
+    vhal_set_unix(1800000007);
+    store_mount();
+    app_init();
+    steps(BTN_DOWN, 4);
+    step(BTN_CENTER); /* Settings */
+    steps(BTN_DOWN, 4);
+    step(BTN_CENTER); /* Simple mode */
+    dump("simple_intro");
+    /* Turned on (as the PIN screens would) with nobody paired yet. */
+    static const uint8_t FAMILY[] = {1, 1, 2, 2, 3, 3};
+    store_set_simple(FAMILY, sizeof(FAMILY));
+    app_wake();
+    app_poll();
+    dump("simple_empty");
+
+    /* Grandma's device: three people, simple mode on, low battery later. */
+    vhal_reset(44);
+    vhal_set_unix(1800000002);
+    store_mount();
+    const char *family[] = {"Susan", "Grandpa Joe", "Dr. Patel"};
+    for (int i = 0; i < 3; i++) {
+        memset(&c, 0, sizeof(c));
+        strcpy(c.name, family[i]);
+        for (int k = 0; k < 32; k++) c.key[k] = (uint8_t)(k * 3 + 11 * i);
+        c.is_low = (uint8_t)(i & 1);
+        store_write_contact(-1, &c);
+    }
+    store_set_simple(FAMILY, sizeof(FAMILY));
+    app_init();
+    app_poll();
+    dump("simple");
+    step(BTN_DOWN);
+    vhal_set_battery_mv(2450);
+    step(BTN_DOWN);
+    dump("simple_lowbat");
+    vhal_set_battery_mv(3000);
+    step(BTN_UP);
+    /* Hold the centre: after 3 s it says to keep holding, at 10 s the
+     * family PIN. */
+    vhal_set_buttons(BTN_CENTER);
+    for (int i = 0; i < 40; i++) {
+        app_poll();
+        vhal_advance(100);
+    }
+    dump("simple_hold");
+    for (int i = 0; i < 70; i++) {
+        app_poll();
+        vhal_advance(100);
+    }
+    vhal_set_buttons(0);
+    app_poll();
+    dump("family_pin");
     return 0;
 }

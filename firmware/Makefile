@@ -9,7 +9,7 @@ CORE = core/hash.c core/base32.c core/totp.c core/words.c core/wordlist.c \
        core/pairing.c core/store.c core/gfx.c core/fonts.c core/timeutil.c \
        core/app.c core/buttons.c core/third_party/monocypher/monocypher.c
 TESTS = tests/test_main.c tests/test_crypto.c tests/test_device.c tests/test_powercut.c \
-        tests/test_app.c tests/test_behaviour.c vhal/vhal.c
+        tests/test_app.c tests/test_behaviour.c tests/test_simple.c vhal/vhal.c
 
 BUILD = build/host
 

@@ -51,6 +51,11 @@
 #define TIME_VALID_AFTER 1767225600 /* 2026-01-01T00:00:00Z */
 #define TITLE_H 15
 #define ROW_H 18
+/* Simple mode: holding the centre this long opens the family PIN; after
+ * FAMILY_HOLD_HINT_MS the screen says to keep holding. */
+#define FAMILY_HOLD_MS 10000
+#define FAMILY_HOLD_HINT_MS 3000
+#define LOW_BATTERY_MV 2550
 
 typedef enum {
     SCR_MENU,     /* generic menu, including home and settings */
@@ -68,6 +73,8 @@ typedef enum {
     SCR_PIN,
     SCR_MESSAGE,
     SCR_ABOUT,
+    SCR_SIMPLE,       /* simple mode: one contact's name and HEAR word */
+    SCR_SIMPLE_INTRO, /* what simple mode is, before the family PIN is set */
 } screen_t;
 
 typedef enum {
@@ -89,12 +96,17 @@ typedef enum {
     C_DELETE,
     C_WIPE,
     C_REMOVE_PIN,
+    C_SIMPLE_OFF,
 } confirm_id_t;
 
 typedef enum {
     P_UNLOCK,
     P_NEW,
     P_CONFIRM,
+    P_FAMILY_NEW,     /* turning simple mode on: choose, confirm, confirm again */
+    P_FAMILY_CONFIRM,
+    P_FAMILY_AGAIN,
+    P_FAMILY_UNLOCK,  /* leaving simple mode */
 } pin_id_t;
 
 static const char CS_LABEL[] =
@@ -178,11 +190,15 @@ static struct {
     uint32_t pair_started_ms;
     uint32_t pair_rx_ms;    /* last byte heard from the other device */
     uint32_t pair_tx_end;   /* our own frame is in the air until then */
+
+    int simple_rank;        /* simple mode: which contact (0 = first) */
+    bool hold_shown;        /* simple mode: "keep holding" is on screen */
 } ui;
 
 static const char *const SCREEN_NAMES[] = {
     "menu", "codes", "code", "contacts", "contact", "pair", "sas", "text",
     "code_opts", "confirm", "time", "tz", "pin", "message", "about",
+    "simple", "simple_intro",
 };
 
 /* ------------------------------------------------------------------ */
@@ -215,6 +231,25 @@ static void go(screen_t s)
 {
     ui.scr = s;
     ui.dirty = true;
+}
+
+static bool simple_on(void)
+{
+    return store_settings()->simple != 0;
+}
+
+/* Simple mode shows words (not a plain message) only with someone paired
+ * and the clock set. */
+static bool simple_words_shown(void)
+{
+    return store_count(REC_CONTACT) > 0 && time_valid();
+}
+
+static void enter_simple(void)
+{
+    ui.simple_rank = 0;
+    ui.hold_shown = false;
+    go(SCR_SIMPLE);
 }
 
 static void title_bar(const char *title)
@@ -305,6 +340,7 @@ static void open_menu(menu_id_t id)
         menu_add("Pair with someone");
         menu_add("Add a code");
         menu_add("Settings");
+        if (simple_on()) menu_add("Back to simple mode");
         break;
     case M_CODE_ACTIONS:
     case M_CONTACT_ACTIONS:
@@ -321,6 +357,7 @@ static void open_menu(menu_id_t id)
         menu_add(s->pin_set ? "Change PIN" : "Set a PIN");
         if (s->pin_set) menu_add("Remove PIN");
         menu_add("About");
+        menu_add(s->simple ? "Simple mode: on" : "Simple mode");
         menu_add("Erase everything");
         break;
     }
@@ -630,6 +667,118 @@ static void draw_contact(void)
 }
 
 /* ------------------------------------------------------------------ */
+/* simple mode                                                        */
+
+/* The bottom line: where we are in the list, and the battery in words. Or,
+ * while the centre is held, that the hold is being counted. */
+static void simple_footer(int rank, int n)
+{
+    int y = DISPLAY_H - 13;
+    if (ui.hold_shown) {
+        gfx_text_centered(&font_small, DISPLAY_W / 2, y, "Family settings: keep holding " GFX_DOT);
+        gfx_invert(0, y - 1, DISPLAY_W, DISPLAY_H - y + 1);
+        return;
+    }
+    if (n > 1) {
+        char pos[32];
+        snprintf(pos, sizeof(pos), GFX_UP GFX_DOWN " %d of %d", rank + 1, n);
+        gfx_text(&font_small, 3, y, pos);
+    }
+    if (hal_battery_mv() < LOW_BATTERY_MV) {
+        int w = gfx_text_width(&font_small, "Battery low: tell your family") + 6;
+        gfx_text(&font_small, DISPLAY_W - w + 3, y, "Battery low: tell your family");
+        gfx_invert(DISPLAY_W - w, y - 1, w, DISPLAY_H - y + 1);
+    }
+}
+
+static void simple_note(const char *l1, const char *l2)
+{
+    gfx_text_centered(&font_medium, DISPLAY_W / 2, 30, l1);
+    gfx_text_centered(&font_medium, DISPLAY_W / 2, 52, l2);
+}
+
+/* One contact, read only: the name, the word they will say (this device's
+ * HEAR word) and what to do if they don't. The SAY word is never drawn:
+ * in simple mode this device only checks the caller. */
+static void draw_simple(void)
+{
+    int n = store_count(REC_CONTACT);
+    if (n == 0) {
+        simple_note("Nobody is set up yet.", "Ask your family to set this up.");
+        simple_footer(0, 0);
+        return;
+    }
+    if (!time_valid()) { /* the words would be wrong */
+        simple_note("The clock needs setting.", "Ask your family to set it.");
+        simple_footer(0, 0);
+        return;
+    }
+    if (ui.simple_rank >= n) ui.simple_rank = 0;
+    int slot = store_nth(REC_CONTACT, ui.simple_rank);
+    contact_rec_t r;
+    if (slot < 0 || !store_read_contact((uint16_t)slot, &r)) return;
+
+    /* "Susan will say:" with the name large; a long name is shortened. */
+    static const char WILL_SAY[] = " will say:";
+    int ws = gfx_text_width(&font_medium, WILL_SAY);
+    int max_name = DISPLAY_W - 6 - ws;
+    /* The fonts' top rows are blank (room for accents): start above 0. */
+    const int name_y = -3;
+    int x = 3;
+    if (gfx_text_width(&font_large, r.name) <= max_name) {
+        x = gfx_text(&font_large, x, name_y, r.name);
+    } else {
+        gfx_text_fit(&font_large, x, name_y, max_name, r.name);
+        x += max_name;
+    }
+    gfx_text(&font_medium, x, name_y + font_large.ascent - font_medium.ascent, WILL_SAY);
+
+    uint64_t t = (uint64_t)now_utc();
+    uint64_t w = t / WORDS_PERIOD_S;
+    uint16_t give, recv, pgive, precv;
+    words_pair(r.key, r.is_low, w, &give, &recv);
+    words_pair(r.key, r.is_low, w - 1, &pgive, &precv);
+    (void)give;
+    (void)pgive;
+    crypto_wipe(&r, sizeof(r));
+    gfx_text_centered(&font_huge, DISPLAY_W / 2, 17, words_word(recv));
+
+    /* The word just before also counts (it may change while they talk). */
+    char also[32];
+    snprintf(also, sizeof(also), "Also OK: %s", words_word(precv));
+    gfx_text(&font_small, 3, 58, also);
+    /* Time left as three dots that empty, in step with the partial-refresh
+     * countdown ticks (BAR_STEPS); no numbers to read. */
+    int remaining = WORDS_PERIOD_S - (int)(t % WORDS_PERIOD_S);
+    int filled = (remaining * BAR_STEPS + WORDS_PERIOD_S - 1) / WORDS_PERIOD_S;
+    for (int i = 0; i < BAR_STEPS; i++) {
+        int cx = DISPLAY_W - 8 - (BAR_STEPS - 1 - i) * 11;
+        if (i < filled) gfx_arrow(ARROW_DOT, cx - 5, 60, 11);
+        else gfx_rect(cx - 2, 63, 5, 5);
+    }
+
+    gfx_hline(0, 74, DISPLAY_W);
+    gfx_text_centered(&font_medium, DISPLAY_W / 2, 75, "If they don't say this word,");
+    gfx_text_centered(&font_medium, DISPLAY_W / 2, 89, "hang up and call them back.");
+    simple_footer(ui.simple_rank, n);
+}
+
+static void draw_simple_intro(void)
+{
+    title_bar("Simple mode");
+    static const char *const L[] = {
+        "For someone who only needs to check",
+        "who is calling. Shows each person's",
+        "name and the word they will say.",
+        GFX_UP GFX_DOWN " next person. Nothing else to press.",
+        "To leave: hold " GFX_DOT " for 10 s, then the",
+        "family PIN. Write the PIN down!",
+    };
+    for (int i = 0; i < 6; i++) gfx_text(&font_small, 5, TITLE_H + 2 + i * 13, L[i]);
+    hint(GFX_DOT " set a family PIN     " GFX_LEFT " back");
+}
+
+/* ------------------------------------------------------------------ */
 /* pairing                                                            */
 
 static void start_pairing(void)
@@ -715,9 +864,19 @@ static void open_pin(pin_id_t id, const char *msg)
     go(SCR_PIN);
 }
 
+static const char *pin_title(void)
+{
+    switch (ui.pin.id) {
+    case P_UNLOCK: return "Locked";
+    case P_NEW:
+    case P_CONFIRM: return "PIN";
+    default: return "Family PIN";
+    }
+}
+
 static void draw_pin(void)
 {
-    title_bar(ui.pin.id == P_UNLOCK ? "Locked" : "PIN");
+    title_bar(pin_title());
     gfx_text_centered(&font_medium, DISPLAY_W / 2, TITLE_H + 8, ui.pin.msg);
     int x = (DISPLAY_W - STORE_PIN_MAX * 16) / 2;
     for (int i = 0; i < STORE_PIN_MAX; i++) {
@@ -729,13 +888,23 @@ static void draw_pin(void)
         char buf[24];
         snprintf(buf, sizeof(buf), "Wait %ld s", (long)((wait + 999) / 1000));
         gfx_text_centered(&font_small, DISPLAY_W / 2, 76, buf);
+    } else if (ui.pin.id == P_FAMILY_UNLOCK && store_family_wait_s(now_utc()) > 0) {
+        /* RTC-based, so it holds across sleep and resets. */
+        uint32_t s = store_family_wait_s(now_utc());
+        char buf[32];
+        unsigned shown = s >= 60 ? (unsigned)((s + 59) / 60) : (unsigned)((s + 9) / 10) * 10u;
+        snprintf(buf, sizeof(buf), s >= 60 ? "Try again in %u min" : "Try again in %u s", shown);
+        gfx_text_centered(&font_small, DISPLAY_W / 2, 76, buf);
     } else if (ui.pin.id == P_UNLOCK && store_pin_fails() > 0) {
         char buf[32];
         snprintf(buf, sizeof(buf), "%d tries left before erase",
                  STORE_PIN_TRIES - store_pin_fails());
         gfx_text_centered(&font_small, DISPLAY_W / 2, 76, buf);
     }
-    hint("enter with " GFX_UP GFX_DOWN GFX_LEFT GFX_RIGHT "    " GFX_DOT " done");
+    if (ui.pin.id == P_FAMILY_UNLOCK && ui.pin.len == 0)
+        hint(GFX_UP GFX_DOWN GFX_LEFT GFX_RIGHT " enter   " GFX_DOT " done   " GFX_LEFT " first: back");
+    else
+        hint("enter with " GFX_UP GFX_DOWN GFX_LEFT GFX_RIGHT "    " GFX_DOT " done");
 }
 
 static void enter_time_editor(void)
@@ -912,7 +1081,8 @@ static void menu_select(void)
         else if (s == 3) {
             memset(&ui.draft, 0, sizeof(ui.draft));
             open_text(T_CODE_LABEL, "Name for this code", CS_LABEL, STORE_LABEL_LEN - 1, NULL);
-        } else open_menu(M_SETTINGS);
+        } else if (s == 4) open_menu(M_SETTINGS);
+        else enter_simple(); /* "Back to simple mode" */
         break;
     case M_CODE_ACTIONS:
     case M_CONTACT_ACTIONS: {
@@ -949,7 +1119,10 @@ static void menu_select(void)
         } else if (item == 2) open_pin(P_NEW, "Choose a PIN (4-12)");
         else if (item == 3) ask(C_REMOVE_PIN, "Remove the PIN?");
         else if (item == 4) go(SCR_ABOUT);
-        else ask(C_WIPE, "Erase ALL codes & contacts?");
+        else if (item == 5) {
+            if (st->simple) ask(C_SIMPLE_OFF, "Turn simple mode off?");
+            else go(SCR_SIMPLE_INTRO);
+        } else ask(C_WIPE, "Erase ALL codes & contacts?");
         break;
     }
     }
@@ -974,6 +1147,10 @@ static void confirm_yes(void)
         store_set_pin(NULL, 0);
         message_to_menu("PIN removed", NULL, M_SETTINGS);
         break;
+    case C_SIMPLE_OFF:
+        store_set_simple(NULL, 0);
+        message_to_menu("Simple mode is off", NULL, M_SETTINGS);
+        break;
     }
 }
 
@@ -997,7 +1174,8 @@ static void pin_submit(void)
         crypto_wipe(ui.pin.digits, sizeof(ui.pin.digits));
         ui.pin.len = 0;
         if (st == STORE_OK) {
-            if (!time_valid()) enter_time_editor();
+            if (simple_on()) enter_simple();
+            else if (!time_valid()) enter_time_editor();
             else open_menu(M_HOME);
         } else if (st == STORE_WIPED) {
             message_to_menu("Too many wrong PINs", "Everything was erased", M_HOME);
@@ -1034,6 +1212,60 @@ static void pin_submit(void)
         crypto_wipe(ui.pin.digits, sizeof(ui.pin.digits));
         message_to_menu("PIN set", "Needed every time it wakes", M_SETTINGS);
         break;
+    case P_FAMILY_NEW:
+        if (ui.pin.len < STORE_FAMILY_PIN_MIN) {
+            snprintf(ui.pin.msg, sizeof(ui.pin.msg), "At least %d moves", STORE_FAMILY_PIN_MIN);
+            ui.pin.len = 0;
+            ui.dirty = true;
+            return;
+        }
+        memcpy(ui.pin.first, ui.pin.digits, sizeof(ui.pin.first));
+        ui.pin.first_len = ui.pin.len;
+        crypto_wipe(ui.pin.digits, sizeof(ui.pin.digits));
+        open_pin(P_FAMILY_CONFIRM, "Enter it again");
+        break;
+    case P_FAMILY_CONFIRM:
+    case P_FAMILY_AGAIN:
+        /* Entered three times in all: there is no reset if it is forgotten. */
+        if (ui.pin.len != ui.pin.first_len ||
+            !ct_equal(ui.pin.digits, ui.pin.first, (size_t)ui.pin.len)) {
+            crypto_wipe(ui.pin.first, sizeof(ui.pin.first));
+            crypto_wipe(ui.pin.digits, sizeof(ui.pin.digits));
+            open_pin(P_FAMILY_NEW, "Didn't match. Choose again");
+            return;
+        }
+        if (ui.pin.id == P_FAMILY_CONFIRM) {
+            crypto_wipe(ui.pin.digits, sizeof(ui.pin.digits));
+            open_pin(P_FAMILY_AGAIN, "Once more, to be sure");
+            return;
+        }
+        store_set_simple(ui.pin.digits, ui.pin.len);
+        crypto_wipe(ui.pin.first, sizeof(ui.pin.first));
+        crypto_wipe(ui.pin.digits, sizeof(ui.pin.digits));
+        ui.pin.len = 0;
+        ui.simple_rank = 0;
+        ui.hold_shown = false;
+        message("Simple mode is on", "To leave: hold " GFX_DOT " for 10 s,", "then the family PIN",
+                SCR_SIMPLE);
+        break;
+    case P_FAMILY_UNLOCK: {
+        if (ui.pin.len < STORE_FAMILY_PIN_MIN) { /* too short to be it: not a try */
+            snprintf(ui.pin.msg, sizeof(ui.pin.msg), "At least %d moves", STORE_FAMILY_PIN_MIN);
+            ui.pin.len = 0;
+            ui.dirty = true;
+            return;
+        }
+        store_status_t st = store_check_family_pin(ui.pin.digits, ui.pin.len, now_utc());
+        crypto_wipe(ui.pin.digits, sizeof(ui.pin.digits));
+        ui.pin.len = 0;
+        if (st == STORE_OK) {
+            open_menu(M_HOME); /* simple mode stays on: waking goes back to it */
+        } else {
+            snprintf(ui.pin.msg, sizeof(ui.pin.msg), "Wrong family PIN");
+            ui.dirty = true;
+        }
+        break;
+    }
     }
 }
 
@@ -1048,6 +1280,7 @@ static int list_step(int sel, int n, int d)
 
 static void on_key(uint8_t b)
 {
+    bool was_dirty = ui.dirty;
     ui.dirty = true;
     switch (ui.scr) {
     case SCR_MENU:
@@ -1143,10 +1376,20 @@ static void on_key(uint8_t b)
         break;
 
     case SCR_PIN: {
+        bool family = ui.pin.id >= P_FAMILY_NEW;
+        if (b == BTN_LEFT && ui.pin.len == 0 && ui.pin.id == P_FAMILY_UNLOCK) {
+            enter_simple(); /* back, even during a wait */
+            break;
+        }
         if ((int32_t)(ui.pin.wait_until - hal_millis()) > 0) break;
+        if (ui.pin.id == P_FAMILY_UNLOCK && store_family_wait_s(now_utc()) > 0) break;
         if (b == BTN_CENTER) {
             pin_submit();
         } else if (b == BTN_LEFT && ui.pin.len == 0 && ui.pin.id != P_UNLOCK) {
+            if (family) {
+                crypto_wipe(ui.pin.first, sizeof(ui.pin.first));
+                crypto_wipe(ui.pin.digits, sizeof(ui.pin.digits));
+            }
             open_menu(M_SETTINGS);
         } else if (ui.pin.len < STORE_PIN_MAX) {
             uint8_t sym = b == BTN_UP ? 1 : b == BTN_RIGHT ? 2 : b == BTN_DOWN ? 3 : 4;
@@ -1195,13 +1438,30 @@ static void on_key(uint8_t b)
         if (ui.msg.back_menu) open_menu(ui.msg.back_menu_id);
         else go(ui.msg.back);
         break;
+
+    case SCR_SIMPLE: {
+        /* Only up and down. Everything else does nothing, not even a
+         * redraw; a long centre hold is handled in scan_buttons(). */
+        int n = store_count(REC_CONTACT);
+        if ((b == BTN_UP || b == BTN_DOWN) && n > 1)
+            ui.simple_rank = list_step(ui.simple_rank, n, b == BTN_UP ? -1 : 1);
+        else ui.dirty = was_dirty;
+        break;
+    }
+
+    case SCR_SIMPLE_INTRO:
+        if (b == BTN_CENTER || b == BTN_RIGHT)
+            open_pin(P_FAMILY_NEW, "Choose a family PIN (6-12)");
+        else if (b == BTN_LEFT) open_menu(M_SETTINGS);
+        else ui.dirty = was_dirty;
+        break;
     }
 }
 
 static bool repeats(uint8_t b)
 {
     if (b == BTN_CENTER) return false;
-    if (ui.scr == SCR_PIN) return false;
+    if (ui.scr == SCR_PIN || ui.scr == SCR_SIMPLE) return false;
     if (b == BTN_UP || b == BTN_DOWN) return true;
     return ui.scr == SCR_TEXT || ui.scr == SCR_TIME;
 }
@@ -1224,6 +1484,19 @@ static void scan_buttons(uint32_t now)
         on_key(held);
     }
     ui.held = held;
+
+    /* Simple mode's only way out: hold the centre for 10 s. */
+    if (ui.scr == SCR_SIMPLE) {
+        uint32_t t = held == BTN_CENTER ? now - ui.held_since : 0;
+        bool hint_now = t >= FAMILY_HOLD_HINT_MS;
+        if (t >= FAMILY_HOLD_MS) {
+            ui.hold_shown = false;
+            open_pin(P_FAMILY_UNLOCK, "Enter the family PIN");
+        } else if (hint_now != ui.hold_shown) {
+            ui.hold_shown = hint_now;
+            ui.dirty = true;
+        }
+    }
 }
 
 /* ------------------------------------------------------------------ */
@@ -1242,7 +1515,15 @@ static uint32_t current_view_key(void)
     case SCR_CONTACT:                    /* the words */
         return (uint32_t)(t / WORDS_PERIOD_S);
     case SCR_PIN:
+        if (ui.pin.id == P_FAMILY_UNLOCK) { /* as drawn: minutes, then 10 s steps */
+            uint32_t w = store_family_wait_s(t);
+            return w >= 60 ? 1000u + (w + 59) / 60 : (w + 9) / 10;
+        }
         return (uint32_t)(hal_millis() / 1000);
+    case SCR_SIMPLE: /* the words; no clock on this screen */
+        return simple_words_shown() ? (uint32_t)(t / WORDS_PERIOD_S) : 0;
+    case SCR_SIMPLE_INTRO:
+        return 0;
     default:
         return (uint32_t)(now_local() / 60); /* the clock in the title bar */
     }
@@ -1256,7 +1537,8 @@ static uint32_t current_view_key(void)
 static uint32_t current_tick_key(void)
 {
     int64_t t = now_utc();
-    if (ui.scr == SCR_CONTACT) return (uint32_t)(t / (WORDS_PERIOD_S / BAR_STEPS));
+    if (ui.scr == SCR_CONTACT || (ui.scr == SCR_SIMPLE && simple_words_shown()))
+        return (uint32_t)(t / (WORDS_PERIOD_S / BAR_STEPS));
     if (ui.scr == SCR_CODE) return (uint32_t)(t / ((ui.code_period ? ui.code_period : 30) / BAR_STEPS));
     return 0;
 }
@@ -1280,6 +1562,8 @@ static void render(bool tick_only)
     case SCR_PIN: draw_pin(); break;
     case SCR_MESSAGE: draw_message(); break;
     case SCR_ABOUT: draw_about(); break;
+    case SCR_SIMPLE: draw_simple(); break;
+    case SCR_SIMPLE_INTRO: draw_simple_intro(); break;
     }
     /* Keys as of what was just drawn (drawing the code screen sets
      * code_period), so a redraw is not followed by a spurious one. */
@@ -1299,6 +1583,7 @@ static void render(bool tick_only)
 static void enter_first_screen(void)
 {
     if (!store_unlocked()) open_pin(P_UNLOCK, "Enter your PIN");
+    else if (simple_on()) enter_simple();
     else if (!time_valid()) enter_time_editor();
     else open_menu(M_HOME);
 }
@@ -1404,6 +1689,7 @@ uint32_t app_poll(void)
         if (ui.scr == SCR_PAIR || ui.scr == SCR_SAS || ui.scr == SCR_TEXT) stop_pairing();
         crypto_wipe(&ui.draft, sizeof(ui.draft));
         crypto_wipe(ui.text.buf, sizeof(ui.text.buf));
+        crypto_wipe(&ui.pin, sizeof(ui.pin)); /* a PIN (or family PIN) half entered */
         store_lock();
         draw_sleep();
         /* Always full: it wipes every trace of words and codes off the

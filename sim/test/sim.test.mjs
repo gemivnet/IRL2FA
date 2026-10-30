@@ -361,6 +361,124 @@ test('a PIN set with the joystick is required after wake', async () => {
   assert.ok(a.totpCode(0) >= 0);
 });
 
+/** Whether the ink of `probe` (a probeText render) appears anywhere on the
+ * panel image `fb`, black on white or inverted. */
+function findText(fb, probe) {
+  const px = (f, x, y) => (f[y * DISPLAY_STRIDE + (x >> 3)] >> (7 - (x & 7))) & 1;
+  let x0 = 250, y0 = DISPLAY_H, x1 = -1, y1 = -1;
+  for (let y = 0; y < DISPLAY_H; y++)
+    for (let x = 0; x < 250; x++)
+      if (px(probe, x, y)) { x0 = Math.min(x0, x); y0 = Math.min(y0, y); x1 = Math.max(x1, x); y1 = Math.max(y1, y); }
+  if (x1 < 0) return false;
+  const w = x1 - x0 + 1, h = y1 - y0 + 1;
+  for (const inv of [0, 1])
+    for (let oy = 0; oy + h <= DISPLAY_H; oy++)
+      for (let ox = 0; ox + w <= 250; ox++) {
+        let match = true;
+        for (let y = 0; y < h && match; y++)
+          for (let x = 0; x < w && match; x++)
+            match = (px(fb, ox + x, oy + y) ^ inv) === px(probe, x0 + x, y0 + y);
+        if (match) return true;
+      }
+  return false;
+}
+
+function hold(w, d, btn, ms) {
+  d.setButtons(btn);
+  w.advance(ms);
+  d.setButtons(0);
+  w.advance(30);
+  settle(w, d);
+}
+
+test('simple mode: set up in Settings, shows only the caller\'s word, up/down only, out with the family PIN', async () => {
+  const { a, b, w } = await newWorld();
+  await pairBoth(w, a, b);
+  press(w, a, BTN.CENTER);
+  press(w, b, BTN.CENTER);
+  typeText(w, a, CS_LABEL, 'Gran');
+  typeText(w, b, CS_LABEL, 'Susan');
+  press(w, a, BTN.CENTER);
+  press(w, b, BTN.CENTER);
+  assert.equal(b.screen(), 'contact');
+
+  // B becomes Gran's device, through its own Settings as on the hardware.
+  press(w, b, BTN.LEFT);
+  press(w, b, BTN.LEFT);
+  presses(w, b, BTN.DOWN, 4);
+  press(w, b, BTN.CENTER); // Settings
+  presses(w, b, BTN.DOWN, 4);
+  press(w, b, BTN.CENTER); // Simple mode
+  assert.equal(b.screen(), 'simple_intro');
+  press(w, b, BTN.CENTER);
+  assert.equal(b.screen(), 'pin');
+  const family = [BTN.UP, BTN.UP, BTN.RIGHT, BTN.RIGHT, BTN.DOWN, BTN.DOWN];
+  for (let k = 0; k < 3; k++) { // choose, again, once more
+    for (const x of family) press(w, b, x);
+    press(w, b, BTN.CENTER);
+  }
+  assert.equal(b.screen(), 'message');
+  assert.ok(b.simpleMode());
+  press(w, b, BTN.DOWN);
+  assert.equal(b.screen(), 'simple');
+
+  // B shows "Susan will say:" and A's SAY word, large; B's own SAY word
+  // is drawn nowhere, in any font. A is unchanged: SAY and HEAR as before.
+  const fonts = [FONT.SMALL, FONT.MEDIUM, FONT.LARGE, FONT.MONO, FONT.HUGE];
+  for (let win = 0; win < 3; win++) {
+    let ok = false;
+    for (let attempt = 0; attempt < 3 && !ok; attempt++) {
+      w.advance(150);
+      const wa = a.contactWords(0, 0), wb = b.contactWords(0, 0);
+      const fb = b.framebuffer();
+      const hear = b.word(wb.receive), say = b.word(wb.give);
+      ok = hear === a.word(wa.give) &&
+           findText(fb, b.probeText(FONT.HUGE, 0, 0, 0, hear)) &&
+           findText(fb, b.probeText(FONT.LARGE, 0, 0, 0, 'Susan')) &&
+           !fonts.some((f) => findText(fb, b.probeText(f, 0, 0, 0, say)));
+      if (ok && win === 0) console.log(`  simple mode: "Susan will say: ${hear}"; its own SAY word "${say}" not drawn`);
+    }
+    assert.ok(ok, `window ${win}: caller's word shown, own SAY word not`);
+    assert.equal(a.screen(), 'contact');
+    press(w, b, BTN.LEFT); // does nothing, but counts as use: stays awake
+    w.advance(15000 - 400);
+  }
+
+  // Left, right and a centre press do nothing at all, not even a redraw.
+  settle(w, b);
+  w.advance(5200 - (b.unix() * 1000) % 5000); // just after a countdown tick
+  settle(w, b);
+  const r0 = b.refreshes();
+  press(w, b, BTN.LEFT);
+  press(w, b, BTN.RIGHT);
+  press(w, b, BTN.CENTER);
+  assert.equal(b.screen(), 'simple');
+  assert.deepEqual(b.refreshes(), r0);
+
+  // Asleep and woken: straight back to the contact screen.
+  assert.ok(w.until(() => b.sleeping, 40000));
+  settle(w, b);
+  b.setButtons(BTN.CENTER);
+  w.advance(30);
+  b.setButtons(0);
+  settle(w, b);
+  assert.equal(b.screen(), 'simple');
+
+  // Hold the centre 10 s: the family PIN. A wrong one is refused; the
+  // right one opens the normal menus.
+  hold(w, b, BTN.CENTER, 6000);
+  assert.equal(b.screen(), 'simple', 'not after 6 s');
+  hold(w, b, BTN.CENTER, 11000); // counted from when the core sees the press
+  assert.equal(b.screen(), 'pin');
+  for (const x of [BTN.DOWN, BTN.DOWN, BTN.DOWN, BTN.DOWN, BTN.DOWN, BTN.DOWN]) press(w, b, x);
+  press(w, b, BTN.CENTER);
+  assert.equal(b.screen(), 'pin');
+  for (const x of family) press(w, b, x);
+  press(w, b, BTN.CENTER);
+  assert.equal(b.screen(), 'menu');
+  assert.ok(b.simpleMode(), 'still on: the family turns it off in Settings');
+});
+
 test('energy accounting', async () => {
   const { a, w } = await newWorld();
   const start = w.elapsedMs;

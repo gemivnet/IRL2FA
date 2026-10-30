@@ -17,6 +17,13 @@
 #define JOURNAL_MAGIC 0x4a4c5249u /* "IRLJ" */
 #define PINLOG_TRY 0x00000000f0f0f0f0ull
 #define PINLOG_OK 0x000000000f0f0f0full
+/* Family PIN entries in the same log: the tag in the high word, the RTC
+ * time (unix seconds) of the try in the low word. CLOCK moves the time the
+ * wait counts from without counting a try (the clock went backwards). */
+#define PINLOG_FAM_TRY 0x46414d54u   /* "FAMT" */
+#define PINLOG_FAM_CLOCK 0x46414d43u /* "FAMC" */
+#define PINLOG_FAM_OK 0x46414d4f00000000ull
+#define FAMILY_KEEP 16 /* failures kept through a compaction (the wait tops out at 9) */
 
 /* Slot: type, 3 reserved, nonce, mac, ciphertext. */
 #define SLOT_NONCE 4
@@ -34,7 +41,13 @@ typedef struct {
     uint8_t nonce[24];
     uint8_t mac[16];
     uint8_t mk[32]; /* master key, wrapped when pin_set */
-} meta_t;          /* 96 bytes */
+    /* Simple mode. Stores written before it existed have 0xff here. */
+    uint8_t simple;        /* 1 = on; anything else = off */
+    uint8_t simple_pad[7];
+    uint8_t fam_nonce[24];
+    uint8_t fam_mac[16];
+    uint8_t fam_box[48];   /* sealed under the master key: salt, Argon2i(PIN) */
+} meta_t;                  /* 192 bytes */
 
 typedef struct {
     uint32_t magic;
@@ -130,6 +143,7 @@ static void load_settings(void)
     settings.sleep_s = meta.sleep_s;
     settings.pin_set = meta.pin_set;
     settings.pin_fails = store_pin_fails();
+    settings.simple = meta.simple == 1;
 }
 
 static void fresh_store(void)
@@ -205,7 +219,8 @@ static void pin_kek(const uint8_t *pin, int len, const uint8_t salt[16], uint8_t
 
 /* The attempt log is a page of 8-byte entries: TRY before every attempt,
  * OK after a correct PIN. Failures = TRYs after the last OK. Writing TRY
- * before checking means pulling the battery mid-attempt still counts. */
+ * before checking means pulling the battery mid-attempt still counts. The
+ * family PIN keeps its own count in the same page (FAM_TRY / FAM_OK). */
 static int pinlog_used(void)
 {
     for (int i = 0; i < (int)(HAL_FLASH_PAGE / 8); i++) {
@@ -216,17 +231,50 @@ static int pinlog_used(void)
     return HAL_FLASH_PAGE / 8;
 }
 
+/* Wrong family PINs since the last right one, and the RTC time to count
+ * the wait from. */
+static uint8_t family_log(uint32_t *last)
+{
+    uint8_t fails = 0;
+    uint32_t t = 0;
+    int n = pinlog_used();
+    for (int i = 0; i < n; i++) {
+        uint64_t v;
+        hal_flash_read(page_off(PINLOG_PAGE) + (uint32_t)i * 8, &v, 8);
+        uint32_t tag = (uint32_t)(v >> 32);
+        if (v == PINLOG_FAM_OK) {
+            fails = 0;
+        } else if (tag == PINLOG_FAM_TRY) {
+            if (fails < 255) fails++;
+            t = (uint32_t)v;
+        } else if (tag == PINLOG_FAM_CLOCK) {
+            t = (uint32_t)v;
+        }
+    }
+    if (last) *last = t;
+    return fails;
+}
+
 static void pinlog_append(uint64_t v)
 {
     int n = pinlog_used();
     if (n >= (int)(HAL_FLASH_PAGE / 8) - 1) {
-        /* Compact: keep only the current failure count. The new page goes
-         * through the journal, so a power cut leaves the old log or the new
-         * one, never an erased log (which would reset the count). */
+        /* Compact: keep only the current failure counts (and the time of
+         * the last family try). The new page goes through the journal, so
+         * a power cut leaves the old log or the new one, never an erased
+         * log (which would reset the count). Ten device failures or more
+         * all mean the same (a wipe), so the count is capped to leave room
+         * for the family entries. */
         uint8_t fails = store_pin_fails();
-        uint64_t t = PINLOG_TRY;
+        uint32_t last;
+        uint8_t ffails = family_log(&last);
+        if (fails > 200) fails = 200;
+        if (ffails > FAMILY_KEEP) ffails = FAMILY_KEEP;
+        uint64_t t = PINLOG_TRY, ft = (uint64_t)PINLOG_FAM_TRY << 32 | last;
         memset(page_buf, 0xff, sizeof(page_buf));
-        for (n = 0; n < fails; n++) memcpy(page_buf + (size_t)n * 8, &t, 8);
+        n = 0;
+        for (int k = 0; k < fails; k++, n++) memcpy(page_buf + (size_t)n * 8, &t, 8);
+        for (int k = 0; k < ffails; k++, n++) memcpy(page_buf + (size_t)n * 8, &ft, 8);
         memcpy(page_buf + (size_t)n * 8, &v, 8);
         commit_page(PINLOG_PAGE);
         return;
@@ -300,6 +348,89 @@ store_status_t store_set_pin(const uint8_t *pin, int len)
     write_meta();
     hal_flash_erase(PINLOG_PAGE);
     load_settings();
+    return STORE_OK;
+}
+
+/* ---- simple mode and the family PIN ---- */
+
+static const uint8_t FAM_AD[4] = {'I', 'R', 'L', 'F'};
+
+store_status_t store_set_simple(const uint8_t *pin, int len)
+{
+    if (!unlocked) return STORE_LOCKED;
+    if (len == 0) {
+        meta.simple = 0;
+        memset(meta.simple_pad, 0, sizeof(meta.simple_pad));
+        memset(meta.fam_nonce, 0, sizeof(meta.fam_nonce));
+        memset(meta.fam_mac, 0, sizeof(meta.fam_mac));
+        memset(meta.fam_box, 0, sizeof(meta.fam_box));
+    } else {
+        if (len < STORE_FAMILY_PIN_MIN || len > STORE_PIN_MAX) return STORE_ERR;
+        uint8_t box[48];
+        hal_random(box, 16); /* salt */
+        pin_kek(pin, len, box, box + 16);
+        hal_random(meta.fam_nonce, sizeof(meta.fam_nonce));
+        crypto_aead_lock(meta.fam_box, meta.fam_mac, master_key, meta.fam_nonce, FAM_AD,
+                         sizeof(FAM_AD), box, sizeof(box));
+        crypto_wipe(box, sizeof(box));
+        meta.simple = 1;
+        memset(meta.simple_pad, 0, sizeof(meta.simple_pad));
+    }
+    write_meta();
+    load_settings();
+    return STORE_OK;
+}
+
+uint8_t store_family_fails(void)
+{
+    return family_log(NULL);
+}
+
+/* Wait after the nth wrong family PIN (n = 3, 4, ...). */
+static uint32_t family_wait_for(uint8_t fails)
+{
+    static const uint16_t WAIT_S[] = {30, 60, 120, 300, 600, 1800, 3600};
+    if (fails < STORE_FAMILY_FREE_TRIES) return 0;
+    unsigned k = fails - STORE_FAMILY_FREE_TRIES;
+    return WAIT_S[k < 6 ? k : 6];
+}
+
+uint32_t store_family_wait_s(int64_t now)
+{
+    uint32_t last;
+    uint32_t wait = family_wait_for(family_log(&last));
+    if (wait == 0) return 0;
+    if (now < (int64_t)last) {
+        /* The clock went back (a battery change resets the RTC): count the
+         * wait from now. Never a lockout, never a free try. */
+        pinlog_append((uint64_t)PINLOG_FAM_CLOCK << 32 | (uint32_t)(now < 0 ? 0 : now));
+        return wait;
+    }
+    int64_t left = (int64_t)last + wait - now;
+    return left > 0 ? (uint32_t)left : 0;
+}
+
+store_status_t store_check_family_pin(const uint8_t *pin, int len, int64_t now)
+{
+    if (meta.simple != 1) return STORE_ERR;
+    if (!unlocked) return STORE_LOCKED;
+    if (store_family_wait_s(now) > 0) return STORE_WAIT;
+    uint8_t box[48], h[32];
+    int bad = crypto_aead_unlock(box, meta.fam_mac, master_key, meta.fam_nonce, FAM_AD,
+                                 sizeof(FAM_AD), meta.fam_box, sizeof(box));
+    CT_PUBLIC(&bad, sizeof(bad));
+    if (bad) { /* see store.h: a damaged verifier must not lock the family out */
+        crypto_wipe(box, sizeof(box));
+        store_set_simple(NULL, 0);
+        return STORE_OK;
+    }
+    pinlog_append((uint64_t)PINLOG_FAM_TRY << 32 | (uint32_t)(now < 0 ? 0 : now));
+    pin_kek(pin, len, box, h);
+    int ok = ct_equal(h, box + 16, sizeof(h));
+    crypto_wipe(box, sizeof(box));
+    crypto_wipe(h, sizeof(h));
+    if (!ok) return STORE_BAD_PIN;
+    pinlog_append(PINLOG_FAM_OK);
     return STORE_OK;
 }
 

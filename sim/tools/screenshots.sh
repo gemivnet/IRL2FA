@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Builds the simulator, serves it locally and captures the docs screenshots in
-# the Playwright Docker image. Usage: sim/tools/screenshots.sh [URL]
+# the Playwright Docker image. Usage: [SHOTS=main,simple] sim/tools/screenshots.sh [URL]
 # SPDX-License-Identifier: AGPL-3.0-or-later
 set -euo pipefail
 cd "$(dirname "$0")/../.."
@@ -13,7 +13,7 @@ if [ -z "$URL" ]; then
 else
   SERVE=true
 fi
-docker run --rm --network host -u "$(id -u):$(id -g)" -e HOME=/tmp -e SIM_URL="$URL" \
+docker run --rm --network host -u "$(id -u):$(id -g)" -e HOME=/tmp -e SIM_URL="$URL" -e SHOTS="${SHOTS:-main,simple}" \
   -v "$PWD":/w -w /w "$IMAGE" bash -c "
     $SERVE
     cd /tmp && npm init -y >/dev/null && npm i -s playwright@1.49.1 >/dev/null && cd /w &&

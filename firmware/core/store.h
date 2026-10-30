@@ -10,6 +10,16 @@
  * under a random 256-bit master key. Without a PIN the master key is stored
  * as-is (the flash is protected by the MCU's readout protection); with a PIN
  * it is wrapped with a key derived from the PIN by Argon2i.
+ *
+ * Simple mode (docs call it "vulnerable (simple) mode", docs/ui-flows.md) is
+ * a kiosk mode for someone who should only check who is calling. Its flag
+ * lives in the settings page; the family PIN that leaves it is kept only as
+ * an Argon2i verifier, sealed under the master key in the same page, so the
+ * flag and the verifier change together in one atomic page write. The
+ * family PIN does not encrypt anything and is separate from the device PIN.
+ * Wrong family PINs are counted in the PIN attempt log (page 3) with the
+ * RTC time of each try, and cost an escalating wait that survives resets
+ * and sleep; they never erase anything.
  * SPDX-License-Identifier: AGPL-3.0-or-later */
 #ifndef IRL2FA_STORE_H
 #define IRL2FA_STORE_H
@@ -29,6 +39,10 @@
 #define STORE_PIN_MAX 12
 #define STORE_PIN_MIN 4
 #define STORE_PIN_TRIES 10   /* wrong PINs before the store is wiped */
+/* No wipe for the family PIN, so it is longer: 4^6 = 4096 sequences at up to
+ * an hour each after the first few is months of guessing. */
+#define STORE_FAMILY_PIN_MIN 6
+#define STORE_FAMILY_FREE_TRIES 3 /* wrong family PINs before the waits start */
 
 typedef enum {
     REC_EMPTY = 0xff,
@@ -58,6 +72,7 @@ typedef struct {
     uint8_t sleep_s;      /* idle seconds before sleeping, 0 = default */
     uint8_t pin_set;
     uint8_t pin_fails;
+    uint8_t simple;       /* simple mode on (read-only here: store_set_simple) */
 } settings_t;
 
 typedef enum {
@@ -67,6 +82,7 @@ typedef enum {
     STORE_WIPED,       /* too many wrong PINs; everything erased */
     STORE_FULL,
     STORE_ERR,
+    STORE_WAIT,        /* family PIN: too soon after the last wrong one */
 } store_status_t;
 
 /* Mounts the store, finishing any interrupted page rewrite and creating a
@@ -78,6 +94,20 @@ store_status_t store_unlock(const uint8_t *pin, int len);
 /* Sets, changes or (len == 0) removes the PIN. Store must be unlocked. */
 store_status_t store_set_pin(const uint8_t *pin, int len);
 uint8_t store_pin_fails(void);
+
+/* Simple mode. store_set_simple() turns it on with a family PIN of
+ * STORE_FAMILY_PIN_MIN..STORE_PIN_MAX moves, or off with len == 0; the
+ * store must be unlocked. store_check_family_pin() checks a family PIN at
+ * RTC time `now`: STORE_OK, STORE_BAD_PIN, STORE_WAIT (store_family_wait_s
+ * is not 0 yet), STORE_LOCKED, or STORE_ERR if simple mode is off. If the
+ * sealed verifier does not open (a damaged settings page), simple mode is
+ * turned off and STORE_OK returned: the family must never be locked out of
+ * the device for good, and changing flash means the attacker has it all. */
+store_status_t store_set_simple(const uint8_t *pin, int len);
+store_status_t store_check_family_pin(const uint8_t *pin, int len, int64_t now);
+uint8_t store_family_fails(void);
+/* Seconds before the next family PIN may be tried, at RTC time `now`. */
+uint32_t store_family_wait_s(int64_t now);
 
 const settings_t *store_settings(void);
 store_status_t store_save_settings(const settings_t *s);
