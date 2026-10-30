@@ -6,7 +6,7 @@ body:
     id: rev
     attributes:
       label: Board revision and where it was made
-      placeholder: "v0.1, JLCPCB PCBA"
+      placeholder: "v0.2, JLCPCB PCBA"
   - type: textarea
     id: parts
     attributes:

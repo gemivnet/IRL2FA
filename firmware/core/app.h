@@ -8,7 +8,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#define IRL2FA_VERSION "0.1.0"
+#define IRL2FA_VERSION "0.2.0"
 
 /* Returned by app_poll() when the app wants to sleep. */
 #define APP_SLEEP 0xffffffffu

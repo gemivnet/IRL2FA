@@ -517,8 +517,18 @@ def step_silk():
             obs.boxes[layer].append(box)
 
     w, h = B["width"], B["height"]
+    marks = [("IRL2FA", 1.2, w / 2, h - 1.6), ("v0.2  irl2fa.com", SILK_REF, w / 2, h - 0.6),
+             ("CERN-OHL-S-2.0", SILK_REF, 11.0, h - 1.0)]
+    # Texts no longer wanted (a marking whose wording changed, e.g. the
+    # revision) are reused for new ones rather than removed: see above.
+    wanted = {m[0] for m in marks} | set(TP_LABELS.values())
+    stale = [t for txt, t in existing.items() if txt not in wanted]
+
     def marking(text, size):
-        t = existing.get(text)
+        t = existing.pop(text, None)
+        if t is None and stale:
+            t = stale.pop()
+            t.SetText(text)
         if t is None:
             t = pcbnew.PCB_TEXT(board)
             t.SetText(text)
@@ -550,8 +560,6 @@ def step_silk():
         if not place_text(t, obs, cands):
             raise SystemExit(f"no free place for the {ref} label {text!r}")
 
-    marks = [("IRL2FA", 1.2, w / 2, h - 1.6), ("v0.1  irl2fa.com", SILK_REF, w / 2, h - 0.6),
-             ("CERN-OHL-S-2.0", SILK_REF, 11.0, h - 1.0)]
     for text, size, px, py in marks:
         t = marking(text, size)
         grid = [(px + dx * 0.5, py + dy * 0.5, 0) for dx in range(-150, 151) for dy in range(-60, 61)]

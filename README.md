@@ -142,7 +142,7 @@ You need a PCB, a display, a coin cell, a printed case and four screws. Everythi
 
 Built one? Please [file a build report](https://github.com/gemivnet/IRL2FA/issues/new?template=build_report.yml).
 
-> **Status:** v0.1 is a complete, simulated and checked design, but no board has been built yet. The first boards will confirm the panel orientation, the IR range and the real sleep current. Until a build report says otherwise, treat it as a prototype.
+> **Status:** v0.2 is a complete, simulated and checked design, but no board has been built yet. The first boards will confirm the panel orientation, the IR range and the real sleep current. Until a build report says otherwise, treat it as a prototype.
 
 ## Updating
 
