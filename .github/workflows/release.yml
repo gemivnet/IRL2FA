@@ -16,11 +16,53 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Firmware
+        # docs/firmware-updates.md. With the IRL2FA_SIGNING_KEY secret (the
+        # Ed25519 seed, 64 hex digits; its public half is
+        # firmware/keys/irl2fa-release.pub, built into the bootloader):
+        #   irl2fa-<tag>.irl2fa              signed update image, for IR updates
+        #   irl2fa-factory-<tag>.bin/.hex    bootloader + signed application (+ its
+        #                                    update image staged), for SWD / JLCPCB
+        # Without it: only the unsigned factory image (a development build:
+        # runs only while readout protection is off, takes no updates until a
+        # signed one arrives), and the release notes say so.
+        env:
+          IRL2FA_SIGNING_KEY: ${{ secrets.IRL2FA_SIGNING_KEY }}
         run: |
+          set -euo pipefail
           firmware/port/stm32u0/build.sh
+          B=firmware/build/stm32u0
+          T=${GITHUB_REF_NAME}
+          V=$(python3 -c "import sys; sys.path.insert(0, 'firmware/tools'); import sign_image as s; print(s.app_version())")
+          if [ "v$V" != "$T" ]; then
+            echo "::error::tag $T does not match IRL2FA_VERSION $V in firmware/core/app.h"; exit 1
+          fi
           mkdir -p out
-          for ext in bin elf hex; do cp firmware/build/stm32u0/irl2fa.$ext out/irl2fa-stm32u083-${GITHUB_REF_NAME}.$ext; done
-          cp firmware/build/stm32u0/size-report.txt out/firmware-size-report.txt
+          cp docs/release-notes.md out/NOTES.md
+          for f in irl2fa.elf boot.elf; do cp $B/$f out/${f%.elf}-stm32u083-$T.elf; done
+          cp $B/size-report.txt out/firmware-size-report.txt
+          if [ -n "${IRL2FA_SIGNING_KEY:-}" ]; then
+            python3 firmware/tools/sign_image.py sign --key env:IRL2FA_SIGNING_KEY --version "$V" \
+              --in $B/irl2fa.bin --out out/irl2fa-$T.irl2fa
+            python3 firmware/tools/sign_image.py verify --pub firmware/keys/irl2fa-release.pub \
+              --in out/irl2fa-$T.irl2fa --bin $B/irl2fa.bin
+            python3 firmware/tools/sign_image.py factory --boot $B/boot.bin --image out/irl2fa-$T.irl2fa \
+              --out out/irl2fa-factory-$T.bin --hex out/irl2fa-factory-$T.hex
+          else
+            echo "::warning::IRL2FA_SIGNING_KEY is not set: publishing only the UNSIGNED factory image"
+            cp $B/irl2fa-factory.bin out/irl2fa-factory-UNSIGNED-$T.bin
+            cp $B/irl2fa-factory.hex out/irl2fa-factory-UNSIGNED-$T.hex
+            cat >> out/NOTES.md <<'NOTE'
+
+          ## Warning: unsigned firmware
+
+          This release was built without the release signing key. There is no
+          `.irl2fa` update image, and the factory image's application is unsigned:
+          a device flashed with it runs only while readout protection is off (it
+          never turns it on), so it does not protect the codes and contacts on
+          it. Do not give such a device to anyone; update it with the next signed
+          release (docs/firmware-updates.md).
+          NOTE
+          fi
 
       - name: Hardware (checked, then packaged)
         run: |
@@ -39,4 +81,5 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "$GITHUB_REF_NAME" out/* --title "IRL2FA $GITHUB_REF_NAME" --notes-file docs/release-notes.md --verify-tag
+          mv out/NOTES.md notes.md
+          gh release create "$GITHUB_REF_NAME" out/* --title "IRL2FA $GITHUB_REF_NAME" --notes-file notes.md --verify-tag

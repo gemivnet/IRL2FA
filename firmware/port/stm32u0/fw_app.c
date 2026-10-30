@@ -55,6 +55,22 @@ bool hal_update_read(uint32_t off, uint8_t *buf, size_t len)
     return board_flash_read(FL_STAGING_OFF + FW_HDR_SIZE + off, buf, len);
 }
 
+/* Readout protection is the bootloader's to set (docs/firmware-updates.md):
+ * the first time the owner wakes the device with the joystick after a start,
+ * if the chip is unprotected and runs a signed image, ask for it. A
+ * programming fixture only powers the board and never gets here. The
+ * bootloader declines on a weak cell; then the next start asks again. */
+void board_request_lock(void)
+{
+    static bool asked;
+    if (asked) return;
+    asked = true;
+    const fw_header_t *h = own_header();
+    if ((FLASH->OPTR & FLASH_OPTR_RDP) != 0xAAu || !h || (h->flags & FW_FLAG_UNSIGNED)) return;
+    boot_mailbox_put(BOOT_CMD_LOCK, 0);
+    NVIC_SystemReset();
+}
+
 int hal_update_result(uint32_t *version)
 {
     static bool taken;

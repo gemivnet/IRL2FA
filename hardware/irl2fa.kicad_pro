@@ -467,6 +467,24 @@
       },
       {
         "bus_width": 12,
+        "clearance": 0.15,
+        "diff_pair_gap": 0.25,
+        "diff_pair_via_gap": 0.25,
+        "diff_pair_width": 0.2,
+        "line_style": 0,
+        "microvia_diameter": 0.3,
+        "microvia_drill": 0.1,
+        "name": "Ground",
+        "pcb_color": "rgba(0, 0, 0, 0.000)",
+        "priority": 1,
+        "schematic_color": "rgba(0, 0, 0, 0.000)",
+        "track_width": 0.3,
+        "via_diameter": 0.6,
+        "via_drill": 0.3,
+        "wire_width": 6
+      },
+      {
+        "bus_width": 12,
         "clearance": 0.2,
         "diff_pair_gap": 0.25,
         "diff_pair_via_gap": 0.25,
@@ -491,32 +509,32 @@
     "netclass_assignments": null,
     "netclass_patterns": [
       {
-        "netclass": "Power",
-        "pattern": "GND"
+        "netclass": "Ground",
+        "pattern": "/GND"
       },
       {
         "netclass": "Power",
-        "pattern": "VBAT"
+        "pattern": "/VBAT"
       },
       {
         "netclass": "Power",
-        "pattern": "VBAT_RAW"
+        "pattern": "/VBAT_RAW"
       },
       {
         "netclass": "Power",
-        "pattern": "VEPD"
+        "pattern": "/VEPD"
       },
       {
         "netclass": "Power",
-        "pattern": "EPD_SW"
+        "pattern": "/EPD_SW"
       },
       {
         "netclass": "Power",
-        "pattern": "EPD_RESE"
+        "pattern": "/EPD_RESE"
       },
       {
         "netclass": "Power",
-        "pattern": "IR_LED_*"
+        "pattern": "/IR_LED_*"
       }
     ]
   },

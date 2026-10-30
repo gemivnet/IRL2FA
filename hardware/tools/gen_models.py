@@ -261,7 +261,7 @@ def main():
     fh34()
     my2450()
     sidelooker("LED_Vishay_VSMB2948SL_SideView", "white", "lens_ir")
-    sidelooker("PhotoTransistor_Vishay_VEMT2523SLX01_SideView", "white", "black")
+    sidelooker("PhotoTransistor_Vishay_VEMT2023SLX01_SideView", "white", "black")   # lens: the daylight-filter epoxy is black
     epd()
     c7()
 

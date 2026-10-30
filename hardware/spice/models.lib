@@ -4,8 +4,9 @@
 
 * MBR0530 Schottky (30 V, 0.5 A, Vf ~0.38 V @ 100 mA)
 .model MBR0530 D(Is=2.6u Rs=0.15 N=1.0 Cjo=170p M=0.5 Bv=30 Ibv=20u)
-* Si1308EDL N-FET (Vth 0.6-1.5 V, Rds(on) 185 mohm @ 2.5 V); body diode added in subckt
-.model SI1308 NMOS(Level=1 VTO=1.0 KP=3.6 CGSO=1n CGDO=0.2n)
+* NX3008NBK N-FET, booster switch (Nexperia data sheet 5 Nov 2022, Table 7: Vgs(th)
+* 0.6-1.1 V, Rds(on) 2.1 ohm max @ 2.5 V / 200 mA); worst case: Vth 1.1, KP from 2.1 ohm
+.model NX3008 NMOS(Level=1 VTO=1.1 KP=0.34)
 * AO3401A P-FET (Vth -0.9 V, Rds(on) 85 mohm @ -2.5 V)
 .model AO3401 PMOS(Level=1 VTO=-0.9 KP=7.4)
 * AO3400A N-FET (Vth 1.05 V, Rds(on) 48 mohm @ 2.5 V)
@@ -22,7 +23,7 @@ Db d s DBODY
 .ends
 * N-FET with body diode: drain gate source
 .subckt NFET_SW d g s
-M1 d g s s SI1308
+M1 d g s s NX3008
 Db s d DBODY
 .ends
 .subckt NFET_LED d g s

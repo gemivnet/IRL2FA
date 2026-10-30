@@ -11,7 +11,7 @@ import sys
 APP_BUDGET = 96 * 1024 - 256     # application slot less the image header
 BOOT_BUDGET = 26 * 1024          # bootloader region
 STAGING_BUDGET = 50 * 1024       # staging slot: header + LZMA payload
-RAM_BUDGET = 40 * 1024 - 48      # less the bootloader's debug block and mailbox
+RAM_BUDGET = 40 * 1024 - 112     # less the debug blocks and the bootloader mailbox
 
 
 def sections(elf):

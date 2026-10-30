@@ -69,7 +69,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        target: [pairing, store, base32, app]
+        target: [pairing, store, base32, app, fwupdate]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - run: docker build -q -t irl2fa-verify firmware/verify
@@ -116,6 +116,12 @@ jobs:
             firmware/build/stm32u0/irl2fa.bin
             firmware/build/stm32u0/irl2fa.hex
             firmware/build/stm32u0/irl2fa.map
+            firmware/build/stm32u0/boot.elf
+            firmware/build/stm32u0/boot.bin
+            firmware/build/stm32u0/boot.map
+            firmware/build/stm32u0/irl2fa-dev.irl2fa
+            firmware/build/stm32u0/irl2fa-factory.bin
+            firmware/build/stm32u0/irl2fa-factory.hex
             firmware/build/stm32u0/size-report.txt
           if-no-files-found: error
 
@@ -128,7 +134,7 @@ jobs:
         with:
           name: irl2fa-stm32u083
           path: firmware/build/stm32u0
-      - name: Emulation tests (the release image, two devices pairing over IR, measured power profile)
+      - name: Emulation tests (the release images, pairing and firmware updates over IR, power cuts, measured power profile)
         run: SKIP_BUILD=1 firmware/renode/run.sh
       - name: Battery budget from the measured profile (drift vs hardware/power/measured.json, >= 1 year)
         run: python3 hardware/power/power.py --measured firmware/build/renode --check

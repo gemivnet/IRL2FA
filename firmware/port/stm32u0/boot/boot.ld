@@ -9,7 +9,7 @@ ENTRY(Reset_Handler)
 MEMORY
 {
     FLASH (rx)  : ORIGIN = 0x08000000, LENGTH = 26K
-    RAM   (rwx) : ORIGIN = 0x20000000, LENGTH = 40K - 48
+    RAM   (rwx) : ORIGIN = 0x20000000, LENGTH = 40K - 112
 }
 
 __min_stack_size = 4K;
@@ -84,4 +84,4 @@ SECTIONS
 
 ASSERT(ORIGIN(FLASH) == __boot_start && LENGTH(FLASH) == __boot_size, "bootloader region")
 ASSERT(__flash_image_end <= __app_slot_start, "bootloader overlaps the application slot")
-ASSERT(__stack_top == __boot_debug, "the stack ends below the debug block and mailbox")
+ASSERT(__stack_top == __app_debug, "the stack ends below the debug blocks and the mailbox")

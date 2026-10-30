@@ -14,6 +14,7 @@ __log_size = 4K;
 __store_start = 0x0802C000;
 __store_size = 80K;
 __mailbox = 0x20009FF0;        /* 16 bytes at the top of SRAM, kept by both programs */
+__app_debug = 0x20009F90;      /* 64 bytes below that: the application's debug block (Renode tests) */
 __boot_debug = 0x20009FD0;     /* 32 bytes below it: the bootloader's debug block (Renode tests) */
 __ram_start = 0x20000000;
 __ram_size = 40K;

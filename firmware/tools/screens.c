@@ -9,6 +9,7 @@
 #include "../core/pairing.h"
 #include "../core/store.h"
 #include "../vhal/vhal.h"
+#include "../tests/data/fw_fixtures.h"
 
 static const char *outdir = ".";
 
@@ -128,6 +129,17 @@ int main(int argc, char **argv)
     steps(BTN_DOWN, 2);
     step(BTN_CENTER);
     dump("pin");
+    step(BTN_LEFT);
+    /* Firmware update: the menu, and sending this device's image. */
+    vhal_set_update_image(FIX_SAMPLE_IMAGE, sizeof(FIX_SAMPLE_IMAGE));
+    steps(BTN_DOWN, 5);
+    step(BTN_CENTER);
+    dump("update_menu");
+    step(BTN_DOWN);
+    step(BTN_CENTER);
+    dump("update_send");
+    step(BTN_LEFT);
+    vhal_set_update_image(NULL, 0);
     /* Sleep screen */
     for (int i = 0; i < 1000; i++) {
         if (app_poll() == APP_SLEEP) break;

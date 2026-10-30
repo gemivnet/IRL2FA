@@ -281,24 +281,27 @@ static size_t data_frame(fwtx_t *tx, uint32_t off, uint8_t *out, size_t cap)
 size_t fwtx_poll(fwtx_t *tx, uint32_t now, uint8_t *out, size_t cap)
 {
     if (tx->state == FWTX_DONE || tx->state == FWTX_FAILED) return 0;
-    bool timeout = tx->state == FWTX_INSTALLING ? now - tx->phase_start > FWTX_INSTALL_MS
-                                                : now - tx->last_rx > FWTX_SILENCE_MS;
+    /* Signed: the caller's clock may read a little behind the one the
+     * transfer was started with. */
+    bool timeout = tx->state == FWTX_INSTALLING
+                       ? (int32_t)(now - tx->phase_start) > (int32_t)FWTX_INSTALL_MS
+                       : (int32_t)(now - tx->last_rx) > (int32_t)FWTX_SILENCE_MS;
     if (timeout) {
         tx->err = FW_E_TIMEOUT;
         tx->state = FWTX_FAILED;
         return 0;
     }
     size_t n = 0;
-    uint32_t since = now - tx->last_tx;
+    int32_t since = (int32_t)(now - tx->last_tx);
     switch (tx->state) {
     case FWTX_OFFERING:
-        if (since >= FWTX_OFFER_MS) n = fwl_frame(out, cap, FWL_OFFER, tx->hdr, FW_HDR_SIZE);
+        if (since >= (int32_t)FWTX_OFFER_MS) n = fwl_frame(out, cap, FWL_OFFER, tx->hdr, FW_HDR_SIZE);
         break;
     case FWTX_SENDING:
-        if (tx->answered || since >= FWTX_RETRY_MS) n = data_frame(tx, tx->next, out, cap);
+        if (tx->answered || since >= (int32_t)FWTX_RETRY_MS) n = data_frame(tx, tx->next, out, cap);
         break;
     default: /* FWTX_INSTALLING: any DATA gets a STATUS back */
-        if (since >= FWTX_POLL_MS) {
+        if (since >= (int32_t)FWTX_POLL_MS) {
             uint32_t last = tx->payload_size > FWL_CHUNK ? tx->payload_size - FWL_CHUNK : 0;
             n = data_frame(tx, last, out, cap);
         }

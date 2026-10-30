@@ -42,7 +42,7 @@ struct irl2fa_boot_debug {
     uint32_t phase; /* 1 checking, 2 receiving, 3 installing, 4 starting the app, 5 locking */
     uint32_t app_err, install_err;
     uint32_t rx_state, rx_next;
-    uint32_t rdp; /* 0 not considered, 1 locked now, 2 cell too low, 3 already, 4 unsigned app */
+    uint32_t rdp; /* 0 not asked, 1 locked now, 2 cell too low, 3 already, 4 unsigned app */
     uint32_t battery_mv;
 };
 #define BOOT_DEBUG ((volatile struct irl2fa_boot_debug *)FL_BOOT_DEBUG_ADDR)
@@ -119,9 +119,10 @@ static void lock_chip(void)
     for (;;) NVIC_SystemReset();
 }
 
-/* At a power-on (a cell put in), with a signed application, on a healthy
- * cell: once, and never at the factory's programming resets. */
-static void maybe_lock(const fw_header_t *app, bool power_on)
+/* When the application asks (its owner woke it with the joystick for the
+ * first time: never on a programming fixture, which only powers the board),
+ * with a signed application, on a healthy cell. */
+static void maybe_lock(const fw_header_t *app, bool requested)
 {
     if (!rdp_level0()) {
         DBG(rdp, 3);
@@ -131,7 +132,7 @@ static void maybe_lock(const fw_header_t *app, bool power_on)
         DBG(rdp, 4);
         return;
     }
-    if (!power_on) return;
+    if (!requested) return;
     bool cal;
     uint16_t a = board_battery_mv(&cal);
     board_delay_ms(20);
@@ -214,7 +215,8 @@ static void receive(bool have_app)
             done = true;
             done_at = now;
         }
-        if (done && now - done_at > DONE_LINGER_MS) report_and_restart(result, version);
+        /* board_millis(), not `now`: an install just took seconds. */
+        if (done && board_millis() - done_at > DONE_LINGER_MS) report_and_restart(result, version);
         if (!done && (hal_buttons() & BTN_LEFT) && have_app) report_and_restart(FW_E_CANCELLED, 0);
         if (!done && now - last > RX_IDLE_MS) {
             if (have_app) report_and_restart(rx.state == FWRX_FAILED ? result : FW_E_TIMEOUT, 0);
@@ -231,10 +233,10 @@ int main(void)
     uint32_t arg;
     uint32_t cmd = boot_mailbox_take(&arg);
     if (cmd == BOOT_CMD_RESULT) boot_mailbox_put(cmd, arg); /* for the application */
-    bool power_on = (RCC->CSR & RCC_CSR_PWRRSTF) != 0;
-    RCC->CSR |= RCC_CSR_RMVF;
 #if IRL2FA_DEBUG_HOOK
     memset((void *)BOOT_DEBUG, 0, sizeof(*BOOT_DEBUG));
+    /* The application's block too: what the tests read is this start's. */
+    memset((void *)FL_APP_DEBUG_ADDR, 0, 64);
     BOOT_DEBUG->magic = 0x47424442u;
 #endif
     DBG(phase, 1);
@@ -254,7 +256,7 @@ int main(void)
     if (rep.installed && rep.install == FW_OK && rep.app == FW_OK)
         boot_mailbox_put(BOOT_CMD_RESULT, (uint32_t)FW_OK | (rep.app_hdr.version << 8));
     if (act == FWBOOT_RUN_APP) {
-        maybe_lock(&rep.app_hdr, power_on);
+        maybe_lock(&rep.app_hdr, cmd == BOOT_CMD_LOCK);
         start_app();
     }
     receive(rep.app == FW_OK);

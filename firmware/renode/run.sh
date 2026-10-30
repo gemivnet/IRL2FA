@@ -19,6 +19,11 @@ if [[ -z "${SKIP_BUILD:-}" ]]; then
     BUILD_DIR="$FW/build/stm32u0" "$FW/port/stm32u0/build.sh"
 fi
 mkdir -p "$OUT"
+# Factory images signed with the public test key, for update.robot. The
+# "old" firmware is a second build (the panel mounted the other way round),
+# so an update really rewrites the application slot.
+BUILD_DIR="$FW/build/stm32u0-alt" "$FW/port/stm32u0/build.sh" -DEPD_ROTATE_180=ON > /dev/null
+python3 "$HERE/make_test_images.py" "$FW/build/stm32u0" "$FW/build/stm32u0-alt" "$FW/build/renode-images"
 
 docker run --rm -u "$(id -u):$(id -g)" -e HOME=/tmp -v "$REPO:$REPO" -w "$REPO" "$IMAGE" \
-    renode-test --results-dir "$OUT" --show-log "$@" "$HERE/irl2fa.robot" "$HERE/power.robot"
+    renode-test --results-dir "$OUT" --show-log "$@" "$HERE/irl2fa.robot" "$HERE/power.robot" "$HERE/update.robot"

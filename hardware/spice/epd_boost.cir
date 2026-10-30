@@ -1,5 +1,5 @@
-* GDEY0213B74 booster (reference circuit): L1 47 uH, Si1308EDL (modelled as a
-* switch with its 185 mohm Rds(on)), 3x MBR0530.
+* GDEY0213B74 booster (reference circuit): L1 47 uH, Q3 NX3008NBK (worst-case
+* threshold and on-resistance, models.lib NX3008), 3x MBR0530.
 * The SSD1680 regulates VGH at 20 V; its loop is modelled as a gate enable
 * that stops switching above 22 V on PREVGH. Checks: PREVGH/PREVGL reach
 * +/-20 V within the soft-start budget, the inductor peak current stays
@@ -7,21 +7,29 @@
 * L1 = APV ANR3015T470M: DCR 1.625 ohm max, Isat 0.36 A / Irms 0.36 A (guaranteed
 * columns, APV ANR catalogue rev 2026-08-05 p.5). Good Display's "Io = 500 mA" is a
 * loose reference: their NR3015T470M is itself 0.32 A Isat.
+* Q3 = Nexperia NX3008NBK (data sheet 5 Nov 2022, Table 7): Vgs(th) 1.1 V max,
+* Rds(on) 2.1 ohm max at Vgs 2.5 V / 200 mA; 30 V, 400 mA (1.6 A pulsed). Modelled as a
+* level-1 MOSFET at that worst case. The 2.2 ohm RESE resistor raises its source with
+* the current, so its Vgs is GDR minus RESE, which the model gets right.
+* GDR's high level is taken as VEPD (the SSD1680 does not publish it). The bench's
+* fixed 2.5 us on-time cannot stand in for the controller's current-mode regulation at
+* a low cell voltage (with a fixed on-time any switch, even an ideal one, falls short at
+* 2.3 V), so the 2.3 V refresh of docs/electrical-review.md EPD-1 stays a bench test on
+* the first boards; the NX3008NBK's 1.1 V maximum threshold removes the margin problem.
 * Assumed switching: 2.5 us on / 8 us off (about 95 kHz), starting 1 ms after
 * the panel is powered. Assumed regulator loads: 0.5 mA on each rail.
 .include models.lib
+.param vin=3.0
 * VEPD ramps up through the load switch (Q2) in about 200 us
-Vin vepd 0 PWL(0 0 200u 3.0)
+Vin vepd 0 PWL(0 0 200u {vin})
 C4 vepd 0 4.7u
 L1 vepd lx 47u
 RL1 lx sw 1.625
 Csw sw 0 60p
-S1 sw rese gdr 0 SWM
-.model SWM SW(Ron=0.185 Roff=10Meg Vt=1.5 Vh=0.3)
-Db rese sw DBODY
+XQ3 sw gdr rese NFET_SW
 R2 rese 0 2.2
-Vpwm pwm 0 PULSE(0 3 1m 50n 50n 2.5u 10.5u)
-Bgate gdr 0 V = V(pwm) * (V(prevgh) < 22 ? 1 : 0)
+Vpwm pwm 0 PULSE(0 1 1m 50n 50n 2.5u 10.5u)
+Bgate gdr 0 V = V(pwm) * V(vepd) * (V(prevgh) < 22 ? 1 : 0)
 Rg gdr 0 1Meg
 * positive rail
 D3 sw prevgh MBR0530

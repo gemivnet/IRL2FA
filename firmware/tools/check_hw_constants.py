@@ -284,6 +284,11 @@ def main() -> int:
     checked += 1
     if hdefs.get("FL_BOOT_DEBUG_ADDR") != lay["__boot_debug"] or lay["__boot_debug"] + 32 != lay["__mailbox"]:
         fail("flash_layout: the boot debug block is not the 32 bytes below the mailbox", errors)
+    checked += 2
+    if lay["__app_debug"] + 64 != lay["__boot_debug"]:
+        fail("flash_layout: the application debug block is not the 64 bytes below the bootloader's", errors)
+    if hdefs.get("FL_APP_DEBUG_ADDR") != lay["__app_debug"]:
+        fail("flash_layout.h FL_APP_DEBUG_ADDR != flash_layout.ld __app_debug", errors)
 
     tool = SIGN_TOOL.read_text()
     tdefs = {k: int(v, 0) for k, v in re.findall(r"^(\w+) = (0x[0-9A-Fa-f]+)\b", tool, re.M)}

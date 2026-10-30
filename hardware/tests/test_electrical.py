@@ -271,9 +271,9 @@ def test_ir_detector_emitter_follower(netlist):
 
 
 @needs_kicad
-@pytest.mark.xfail(strict=True, reason="IR-1: VEMT2523SLX01 has no daylight filter (clear lens, 470-1090 nm); "
-                                       "ambient light above ~75 uA photocurrent holds IR_RX above VIL")
 def test_ir_detector_has_daylight_filter(netlist):
+    """IR-1: ambient light above ~75 uA of photocurrent would hold IR_RX above VIL;
+    the detector must block daylight."""
     assert mpn(netlist, "Q5") in REF["ir_detector"]["daylight_filter_mpns"]
 
 
@@ -334,6 +334,6 @@ def test_capacitor_voltage_ratings(netlist):
 
 @needs_kicad
 def test_ir_rx_dark_current_reads_low(netlist):
-    """Dark current x load must stay far below VIL: ICEO 100 nA max (VEMT2523SLX01 p.2)."""
+    """Dark current x load must stay far below VIL: ICEO 100 nA max (VEMT2023SLX01 doc 84166 p.2)."""
     rload = value_ohms(netlist["comps"][two_pin_parts_between(netlist, "R", "IR_RX", "GND")[0]]["value"])
     assert 100e-9 * rload < 0.1 * REF["mcu"]["vil_frac"] * 2.2

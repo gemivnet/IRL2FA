@@ -16,7 +16,8 @@ ENTRY(Reset_Handler)
 MEMORY
 {
     FLASH (rx)  : ORIGIN = 0x08006900, LENGTH = 96K - 0x100
-    RAM   (rwx) : ORIGIN = 0x20000000, LENGTH = 40K - 48
+    RAM   (rwx) : ORIGIN = 0x20000000, LENGTH = 40K - 112
+    DEBUG (rw)  : ORIGIN = 0x20009F90, LENGTH = 64
 }
 
 /* Minimum stack the image must leave free (checked below). Argon2 and
@@ -80,6 +81,11 @@ SECTIONS
         __bss_end = .;
     } > RAM
 
+    .irl2fa_debug (NOLOAD) :
+    {
+        KEEP(*(.irl2fa_debug))
+    } > DEBUG
+
     .stack_check (NOLOAD) :
     {
         . = ALIGN(8);
@@ -96,6 +102,7 @@ SECTIONS
 ASSERT(ORIGIN(FLASH) == __app_slot_start + __app_offset, "vector table at the application slot + 0x100")
 ASSERT(ORIGIN(FLASH) % 256 == 0, "VTOR needs the vector table 256-byte aligned (48 entries)")
 ASSERT(__flash_image_end <= __app_slot_start + __app_slot_size, "application overlaps the staging slot")
-ASSERT(__stack_top == __boot_debug, "the stack ends below the bootloader debug block and mailbox")
+ASSERT(__stack_top == __app_debug, "the stack ends below the debug blocks and the mailbox")
+ASSERT(ORIGIN(DEBUG) == __app_debug && ORIGIN(DEBUG) + LENGTH(DEBUG) == __boot_debug, "debug block below the bootloader's")
 ASSERT(__store_start % 2048 == 0, "store must start on a flash page boundary")
 ASSERT(__store_size == 40 * 2048, "store must be 40 pages (core/store.h)")

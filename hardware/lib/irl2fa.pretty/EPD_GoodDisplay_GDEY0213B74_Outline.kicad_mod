@@ -3,7 +3,7 @@
 	(generator "irl2fa_gen_footprints")
 	(generator_version "1.0")
 	(layer "F.Cu")
-	(descr "Good Display GDEY0213B74 2.13in e-paper (SSD1680), mechanical outline only, front side. Origin = glass centre. Glass 59.2x29.2x1.0, active area 48.55x23.70 starting 7.95 mm from the FPC-side glass edge (centred in Y). FPC 12.5 wide, 14.3 long, 0.3 thick, leaves the left short edge 8.15 mm from the top glass edge. Edge.Cuts: 1.4x14.0 rounded FPC fold slot per hardware/board.yaml (slot centre x=-32.3 rel. glass centre). 3D model: glass on 0.2 mm adhesive, FPC folded 180 deg through the slot to the back side.")
+	(descr "Good Display GDEY0213B74 2.13in e-paper (SSD1680), mechanical outline only, front side. Origin = glass centre. Glass 59.2x29.2x1.0, active area 48.55x23.70 starting 7.95 mm from the FPC-side glass edge (centred in Y). FPC 12.5 wide, 14.3 long, 0.3 thick, leaves the left short edge 8.15 mm from the top glass edge. Edge.Cuts: 1.4x17 rounded FPC fold slot per hardware/board.yaml (slot centre x=-32.3 rel. glass centre), covering the flex's 14.3 mm wide flare where it passes. 3D model: glass on 0.2 mm adhesive, FPC folded 180 deg through the slot to the back side.")
 	(tags "e-paper EPD Good Display GDEY0213B74 2.13 outline")
 	(property "Reference" "REF**"
 		(at 0 -15.8 0)
@@ -36,7 +36,7 @@
 			)
 		)
 	)
-	(property "Description" "Good Display GDEY0213B74 2.13in e-paper (SSD1680), mechanical outline only, front side. Origin = glass centre. Glass 59.2x29.2x1.0, active area 48.55x23.70 starting 7.95 mm from the FPC-side glass edge (centred in Y). FPC 12.5 wide, 14.3 long, 0.3 thick, leaves the left short edge 8.15 mm from the top glass edge. Edge.Cuts: 1.4x14.0 rounded FPC fold slot per hardware/board.yaml (slot centre x=-32.3 rel. glass centre). 3D model: glass on 0.2 mm adhesive, FPC folded 180 deg through the slot to the back side."
+	(property "Description" "Good Display GDEY0213B74 2.13in e-paper (SSD1680), mechanical outline only, front side. Origin = glass centre. Glass 59.2x29.2x1.0, active area 48.55x23.70 starting 7.95 mm from the FPC-side glass edge (centred in Y). FPC 12.5 wide, 14.3 long, 0.3 thick, leaves the left short edge 8.15 mm from the top glass edge. Edge.Cuts: 1.4x17 rounded FPC fold slot per hardware/board.yaml (slot centre x=-32.3 rel. glass centre), covering the flex's 14.3 mm wide flare where it passes. 3D model: glass on 0.2 mm adhesive, FPC folded 180 deg through the slot to the back side."
 		(at 0 0 0)
 		(layer "F.Fab")
 		(hide yes)
@@ -171,8 +171,8 @@
 		(layer "F.SilkS")
 	)
 	(fp_line
-		(start -33 -6.3)
-		(end -33 6.3)
+		(start -33 -8.5)
+		(end -33 7.1)
 		(stroke
 			(width 0.05)
 			(type solid)
@@ -180,8 +180,8 @@
 		(layer "Edge.Cuts")
 	)
 	(fp_line
-		(start -31.6 -6.3)
-		(end -31.6 6.3)
+		(start -31.6 -8.5)
+		(end -31.6 7.1)
 		(stroke
 			(width 0.05)
 			(type solid)
@@ -189,9 +189,9 @@
 		(layer "Edge.Cuts")
 	)
 	(fp_arc
-		(start -33 -6.3)
-		(mid -32.3 -7)
-		(end -31.6 -6.3)
+		(start -33 -8.5)
+		(mid -32.3 -9.2)
+		(end -31.6 -8.5)
 		(stroke
 			(width 0.05)
 			(type solid)
@@ -199,9 +199,9 @@
 		(layer "Edge.Cuts")
 	)
 	(fp_arc
-		(start -31.6 6.3)
-		(mid -32.3 7)
-		(end -33 6.3)
+		(start -31.6 7.1)
+		(mid -32.3 7.8)
+		(end -33 7.1)
 		(stroke
 			(width 0.05)
 			(type solid)
@@ -209,7 +209,7 @@
 		(layer "Edge.Cuts")
 	)
 	(fp_poly
-		(pts (xy -29.85 -14.85) (xy 29.85 -14.85) (xy 29.85 14.85) (xy -29.85 14.85) (xy -29.85 7.25) (xy -33.25 7.25) (xy -33.25 -7.25) (xy -29.85 -7.25))
+		(pts (xy -29.85 -14.85) (xy 29.85 -14.85) (xy 29.85 14.85) (xy -29.85 14.85) (xy -29.85 8.05) (xy -33.25 8.05) (xy -33.25 -9.45) (xy -29.85 -9.45))
 		(stroke
 			(width 0.05)
 			(type solid)

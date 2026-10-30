@@ -6,7 +6,10 @@ the original work in this repository.
 
 | Component | Where | Licence | Source |
 |-|-|-|-|
-| Monocypher (X25519, BLAKE2b, ChaCha20) | `firmware/core/third_party/monocypher/` | CC0-1.0 or BSD-2-Clause (dual) | https://monocypher.org/ |
+| Monocypher (X25519, BLAKE2b, ChaCha20, the Ed25519 check equation) | `firmware/core/third_party/monocypher/` | CC0-1.0 or BSD-2-Clause (dual) | https://monocypher.org/ |
+| LZMA decoder, written from Igor Pavlov's LzmaSpec reference | `firmware/core/lzma_dec.c` (derived) | public domain (LZMA SDK) | https://www.7-zip.org/sdk.html |
+| ARM-Thumb BCJ filter, from liblzma's `simple/armthumb.c` | `firmware/core/fwimage.c` `thumb_read()` (derived) | public domain (XZ Utils) | https://tukaani.org/xz/ |
+| Ed25519 reference algorithm (RFC 8032 section 6) | `firmware/tools/sign_image.py` (derived) | BSD-3-Clause (IETF Trust, code in RFCs) | https://www.rfc-editor.org/rfc/rfc8032 |
 | BIP-39 English wordlist | `firmware/core/wordlist.c` (generated) | MIT | https://github.com/bitcoin/bips/blob/master/bip-0039/english.txt |
 | STM32U0 CMSIS device headers (stm32u0xx.h, stm32u083xx.h, system_stm32u0xx.h) | `firmware/port/stm32u0/vendor/cmsis_device_u0/` | Apache-2.0 | https://github.com/STMicroelectronics/STM32CubeU0 (tag v1.3.0) |
 | STM32U0 LL driver headers (stm32u0xx_ll_gpio.h, stm32u0xx_ll_adc.h) | `firmware/port/stm32u0/vendor/stm32u0xx_ll/` | BSD-3-Clause | https://github.com/STMicroelectronics/STM32CubeU0 (tag v1.3.0) |

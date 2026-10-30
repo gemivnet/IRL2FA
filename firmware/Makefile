@@ -16,8 +16,16 @@ TESTS = tests/test_main.c tests/test_crypto.c tests/test_device.c tests/test_pow
 BUILD = build/host
 
 .PHONY: test clean assets
-test: $(BUILD)/tests
+test: $(BUILD)/tests $(BUILD)/fwrx_host
 	./$(BUILD)/tests
+	python3 tools/test_update_tools.py
+
+# The bootloader's receiver on stdin/stdout, for tools/test_update_tools.py.
+FWRX_SRC = tests/fwrx_host.c core/fwboot.c core/fwimage.c core/fwlog.c core/fwlink.c core/lzma_dec.c \
+           core/pairing.c core/hash.c tests/vflash.c core/third_party/monocypher/monocypher.c
+$(BUILD)/fwrx_host: $(FWRX_SRC) $(wildcard core/*.h tests/*.h tests/data/*.h)
+	@mkdir -p $(BUILD)
+	$(CC) $(CFLAGS) -o $@ $(FWRX_SRC)
 
 $(BUILD)/tests: $(CORE) $(TESTS) $(wildcard core/*.h tests/*.h tests/data/*.h tests/*.def vhal/*.h)
 	@mkdir -p $(BUILD)

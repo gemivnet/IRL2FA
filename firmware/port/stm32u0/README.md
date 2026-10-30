@@ -23,11 +23,20 @@ firmware/port/stm32u0/build.sh
 ```
 
 This builds a small Docker image (`debian:bookworm-slim` with Debian's
-`gcc-arm-none-eabi` 12.2, newlib-nano, CMake) on first use and writes
-`firmware/build/stm32u0/irl2fa.{elf,bin,hex,map}` plus `size-report.txt`. The
-build uses `-Os -flto -Wall -Wextra -Werror`, and the size report fails the
-build if the image passes 176 KB of flash or leaves less than 4 KB of RAM for the
-stack. `NO_DOCKER=1` uses a host toolchain instead.
+`gcc-arm-none-eabi` 12.2, newlib-nano, CMake, Python 3) on first use and writes,
+in `firmware/build/stm32u0/`:
+
+- `irl2fa.{elf,bin,hex,map}`: the application, linked for the application slot;
+- `boot.{elf,bin,hex,map}`: the bootloader, with the public key from
+  `firmware/keys/irl2fa-release.pub` (CMake `-DIRL2FA_BOOT_PUBKEY=<hex|file|NONE>`);
+- `irl2fa-dev.irl2fa`: the application as an unsigned development image;
+- `irl2fa-factory.{bin,hex}`: bootloader + development application, for SWD;
+- `size-report.txt`, which fails the build if the application, the
+  bootloader or the compressed update image outgrows its region, or less than
+  4 KB of RAM is left for the stack.
+
+The build uses `-Os -flto -Wall -Wextra -Werror`. `NO_DOCKER=1` uses a host
+toolchain instead. Releases sign the application ([docs/firmware-updates.md](../../../docs/firmware-updates.md)).
 
 CMake options: `-DIRL2FA_DEBUG_HOOK=OFF` drops the debug block (see Emulation),
 and `-DEPD_ROTATE_180=ON` flips the display if a prototype shows it upside down.
@@ -36,13 +45,19 @@ and `-DEPD_ROTATE_180=ON` flips the display if a prototype shows it upside down.
 
 | Region | Address | Size | Use |
 |-|-|-|-|
-| Flash, code | `0x08000000` | 176 KB | vectors, code, constants |
+| Flash, bootloader | `0x08000000` | 26 KB | `boot/` (`boot/boot.ld`) |
+| Flash, application slot | `0x08006800` | 96 KB | signed image header, then the application from `0x08006900` (`stm32u083kc.ld`) |
+| Flash, staging slot | `0x0801E800` | 50 KB | a received update image |
+| Flash, journal | `0x0802B000` | 4 KB | the bootloader's install journal |
 | Flash, store | `0x0802C000` | 80 KB = 40 x 2 KB pages | `core/store.c` via `hal_flash_*` |
-| SRAM | `0x20000000` | 40 KB | data, bss (about 20 KB), stack |
+| SRAM | `0x20000000` | 40 KB - 48 bytes | data, bss (about 21 KB), stack |
+| SRAM, top 48 bytes | `0x20009FD0` | 48 bytes | bootloader debug block, mailbox |
 
-The linker script refuses an image that would overlap the store. A firmware update
-that programs only the image's pages (all the tools below do that by default)
-keeps the store, so codes and contacts survive an update at RDP level 0.
+[`flash_layout.h`](flash_layout.h) / [`flash_layout.ld`](flash_layout.ld) are
+the one definition; [docs/firmware-updates.md](../../../docs/firmware-updates.md)
+explains it. The bootloader never writes the store, so codes and contacts
+survive an update, and so does an SWD reflash that writes only the factory
+image's own pages (all the tools below do that by default).
 
 ### Pins
 
@@ -133,8 +148,14 @@ target voltage on pin 1.
 
 **STM32CubeProgrammer** (a release that lists the STM32U0 series):
 
+Flash the **factory image**: it holds the bootloader and the application
+(and, in releases, the update image in the staging slot). The application's
+`.elf` alone does not start: it lives behind the bootloader. Release assets:
+`irl2fa-factory-<version>.hex`; local builds:
+`firmware/build/stm32u0/irl2fa-factory.hex` (unsigned).
+
 ```sh
-STM32_Programmer_CLI -c port=SWD mode=UR reset=HWrst -w firmware/build/stm32u0/irl2fa.elf -v -rst
+STM32_Programmer_CLI -c port=SWD mode=UR reset=HWrst -w firmware/build/stm32u0/irl2fa-factory.hex -v -rst
 ```
 
 **OpenOCD** (a build with `target/stm32u0x.cfg`, i.e. 0.12.0+dev from 2024 or later;
@@ -142,13 +163,13 @@ the U0 uses the `stm32l4x` flash driver):
 
 ```sh
 openocd -f interface/stlink.cfg -c "transport select hla_swd" -f target/stm32u0x.cfg \
-        -c "program firmware/build/stm32u0/irl2fa.elf verify reset exit"
+        -c "program firmware/build/stm32u0/irl2fa-factory.hex verify reset exit"
 ```
 
 **probe-rs** (check the exact chip name with `probe-rs chip list | grep -i U083`):
 
 ```sh
-probe-rs download --chip STM32U083KCUx --connect-under-reset firmware/build/stm32u0/irl2fa.elf
+probe-rs download --chip STM32U083KCUx --connect-under-reset --binary-format hex firmware/build/stm32u0/irl2fa-factory.hex
 probe-rs reset --chip STM32U083KCUx
 ```
 
@@ -170,7 +191,13 @@ which clears bit 16 of `FLASH_ACR`).
 
 The store's master key sits in flash. Without a PIN it is not wrapped by
 anything, so RDP is what keeps someone with a debugger from reading the secrets.
-Set **level 1** after flashing:
+
+**The bootloader sets level 1 itself**, once: when the owner first wakes the
+device with the joystick, with a signed application and a cell of at least
+2.9 V (never on a programming fixture)
+([docs/firmware-updates.md](../../../docs/firmware-updates.md#readout-protection-on-the-first-wake)).
+Nothing needs doing after flashing a release's factory image; a development
+(unsigned) image never locks the chip. To set it by hand anyway:
 
 ```sh
 # STM32CubeProgrammer: 0xAA = level 0, 0xCC = level 2, any other value = level 1
@@ -198,10 +225,9 @@ Consequences of level 1:
   protection; check there which RAM/backup areas are covered as well). The
   device itself runs normally.
 - **Going back to level 0 mass-erases all of flash, including the store:** every
-  code and contact is lost. That includes firmware updates: to reflash a level 1
-  device you regress to level 0, which wipes it, and then flash again. Export
-  nothing, because there is no export. Plan updates as "re-enrol codes", or
-  ship development units at level 0.
+  code and contact is lost. Firmware updates do not need it: they go over
+  infrared and keep the store ([docs/firmware-updates.md](../../../docs/firmware-updates.md)).
+  Replacing the *bootloader* (a fork's own key) does: that is SWD only.
 - Level 1 does not protect against invasive or fault-injection attacks.
   Published voltage-glitch attacks bypass RDP1 on several STM32 families. A PIN
   (Argon2-wrapped master key) is what protects secrets on a stolen device.
@@ -226,9 +252,14 @@ not use ST's templates.
 
 ## Emulation (Renode)
 
-`firmware/renode/run.sh` builds this port and runs `firmware/renode/irl2fa.robot`
-in the `antmicro/renode` Docker image. **It tests the release image**: nothing
-is compiled differently for emulation. The tests find the screen the core is on
+`firmware/renode/run.sh` builds this port and runs `firmware/renode/irl2fa.robot`,
+`power.robot` and `update.robot` in the `antmicro/renode` Docker image. **It
+tests the release images**: nothing is compiled differently for emulation.
+Each emulated device gets the factory image (bootloader + application) in
+flash and starts in the bootloader, as the chip does. The update tests use the
+same bootloader binary with the public test key's 32 bytes in place of the
+release key's (`make_test_images.py`), and the bootloader's state is in a
+32-byte block at `0x20009FD0` that the application leaves alone. The tests find the screen the core is on
 through the debug block `irl2fa_debug` (`main.c`), a 40-byte RAM structure that
 holds poll and sleep counters, error counters and `app_screen_name()`. Nothing
 secret is in it. It is read by symbol with `sysbus ReadBytes`, without
@@ -241,7 +272,13 @@ Renode's generic models (Cortex-M0+ with NVIC/SysTick, `STM32_GPIOPort`,
 
 **Modelled** (behaviour the firmware depends on):
 
-- RCC: oscillator ready flags follow their enables; SWS follows SW.
+- RCC: oscillator ready flags follow their enables; SWS follows SW. CSR's
+  reset flags: a new machine has had a power-on (PWRRSTF), a machine reset is
+  a software reset, `sysbus.rcc PowerOnReset` makes the next reset a power-on.
+- FLASH option bytes: OPTKEYR unlock, OPTR (RDP 0xAA at first), OPTSTRT,
+  OBL_LAUNCH (loads them and resets); `RdpLevel`, `OptionBytePrograms` for the
+  tests. `TearLastOperation` leaves what a cell pulled during the latest erase
+  or program would (a half-erased page or an ECC-bad double-word).
 - PWR: plain registers; voltage scaling always reports ready.
 - FLASH interface: KEYR unlock sequence, LOCK, page erase (fills the page with
   0xFF), EOP. Programming is the CPU writing the flash array, as on silicon.
@@ -304,4 +341,5 @@ Renode's generic models (Cortex-M0+ with NVIC/SysTick, `STM32_GPIOPort`,
   tested.
 - **RTC wake-up timer:** it is modelled, but the core never asks for a timed
   wake-up (`app_wake_at()` returns 0), so no test exercises it.
-- **TRNG statistics, AES, option bytes / RDP, watchdogs, the LSE/LSI, DBGMCU.**
+- **TRNG statistics, AES, what RDP level 1 does to the debug port, watchdogs,
+  the LSE/LSI, DBGMCU.**

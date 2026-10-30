@@ -15,7 +15,7 @@ body:
     id: bringup
     attributes:
       label: Bring-up
-      description: Did it flash, show the screen the right way up, keep time, pair over IR? Measured sleep current if you have it (TP1/TP2).
+      description: Did it flash, show the screen the right way up, keep time, pair over IR? Measured sleep current if you have it (TP1 VBAT / TP2 GND).
   - type: textarea
     id: case
     attributes:

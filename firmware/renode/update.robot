@@ -163,11 +163,11 @@ Start Receiving
 
 Start Sending
     [Documentation]    Firmware update -> Send it to another.
-    [Arguments]    ${name}
+    [Arguments]    ${name}    ${expect}=update
     Open Firmware Update    ${name}
     Press    ${name}    joyDown
     Press    ${name}    joyCenter
-    Wait For Screen    ${name}    update
+    Wait For Screen    ${name}    ${expect}
 
 Wait For Boot Phase
     [Arguments]    ${name}    ${phase}    ${timeout_s}=30
@@ -193,25 +193,31 @@ Wait For Received
     Fail    ${name}: received ${b}[rx_next] of ${size} bytes after ${timeout_s} s
 
 Wait For Erases
-    [Documentation]    Until the flash has erased `n` more pages than `since`.
+    [Documentation]    Until the flash has erased `n` more pages than `since`
+    ...    (returns the count), or the bootloader has started the
+    ...    application, i.e. the install is over (returns -1).
     [Arguments]    ${name}    ${since}    ${n}    ${timeout_s}=60
     ${steps}=    Evaluate    int(${timeout_s} * 50)
     FOR    ${i}    IN RANGE    ${steps}
         ${e}=    Model Int    ${name}    sysbus.flash_ctrl PageErases
         IF    ${e} >= ${since} + ${n}    RETURN    ${e}
+        ${b}=    Boot Block    ${name}
+        IF    ${b}[phase] == 4    RETURN    ${-1}
         Run For    0.02
     END
     Fail    ${name}: only ${e} page erases after ${timeout_s} s
 
 Cut Power
     [Documentation]    The cell pulled and put back: the flash operation under way
-    ...    is torn (an ECC-bad double-word, or a half-erased page), SRAM is
-    ...    lost, the next start is a power-on.
+    ...    is torn (an ECC-bad double-word, or a half-erased page), the RAM
+    ...    mailbox is lost, the next start is a power-on. (Only the mailbox:
+    ...    Renode applies the reset when the emulation resumes, and a core
+    ...    running on a zeroed stack until then would crash first.)
     [Arguments]    ${name}
     Execute Command    mach set "${name}"
     ${torn}=    Execute Command    sysbus.flash_ctrl TearLastOperation
     Log    ${name}: ${torn}
-    Execute Command    sysbus.sram SetRange 0x0 0xA000 0x00
+    Execute Command    sysbus.sram SetRange 0x9FF0 0x10 0x00
     Execute Command    sysbus.rcc PowerOnReset
     Execute Command    machine RequestReset
     Run For    0.001
@@ -262,6 +268,16 @@ Resend From
     Press    ${name}    joyCenter
     Wait For Screen    ${name}    update
 
+Sleep And Wake
+    [Documentation]    Left on the home menu sends it to sleep; the joystick wakes it.
+    [Arguments]    ${name}
+    Wait For Screen    ${name}    menu    timeout_s=30
+    Wait Until Display Idle    ${name}
+    Press    ${name}    joyLeft
+    Run For    5
+    Press    ${name}    joyCenter
+    Run For    1
+
 Dump Screen
     [Arguments]    ${name}    ${file}
     Execute Command    mach set "${name}"
@@ -279,7 +295,7 @@ Save Screens And Test Teardown
 *** Test Cases ***
 Updates Over IR Through Power Cuts In Every Phase
     [Documentation]    bob (v0.1.0) receives v0.2.0 from alice. The cell is pulled
-    ...    three times while it arrives and four times while it installs; every
+    ...    three times while it arrives and four or more times while it installs; every
     ...    time bob comes back bootable (v0.1.0 before the install starts, the
     ...    install finishing on its own after), the transfer resumes where it
     ...    stopped, and bob's record store is never touched.
@@ -308,11 +324,17 @@ Updates Over IR Through Power Cuts In Every Phase
         ${floor}=    Evaluate    ${at} * 47000 // 1000 - 2048
         Should Be True    ${after}[rx_next] > ${floor}    the transfer did not resume where it stopped
     END
-    # ---- install: cut after page erases 1, 9, 20 and 41 of it ----
+    # ---- install: cut after page erases 3, 9 and 20 of it, and every 4
+    # after that until it gets through (the first erases may be the journal
+    # page, before the install is journalled; pages the two builds share are
+    # not rewritten) ----
     Wait For Boot Phase    bob    3    timeout_s=300
     ${e}=    Model Int    bob    sysbus.flash_ctrl PageErases
-    FOR    ${n}    IN    1    8    11    21
+    ${cuts}=    Set Variable    ${0}
+    FOR    ${n}    IN    3    6    11    4    4    4    4    4    4    4
         ${e}=    Wait For Erases    bob    ${e}    ${n}
+        IF    ${e} < 0    BREAK
+        ${cuts}=    Evaluate    ${cuts} + 1
         Run For    0.005
         Cut Power    bob
         ${h}=    Store Hash    bob
@@ -320,14 +342,18 @@ Updates Over IR Through Power Cuts In Every Phase
         Run For    0.05
         ${e}=    Model Int    bob    sysbus.flash_ctrl PageErases
     END
+    Should Be True    ${cuts} >= 4    only ${cuts} cuts during the install
     Running Version Should Be    bob    ${V2}    timeout_s=120
     ${h}=    Store Hash    bob
     Should Be Equal    ${h}    ${store}    the record store changed
     ${ecc}=    Model Int    bob    sysbus.flash_ctrl EccDetections
     Should Be True    ${ecc} >= 1    no torn double-word was ever read back
-    Wait For Screen    bob    menu    timeout_s=30
+    # The install that finished after the last cut is reported, then the menu.
+    Wait For Screen    bob    message    timeout_s=30
     Wait Until Display Idle    bob
     Dump Screen    bob    update-done
+    Press    bob    joyCenter
+    Wait For Screen    bob    menu
     # alice gave up on the last attempt (bob went quiet mid-install): fine.
 
 Updates Over IR And Reports It
@@ -360,9 +386,14 @@ Refuses An Image Not Signed With Its Key
     Start Receiving    bob
     Start Sending    mallory
     Wait For Boot Phase    bob    3    timeout_s=300
-    Running Version Should Be    bob    ${V1}    timeout_s=60
-    ${b}=    Boot Block    bob
+    # The verdict, while the bootloader still tells the sender (it restarts after 6 s).
+    FOR    ${i}    IN RANGE    200
+        ${b}=    Boot Block    bob
+        IF    ${b}[rx_state] == 4    BREAK
+        Run For    0.1
+    END
     Should Be Equal As Integers    ${b}[install_err]    6    expected FW_E_SIGNATURE
+    Running Version Should Be    bob    ${V1}    timeout_s=60
     Wait For Screen    bob    message    timeout_s=30
     Wait For Screen    mallory    message    timeout_s=30
     Wait Until Display Idle    mallory
@@ -374,51 +405,62 @@ Refuses An Older Image At Once
     Connect Over IR    alice    bob
     Wait For Screen    bob    menu    timeout_s=30
     Start Receiving    bob
-    Start Sending    alice
-    Wait For Screen    alice    message    timeout_s=20
-    Running Version Should Be    bob    ${V2}    timeout_s=30
+    # Refused at the offer: "Not sent" before the sending screen even settles.
+    Start Sending    alice    expect=message
     ${b}=    Boot Block    bob
     Should Be Equal As Integers    ${b}[rx_state]    4    the receiver did not refuse
     Should Be Equal As Integers    ${b}[rx_next]    0    an older image was accepted
+    Should Be Equal As Integers    ${b}[install_err]    0    an install was attempted
+    Running Version Should Be    bob    ${V2}    timeout_s=30
 
-Sets Readout Protection Only At A Power-On With A Healthy Cell
-    # A low cell: no option-byte write, the device runs unprotected.
-    Create Device    dev    1    v1    vdda=2700
+Sets Readout Protection When Its Owner First Wakes It On A Healthy Cell
+    [Documentation]    Never on a programming fixture (power only, 3.0 V, power
+    ...    cycles), never on a weak cell; once its owner wakes it with the
+    ...    joystick on a fresh cell, level 1, once, and it carries on.
+    Create Device    dev    1    v1
+    Running Version Should Be    dev    ${V1}
+    Cut Power    dev
+    Running Version Should Be    dev    ${V1}
+    ${rdp}=    Model Int    dev    sysbus.flash_ctrl RdpLevel
+    Should Be Equal As Integers    ${rdp}    0    locked on the fixture
+    # The owner wakes it, but the cell is weak: asked, declined.
+    Execute Command    sysbus.adc VddaMillivolts 2700
+    Sleep And Wake    dev
     Running Version Should Be    dev    ${V1}
     ${b}=    Boot Block    dev
     Should Be Equal As Integers    ${b}[rdp]    2
     ${rdp}=    Model Int    dev    sysbus.flash_ctrl RdpLevel
     Should Be Equal As Integers    ${rdp}    0
-    # A fresh cell, but a reset that is not a power-on: still nothing.
+    # A fresh cell: the next start, the first wake.
     Execute Command    sysbus.adc VddaMillivolts 3000
-    Execute Command    machine RequestReset
-    Running Version Should Be    dev    ${V1}
-    ${rdp}=    Model Int    dev    sysbus.flash_ctrl RdpLevel
-    Should Be Equal As Integers    ${rdp}    0
-    # The fresh cell put in: level 1, once, and the device starts normally.
     Cut Power    dev
+    Running Version Should Be    dev    ${V1}
+    Sleep And Wake    dev
     Running Version Should Be    dev    ${V1}
     ${rdp}=    Model Int    dev    sysbus.flash_ctrl RdpLevel
     Should Be Equal As Integers    ${rdp}    1
     ${n}=    Model Int    dev    sysbus.flash_ctrl OptionBytePrograms
     Should Be Equal As Integers    ${n}    1
+    Wait For Screen    dev    menu    timeout_s=30
+    # Once.
     Cut Power    dev
     Running Version Should Be    dev    ${V1}
+    Sleep And Wake    dev
     ${n}=    Model Int    dev    sysbus.flash_ctrl OptionBytePrograms
     Should Be Equal As Integers    ${n}    1    option bytes written again
-    Wait For Screen    dev    menu    timeout_s=30
 
 Never Protects A Development Image
     [Documentation]    The unsigned factory image (a build without the signing key)
     ...    boots only while the chip is unprotected, so it must never protect it.
-    Create Device    dev    1    v1    vdda=2700
+    Create Device    dev    1    v1
     Running Version Should Be    dev    ${V1}
     Execute Command    mach set "dev"
     Execute Command    sysbus LoadBinary @${CURDIR}/../build/stm32u0/irl2fa-factory.bin 0x08000000
-    Execute Command    sysbus.adc VddaMillivolts 3000
     Cut Power    dev
     Wait For Boot Phase    dev    4
-    ${b}=    Boot Block    dev
-    Should Be Equal As Integers    ${b}[rdp]    4
+    Sleep And Wake    dev
+    Wait For Screen    dev    menu    timeout_s=30
     ${rdp}=    Model Int    dev    sysbus.flash_ctrl RdpLevel
     Should Be Equal As Integers    ${rdp}    0
+    ${n}=    Model Int    dev    sysbus.flash_ctrl OptionBytePrograms
+    Should Be Equal As Integers    ${n}    0

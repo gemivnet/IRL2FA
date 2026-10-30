@@ -76,14 +76,14 @@
   "ir": {
     "baud": 4800,
     "led_mA": {
-      "typ": 18.0,
-      "worst": 25.0,
-      "source": "VSMB2948SL through 100 ohm and AO3400A: 18 mA at 3 V; hardware/spice/ir_led.cir limits it to 25 mA on a fresh cell"
+      "typ": 25.0,
+      "worst": 35.0,
+      "source": "VSMB2948SL through 68 ohm and AO3400A: 25 mA at 3 V; hardware/spice/ir_led.cir limits it to 35 mA on a fresh cell"
     },
     "rx_mA": {
       "typ": 0.1,
       "worst": 0.3,
-      "source": "VEMT2523SLX01 emitter follower into 10 kohm: photocurrent only, at most 3 V / 10 kohm = 0.3 mA when lit; dark current is nA"
+      "source": "VEMT2023SLX01 emitter follower into 10 kohm: photocurrent only, at most 3 V / 10 kohm = 0.3 mA when lit; dark current is nA"
     }
   },
   "measured": "measured.json",

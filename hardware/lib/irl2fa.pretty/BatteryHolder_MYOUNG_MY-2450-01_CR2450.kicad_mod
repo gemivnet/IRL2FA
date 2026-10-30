@@ -3,7 +3,7 @@
 	(generator "irl2fa_gen_footprints")
 	(generator_version "1.0")
 	(layer "F.Cu")
-	(descr "MYOUNG MY-2450-01 (CR2450-W) SMT CR2450 clip, nickel-plated C5191 phosphor bronze 0.25 mm (LCSC C964845), drawing MY-CP-0106 rev A/0. Height 5.70 above the PCB. Plate 25.5 x 23.2 with a 7.5 mm closed end and a stop flap; the cell slides in from the open end (+y). Pads 6.15 x 6.00, outer span 36.80, 9.20 from the closed end. Pad 1 = + (both legs), pad 2 = - : a bare 12 mm copper pad under the cell centre (no paste; order ENIG).")
+	(descr "MYOUNG MY-2450-01 (CR2450-W) SMT CR2450 clip, nickel-plated C5191 phosphor bronze 0.25 mm (LCSC C964845), drawing MY-CP-0106 rev A/0. Height 5.70 above the PCB. Plate 25.5 x 23.2 with a 7.5 mm closed end and a stop flap; the cell slides in from the open end (+y). Pads 6.15 x 6.00, outer span 36.80, 9.20 from the closed end. Pad 1 = + (both legs, paste reduced to ~79 %), pad 2 = - : a bare 12 mm copper pad under the cell centre (no paste; order ENIG; solid zone connection).")
 	(tags "CR2450 coin cell battery clip retainer SMD MYOUNG MY-2450-01 CR2450-W")
 	(property "Reference" "REF**"
 		(at 0 -13.7 0)
@@ -36,7 +36,7 @@
 			)
 		)
 	)
-	(property "Description" "MYOUNG MY-2450-01 (CR2450-W) SMT CR2450 clip, nickel-plated C5191 phosphor bronze 0.25 mm (LCSC C964845), drawing MY-CP-0106 rev A/0. Height 5.70 above the PCB. Plate 25.5 x 23.2 with a 7.5 mm closed end and a stop flap; the cell slides in from the open end (+y). Pads 6.15 x 6.00, outer span 36.80, 9.20 from the closed end. Pad 1 = + (both legs), pad 2 = - : a bare 12 mm copper pad under the cell centre (no paste; order ENIG)."
+	(property "Description" "MYOUNG MY-2450-01 (CR2450-W) SMT CR2450 clip, nickel-plated C5191 phosphor bronze 0.25 mm (LCSC C964845), drawing MY-CP-0106 rev A/0. Height 5.70 above the PCB. Plate 25.5 x 23.2 with a 7.5 mm closed end and a stop flap; the cell slides in from the open end (+y). Pads 6.15 x 6.00, outer span 36.80, 9.20 from the closed end. Pad 1 = + (both legs, paste reduced to ~79 %), pad 2 = - : a bare 12 mm copper pad under the cell centre (no paste; order ENIG; solid zone connection)."
 		(at 0 0 0)
 		(layer "F.Fab")
 		(hide yes)
@@ -52,16 +52,19 @@
 		(at 15.325 -0.3)
 		(size 6.15 6)
 		(layers "F.Cu" "F.Paste" "F.Mask")
+		(solder_paste_margin -0.35)
 	)
 	(pad "1" smd rect
 		(at -15.325 -0.3)
 		(size 6.15 6)
 		(layers "F.Cu" "F.Paste" "F.Mask")
+		(solder_paste_margin -0.35)
 	)
 	(pad "2" smd circle
 		(at 0 0)
 		(size 12 12)
 		(layers "F.Cu" "F.Mask")
+		(zone_connect 2)
 	)
 	(fp_poly
 		(pts (xy -3.75 -12.5) (xy 3.75 -12.5) (xy 12.75 -5.6) (xy 12.75 5.7) (xy 12.7072 6.3526) (xy 12.5796 6.9941) (xy 12.3694 7.6134) (xy 12.0801 8.2) (xy 11.7168 8.7438) (xy 11.2855 9.2355) (xy 10.7938 9.6668) (xy 10.25 10.0301) (xy 9.6634 10.3194) (xy 9.0441 10.5296) (xy 8.4026 10.6572) (xy 7.75 10.7) (xy 3.5 10.3) (xy 3.1089 9.7031) (xy 2.6172 9.186) (xy 2.0408 8.7653) (xy 1.3984 8.4547) (xy 0.7107 8.2642) (xy 0 8.2) (xy -0.7107 8.2642) (xy -1.3984 8.4547) (xy -2.0408 8.7653) (xy -2.6172 9.186) (xy -3.1089 9.7031) (xy -3.5 10.3) (xy -7.75 10.7) (xy -8.4026 10.6572) (xy -9.0441 10.5296) (xy -9.6634 10.3194) (xy -10.25 10.0301) (xy -10.7938 9.6668) (xy -11.2855 9.2355) (xy -11.7168 8.7438) (xy -12.0801 8.2) (xy -12.3694 7.6134) (xy -12.5796 6.9941) (xy -12.7072 6.3526) (xy -12.75 5.7) (xy -12.75 -5.6))

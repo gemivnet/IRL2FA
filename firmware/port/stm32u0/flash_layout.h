@@ -37,6 +37,8 @@
 /* The 32 bytes below: the bootloader's debug block (boot/boot_main.c), where
  * the application leaves it alone so the tests can read it afterwards. */
 #define FL_BOOT_DEBUG_ADDR 0x20009FD0u
+/* The 64 bytes below that: the application's debug block (main.c). */
+#define FL_APP_DEBUG_ADDR 0x20009F90u
 
 #if !defined(__ASSEMBLER__) && !defined(FL_LINKER)
 #include <stdbool.h>
@@ -53,6 +55,7 @@ typedef struct {
 enum {
     BOOT_CMD_UPDATE = 1, /* application -> bootloader: run the IR update receiver */
     BOOT_CMD_RESULT = 2, /* bootloader -> application: arg = fw_err_t | version << 8 */
+    BOOT_CMD_LOCK = 3,   /* application -> bootloader: its owner woke it; set RDP level 1 */
 };
 
 #define BOOT_MAILBOX ((volatile boot_mailbox_t *)FL_MAILBOX_ADDR)
