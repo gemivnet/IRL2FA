@@ -5,8 +5,8 @@
  *
  *     header (128 bytes) | payload (payload_size bytes)
  *
- * where the payload is the application binary, LZMA-compressed (or stored,
- * for tests). The application slot holds the same header, padded with 0xFF
+ * where the payload is the application binary, LZMA-compressed after
+ * xz's ARM-Thumb branch filter (or plain LZMA, or stored, for tests). The application slot holds the same header, padded with 0xFF
  * to 256 bytes, then the binary itself (its vector table at slot + 0x100).
  *
  * The header's first 64 bytes are its fields; the last 64 are an Ed25519
@@ -36,6 +36,7 @@
 #define FW_FLAG_UNSIGNED 1u
 #define FW_COMP_STORED 0u
 #define FW_COMP_LZMA 1u
+#define FW_COMP_LZMA_THUMB 2u /* LZMA over the ARM-Thumb BCJ filter (BL targets made absolute) */
 #define FW_PAGE_MAX 2048u
 
 /* Results, also the error codes of the IR protocol and of the bootloader's
@@ -96,8 +97,12 @@ typedef struct {
     const fw_flash_t *fl;
     uint32_t in_addr, in_left;
     bool in_error;
-    bool lz;
+    bool lz, thumb;
     lzma_dec_t dec;
+    /* ARM-Thumb BCJ decoder: a 4-byte window over the LZMA output */
+    uint8_t win[4], raw[64];
+    uint8_t win_n, raw_n, raw_i;
+    uint32_t win_pos, next_check, raw_left;
     hash_ctx_t hash;
     uint8_t buf[FW_PAGE_MAX];
     uint8_t page0[FW_PAGE_MAX];

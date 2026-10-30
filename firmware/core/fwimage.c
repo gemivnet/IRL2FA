@@ -39,7 +39,7 @@ fw_err_t fw_header_parse(const uint8_t raw[FW_HDR_SIZE], fw_header_t *h)
     if (h->image_size < 8 || h->payload_size == 0) return FW_E_FORMAT;
     if (h->comp == FW_COMP_STORED) {
         if (h->payload_size != h->image_size || h->props != 0 || h->dict_log2 != 0) return FW_E_FORMAT;
-    } else if (h->comp == FW_COMP_LZMA) {
+    } else if (h->comp == FW_COMP_LZMA || h->comp == FW_COMP_LZMA_THUMB) {
         /* lzma_dec_init() checks the rest. */
         if (h->dict_log2 < 12 || h->dict_log2 > 13) return FW_E_FORMAT;
     } else {
@@ -116,15 +116,63 @@ static bool stream_open(fw_work_t *w, const fw_flash_t *fl, const fw_layout_t *l
     w->in_addr = lay->staging_addr + FW_HDR_SIZE;
     w->in_left = h->payload_size;
     w->in_error = false;
-    w->lz = h->comp == FW_COMP_LZMA;
+    w->lz = h->comp != FW_COMP_STORED;
+    w->thumb = h->comp == FW_COMP_LZMA_THUMB;
+    w->win_n = w->raw_n = w->raw_i = 0;
+    w->win_pos = w->next_check = 0;
+    w->raw_left = h->image_size;
     if (!w->lz) return true;
     return lzma_dec_init(&w->dec, h->props, 1u << h->dict_log2, h->image_size, in_fill, w);
+}
+
+/* xz's ARM-Thumb BCJ decoder (liblzma simple/armthumb.c), streamed: the
+ * encoder turned each BL pair's relative offset into an absolute target;
+ * at an even position p, F0-F7 xx F8-FF xx little-endian halfwords with a
+ * 22-bit target t become t - (p + 4), and the 4 bytes are not looked at
+ * again. Positions are offsets in the binary (the encoder's start 0). */
+static size_t thumb_read(fw_work_t *w, uint8_t *out, size_t n)
+{
+    size_t k = 0;
+    while (k < n) {
+        while (w->win_n < 4 && w->raw_left) {
+            if (w->raw_i == w->raw_n) {
+                uint32_t want = w->raw_left < sizeof(w->raw) ? w->raw_left : (uint32_t)sizeof(w->raw);
+                w->raw_n = (uint8_t)lzma_dec_read(&w->dec, w->raw, want);
+                w->raw_i = 0;
+                if (w->raw_n == 0) return k;
+            }
+            w->win[w->win_n++] = w->raw[w->raw_i++];
+            w->raw_left--;
+        }
+        if (w->win_n == 0) return k;
+        uint8_t *b = w->win;
+        uint32_t p = w->win_pos;
+        if (w->win_n == 4 && !(p & 1u) && p >= w->next_check && (b[1] & 0xF8u) == 0xF0u &&
+            (b[3] & 0xF8u) == 0xF8u) {
+            uint32_t src = (((uint32_t)b[1] & 7u) << 19) | ((uint32_t)b[0] << 11) |
+                           (((uint32_t)b[3] & 7u) << 8) | b[2];
+            uint32_t dest = ((src << 1) - (p + 4u)) >> 1;
+            b[1] = (uint8_t)(0xF0u | ((dest >> 19) & 7u));
+            b[0] = (uint8_t)(dest >> 11);
+            b[3] = (uint8_t)(0xF8u | ((dest >> 8) & 7u));
+            b[2] = (uint8_t)dest;
+            w->next_check = p + 4u;
+        }
+        out[k++] = b[0];
+        b[0] = b[1];
+        b[1] = b[2];
+        b[2] = b[3];
+        w->win_n--;
+        w->win_pos++;
+    }
+    return k;
 }
 
 /* Reads exactly `n` bytes of the binary, or fails. */
 static fw_err_t stream_read(fw_work_t *w, uint8_t *out, size_t n)
 {
-    size_t got = w->lz ? lzma_dec_read(&w->dec, out, n) : in_fill(w, out, n);
+    size_t got = w->thumb ? thumb_read(w, out, n) : w->lz ? lzma_dec_read(&w->dec, out, n)
+                                                         : in_fill(w, out, n);
     if (got == n) return FW_OK;
     return w->in_error ? FW_E_FLASH : FW_E_DATA;
 }

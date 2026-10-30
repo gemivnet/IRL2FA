@@ -50,7 +50,7 @@ HDR_SIZE = 128
 HDR_SIGNED = 64
 APP_OFFSET = 256
 FLAG_UNSIGNED = 1
-COMP_STORED, COMP_LZMA = 0, 1
+COMP_STORED, COMP_LZMA, COMP_LZMA_THUMB = 0, 1, 2
 HW_ID = 0x00830001          # STM32U083KC on the IRL2FA board (port/stm32u0/flash_layout.h)
 MIN_BOOT = 1
 LZMA_LC, LZMA_LP, LZMA_PB, LZMA_DICT_LOG2 = 0, 1, 1, 13
@@ -204,22 +204,36 @@ def format_version(v: int) -> str:
     return f"{v >> 16}.{(v >> 8) & 0xFF}.{v & 0xFF}"
 
 
-def compress(binary: bytes) -> bytes:
+def lzma_filters(comp, props=None, dict_log2=LZMA_DICT_LOG2):
+    """xz's ARM-Thumb BCJ filter (COMP_LZMA_THUMB) then raw LZMA1."""
+    if props is None:
+        lc, lp, pb = LZMA_LC, LZMA_LP, LZMA_PB
+    else:
+        lc, lp, pb = props % 9, (props // 9) % 5, props // 45
+    lz = {"id": lzma.FILTER_LZMA1, "lc": lc, "lp": lp, "pb": pb, "dict_size": 1 << dict_log2}
+    return ([{"id": lzma.FILTER_ARMTHUMB}] if comp == COMP_LZMA_THUMB else []) + [lz]
+
+
+def compress(binary: bytes, comp=None) -> bytes:
+    if comp == COMP_LZMA_THUMB:
+        f = lzma_filters(comp)
+        f[-1]["preset"] = 9 | lzma.PRESET_EXTREME
+        return lzma.compress(binary, format=lzma.FORMAT_RAW, filters=f)
     filters = [{"id": lzma.FILTER_LZMA1, "preset": 9 | lzma.PRESET_EXTREME,
                 "lc": LZMA_LC, "lp": LZMA_LP, "pb": LZMA_PB, "dict_size": 1 << LZMA_DICT_LOG2}]
     return lzma.compress(binary, format=lzma.FORMAT_RAW, filters=filters)
 
 
 def header_fields(version, image_size, payload_size, comp, flags=0, hw_id=HW_ID, min_boot=MIN_BOOT):
-    props = (LZMA_PB * 5 + LZMA_LP) * 9 + LZMA_LC if comp == COMP_LZMA else 0
-    dict_log2 = LZMA_DICT_LOG2 if comp == COMP_LZMA else 0
+    props = (LZMA_PB * 5 + LZMA_LP) * 9 + LZMA_LC if comp != COMP_STORED else 0
+    dict_log2 = LZMA_DICT_LOG2 if comp != COMP_STORED else 0
     return struct.pack("<IHHIIIIIBBBB", MAGIC, HDR_VERSION, flags, version, hw_id, min_boot,
                        image_size, payload_size, comp, props, dict_log2, 0) + bytes(32)
 
 
-def make_image(binary: bytes, version: int, seed: bytes | None, comp=COMP_LZMA, hw_id=HW_ID,
+def make_image(binary: bytes, version: int, seed: bytes | None, comp=COMP_LZMA_THUMB, hw_id=HW_ID,
                min_boot=MIN_BOOT) -> bytes:
-    payload = compress(binary) if comp == COMP_LZMA else binary
+    payload = binary if comp == COMP_STORED else compress(binary, comp)
     flags = 0 if seed else FLAG_UNSIGNED
     fields = header_fields(version, len(binary), len(payload), comp, flags, hw_id, min_boot)
     digest = hashlib.sha512(fields + binary).digest()
@@ -246,9 +260,7 @@ def unpack_binary(image: bytes) -> bytes:
         raise ValueError("truncated payload")
     if h["comp"] == COMP_STORED:
         return payload
-    lc, rest = h["props"] % 9, h["props"] // 9
-    lp, pb = rest % 5, rest // 5
-    filters = [{"id": lzma.FILTER_LZMA1, "lc": lc, "lp": lp, "pb": pb, "dict_size": 1 << h["dict_log2"]}]
+    filters = lzma_filters(h["comp"], h["props"], h["dict_log2"])
     dec = lzma.LZMADecompressor(format=lzma.FORMAT_RAW, filters=filters)
     return dec.decompress(payload, max_length=h["image_size"])
 
@@ -335,7 +347,7 @@ def cmd_sign(a):
     binary = Path(a.input).read_bytes()
     version = parse_version(a.version or app_version())
     seed = None if a.unsigned else read_seed(a.key) if a.key else sys.exit("sign_image: --key or --unsigned")
-    image = make_image(binary, version, seed, COMP_STORED if a.stored else COMP_LZMA,
+    image = make_image(binary, version, seed, COMP_STORED if a.stored else COMP_LZMA_THUMB,
                        int(a.hw_id, 0), a.min_boot)
     if HDR_SIZE + parse_header(image)["payload_size"] > STAGING_SIZE and not a.unsigned:
         sys.exit(f"sign_image: update image is {len(image)} bytes, the staging slot {STAGING_SIZE}")
@@ -357,7 +369,7 @@ def cmd_info(a):
     h = parse_header(Path(a.input).read_bytes())
     print(f"version {format_version(h['version'])}  hw 0x{h['hw_id']:08x}  min boot {h['min_boot']}  "
           f"binary {h['image_size']} B  payload {h['payload_size']} B  "
-          f"{'LZMA' if h['comp'] == COMP_LZMA else 'stored'}  "
+          f"{('stored', 'LZMA', 'Thumb+LZMA')[min(h['comp'], 2)]}  "
           f"{'UNSIGNED' if h['flags'] & FLAG_UNSIGNED else 'signed'}")
 
 

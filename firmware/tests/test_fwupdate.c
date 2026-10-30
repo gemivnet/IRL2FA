@@ -420,7 +420,7 @@ TEST(test_fw_header)
     static const struct {
         unsigned off;
         uint8_t val;
-    } BAD[] = {{0, 'X'}, {4, 2}, {6, 4}, {31, 1}, {40, 1}, {28, 2}, {30, 11}, {30, 14}};
+    } BAD[] = {{0, 'X'}, {4, 2}, {6, 4}, {31, 1}, {40, 1}, {28, 3}, {30, 11}, {30, 14}};
     for (size_t i = 0; i < sizeof(BAD) / sizeof(BAD[0]); i++) {
         memcpy(raw, FIX_SAMPLE_IMAGE, FW_HDR_SIZE);
         raw[BAD[i].off] = BAD[i].val;
@@ -843,6 +843,59 @@ TEST(test_fw_powercut_install)
         }
     }
     CHECK(olds >= 1 && news > 100 && nested > 100);
+}
+
+/* make_fw_fixtures.py thumb_plain(): Thumb-like halfwords with BL pairs. */
+static void thumb_plain(uint8_t *out, size_t n)
+{
+    uint32_t s = 0x2468ACE1u;
+    size_t len = 0;
+    while (len < n) {
+        s ^= s << 13;
+        s ^= s >> 17;
+        s ^= s << 5;
+        uint8_t b[4];
+        size_t k = 2;
+        if (s % 5 == 0) {
+            b[0] = (uint8_t)(s >> 16);
+            b[1] = (uint8_t)(0xF0 | ((s >> 8) & 7));
+            b[2] = (uint8_t)(s >> 24);
+            b[3] = (uint8_t)(0xF8 | ((s >> 11) & 7));
+            k = 4;
+        } else {
+            b[0] = (uint8_t)s;
+            b[1] = (uint8_t)(s >> 8);
+        }
+        for (size_t i = 0; i < k && len < n; i++) out[len++] = b[i];
+    }
+}
+
+/* The release format: xz's ARM-Thumb branch filter, then LZMA, as
+ * sign_image.py makes it; decoded through every chunk size the copy uses. */
+TEST(test_fw_thumb)
+{
+    fixtures();
+    static fwdev_t d;
+    static uint8_t want[FIX_THUMB_SIZE];
+    thumb_plain(want, sizeof(want));
+    dev_init(&d);
+    fw_header_t h;
+    CHECK_EQ_INT(fw_header_parse(FIX_THUMB_IMAGE, &h), FW_OK);
+    CHECK_EQ_INT(h.comp, FW_COMP_LZMA_THUMB);
+    stage(&d, FIX_THUMB_IMAGE, sizeof(FIX_THUMB_IMAGE));
+    CHECK_EQ_INT(boot(&d), FIX_SAMPLE_VERSION);
+    CHECK(memcmp(d.f.mem + TFW_LAYOUT.app_addr + FW_APP_OFFSET, want, sizeof(want)) == 0);
+    /* A damaged payload never installs. */
+    static uint8_t bad[sizeof(FIX_THUMB_IMAGE)];
+    for (int i = 0; i < 8; i++) {
+        memcpy(bad, FIX_THUMB_IMAGE, sizeof(bad));
+        bad[FW_HDR_SIZE + 1 + rnd((unsigned)(sizeof(bad) - FW_HDR_SIZE - 40))] ^= (uint8_t)(1u << (i % 8));
+        stage(&d, bad, sizeof(bad));
+        fw_policy_t pol = policy();
+        fw_err_t e = fw_verify_staging(&WORK, &d.fl, &TFW_LAYOUT, &pol, &h);
+        CHECK(e == FW_E_SIGNATURE || e == FW_E_DATA);
+    }
+    CHECK(store_intact(&d));
 }
 
 /* A signed application programmed over SWD (the factory image) was never
