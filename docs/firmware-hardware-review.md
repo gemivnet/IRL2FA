@@ -24,10 +24,10 @@ Date: 2026-10-30. Branch `review-firmware`.
 | Vishay VEMT2523SLX01 datasheet | Rev 1.0, 05-Apr-13 (doc 84167) | PDF |
 | NXP UM10204 I2C-bus specification | section 3.1.16 (bus clear) | from knowledge of the document |
 
-**Not obtained:** the STM32U073/U083 datasheet DS14548 (I/O AC characteristics
-table) and the device errata sheet ES0602. Both are only on st.com, which this
-environment cannot download from (connections reset, and a browser user agent is
-not allowed). See "Still to check" at the end.
+**Obtained later:** the device errata sheet ES0602 Rev 3 (February 2024; saved
+by the owner, not redistributed) and the STM32U083 datasheet (LCSC's copy of
+the Chinese edition; VREFINT on p.45). See "Errata ES0602, entry by entry" at
+the end.
 
 ## Findings, by severity
 
@@ -400,11 +400,31 @@ All of these fail on the firmware as it was on `main` and pass now.
   then handled (the emulator injects one; the silicon makes one when it will).
 - BOR behaviour of the CR2450 under the panel's inrush.
 
-## Still to check (blocked here)
+## Errata ES0602, entry by entry
 
-- **ES0602, STM32U073/U083 errata:** not downloadable from this environment.
-  The one entry seen in search snippets (2.6.1, an LPTIM interrupt stalling Stop
-  entry) concerns a peripheral the firmware does not use. Every other entry is
-  unreviewed.
+Every limitation in ES0602 Rev 3 (silicon revision A, the only one), against
+what the firmware does:
+
+| Entry | Limitation | Applies? | Action |
+|-|-|-|-|
+| 2.1.1 | PC13 transitions disturb the LSE | No: the LSE is unused (the RTC is the external RV-3032; PC14/PC15 are spare) | none |
+| 2.1.2 | VREFINT_CAL left unprogrammed (0xFFFF) on some parts | **Yes**: the battery reading divided by it, so a blank value read every cell as full (clamped to 3.6 V), defeating low-battery warnings and any "cell healthy" gate | **Fixed**: `hal_battery_mv` falls back to the datasheet's typical 1.212 V (1654 counts) when the value is 0 or 0xFFFF |
+| 2.2.1 | DMA flag clear race | No DMA used | none |
+| 2.3.1 | ADC overrun flag missed | No: single conversions, polled, overrun not used | none |
+| 2.4.x | DAC | Not used | none |
+| 2.5.x | TIM one-pulse / compare / OC clear | Not used | none |
+| 2.6.x | LPTIM stuck interrupt, flags | Not used | none |
+| 2.7.1 | MCU RTC alarm flag in debug | The MCU RTC is not used | none |
+| 2.8.1 | I2C sampling when tSU;DAT < one kernel clock | No: I2CCLK is HSI16 (62.5 ns), above the 4 MHz / 10 MHz minimums for standard and fast mode | none |
+| 2.8.2 | Spurious BERR in master mode | **Yes**: `i2c_wait` aborted the transfer on BERR, so a spurious flag failed an RTC read | **Fixed**: BERR is cleared and the transfer continues; NACK and arbitration loss still fail |
+| 2.9.1 | USART data corrupted by a glitch in the second half of the stop bit | Possible on the IR line (ambient light, own echo) | Covered: every IR frame carries a CRC and is resent until acknowledged (pairing.c); corrupted bytes cost a retry, never wrong data |
+| 2.9.2-2.9.4 | Smartcard, ABREN, ONEBIT noise flag | Not used (8N1, 3-sample majority, no auto-baud) | none |
+| 2.10.1 | LPUART transmitter jitter at low BRR | No: IR is on USART1 from HSI16 (ratio 3333) | none |
+| 2.11.1 | SPI BSY stuck when disabled while TXE = 0 | Checked: `spi_close` waits for TXE (each byte waits for RXNE) and BSY = 0 before clearing SPE, which is the workaround | none |
+| 2.11.2 | SPI slave BSY | Master only | none |
+| 2.12.x | USB | Not used | none |
+
+## Still to check
+
 - **DS14548 I/O AC characteristics:** the exact low/medium-speed limits behind
   F5. The fix is conservative either way.

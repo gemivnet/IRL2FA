@@ -82,6 +82,21 @@ Wait Until Display Idle
     END
     Fail    ${name}: panel still powered after ${timeout_s} s
 
+Open About
+    [Arguments]    ${name}
+    # Home: Codes, Contacts, Pair, Add a code, Settings. Settings (no PIN):
+    # Date & time, Time zone, Set a PIN, About.
+    FOR    ${i}    IN RANGE    4
+        Press    ${name}    joyDown
+    END
+    Press    ${name}    joyCenter
+    FOR    ${i}    IN RANGE    3
+        Press    ${name}    joyDown
+    END
+    Press    ${name}    joyCenter
+    Wait For Screen    ${name}    about    timeout_s=4
+    Wait Until Display Idle    ${name}
+
 Press
     [Arguments]    ${name}    ${button}
     Execute Command    mach set "${name}"
@@ -355,3 +370,22 @@ Writes The RTC Configuration EEPROM Only Once
     ${clk}=    Model Text    dev    sysbus.i2c1.rtc ClkoutEnabled
     Should Contain    ${clk}    False
     Device Healthy    dev
+
+Reads The Battery With A Blank VREFINT Calibration
+    # ES0602 2.1.2: some STM32U0 parts left the factory with VREFINT_CAL
+    # unprogrammed (0xFFFF). The battery reading divided by it, so such a part
+    # read every cell as full (clamped to 3.60 V). The firmware now falls back
+    # to the datasheet's typical value (1654 counts), so a blank part must show
+    # what a part calibrated to exactly that value shows.
+    Create Device    nominal    1
+    Execute Command    sysbus WriteWord 0x1FFF6EA4 0x0676
+    Create Device    blank    1
+    Execute Command    sysbus WriteWord 0x1FFF6EA4 0xFFFF
+    FOR    ${dev}    IN    nominal    blank
+        Wait For Screen    ${dev}    menu    timeout_s=8
+        Wait Until Display Idle    ${dev}
+        Open About    ${dev}
+    END
+    ${n}=    Epd Text    nominal    RegionHash 0 48 250 14
+    ${b}=    Epd Text    blank    RegionHash 0 48 250 14
+    Should Be Equal    ${n}    ${b}    a blank VREFINT_CAL changes the battery reading

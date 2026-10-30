@@ -12,6 +12,9 @@
 #include "rv3032.h"
 #include "stm32u0xx_ll_adc.h" /* VREFINT_CAL_ADDR, VREFINT_CAL_VREF */
 
+/* What VREFINT_CAL holds for a typical 1.212 V reference: 1212 / 3000 * 4095. */
+#define VREFINT_CAL_NOMINAL 1654u
+
 uint32_t SystemCoreClock = SYSCLK_HZ; /* declared by system_stm32u0xx.h */
 
 volatile uint32_t board_wake_flags;
@@ -336,14 +339,17 @@ static bool i2c_fail(void)
     return false;
 }
 
-/* Waits for `flag` in ISR; fails early on NACK. */
+/* Waits for `flag` in ISR; fails early on NACK or lost arbitration. A bus
+ * error is cleared and ignored: ES0602 2.8.2, the master can flag BERR
+ * spuriously while the transfer carries on normally. */
 static bool i2c_wait(uint32_t flag)
 {
     uint32_t start = ms_ticks;
     for (;;) {
         uint32_t isr = I2C1->ISR;
         if (isr & flag) return true;
-        if (isr & (I2C_ISR_NACKF | I2C_ISR_BERR | I2C_ISR_ARLO)) return false;
+        if (isr & I2C_ISR_BERR) I2C1->ICR = I2C_ICR_BERRCF;
+        if (isr & (I2C_ISR_NACKF | I2C_ISR_ARLO)) return false;
         if (ms_ticks - start > I2C_TIMEOUT_MS) return false;
     }
 }
@@ -838,7 +844,13 @@ uint16_t hal_battery_mv(void)
 
     uint32_t raw = sum / 4u;
     if (!ok || raw == 0) return cached ? cached : 3000;
-    uint32_t mv = VREFINT_CAL_VREF * (uint32_t)(*VREFINT_CAL_ADDR) / raw;
+    /* ES0602 2.1.2: some parts left the factory with VREFINT_CAL blank
+     * (0xFFFF), which would read every cell as full. Fall back to the
+     * datasheet's typical 1.212 V (DS14548 VREFINT, 1.182-1.232 V: about
+     * +-1.7 %, so 50 mV at 3 V). */
+    uint32_t cal = *VREFINT_CAL_ADDR;
+    if (cal == 0u || cal == 0xFFFFu) cal = VREFINT_CAL_NOMINAL;
+    uint32_t mv = VREFINT_CAL_VREF * cal / raw;
     if (mv > 3600u) mv = 3600u;
     cached = (uint16_t)mv;
     when = ms_ticks;
