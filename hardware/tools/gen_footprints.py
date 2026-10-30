@@ -107,8 +107,10 @@ class Footprint:
             self.line(layer, x2, y2, x2 + head * math.cos(a + da), y2 + head * math.sin(a + da), w)
 
     # pads -------------------------------------------------------------------
-    def smd(self, num, x, y, w, h, shape="roundrect", rratio=0.25):
+    def smd(self, num, x, y, w, h, shape="roundrect", rratio=0.25, paste_margin=None):
         extra = f"\n\t\t(roundrect_rratio {rratio})" if shape == "roundrect" else ""
+        if paste_margin is not None:
+            extra += f"\n\t\t(solder_paste_margin {f(paste_margin)})"
         self.items.append(
             f'\t(pad "{num}" smd {shape}\n\t\t(at {f(x)} {f(y)})\n\t\t(size {f(w)} {f(h)})\n'
             f'\t\t(layers "F.Cu" "F.Paste" "F.Mask"){extra}\n\t)')
@@ -290,6 +292,7 @@ MY2450 = dict(
     pad_w=6.15, pad_h=6.0, pad_span=36.8, pad_top=9.2,                     # PCB layout diagram
     stop_t=0.25, height=5.7, cell_r=24.5 / 2,
     neg_pad_d=12.0,       # negative contact pad: well inside the cell's negative cap
+    leg_paste_margin=-0.35,   # 6.15 x 6.0 legs: ~79 % paste aperture, not 100 % (assembly review A-10)
 )
 
 
@@ -392,18 +395,20 @@ def my2450():
         "MYOUNG MY-2450-01 (CR2450-W) SMT CR2450 clip, nickel-plated C5191 phosphor bronze 0.25 mm "
         "(LCSC C964845), drawing MY-CP-0106 rev A/0. Height 5.70 above the PCB. Plate 25.5 x 23.2 with a "
         "7.5 mm closed end and a stop flap; the cell slides in from the open end (+y). Pads 6.15 x 6.00, "
-        "outer span 36.80, 9.20 from the closed end. Pad 1 = + (both legs), pad 2 = - : a bare 12 mm "
-        "copper pad under the cell centre (no paste; order ENIG).",
+        "outer span 36.80, 9.20 from the closed end. Pad 1 = + (both legs, paste reduced to ~79 %), "
+        "pad 2 = - : a bare 12 mm copper pad under the cell centre (no paste; order ENIG; solid zone "
+        "connection).",
         "CR2450 coin cell battery clip retainer SMD MYOUNG MY-2450-01 CR2450-W",
         "smd",
         "https://www.lcsc.com/datasheet/C964845.pdf")
     px, py = g["pad_x"], g["pad_y"]
-    fp.smd("1", px, py, m["pad_w"], m["pad_h"], "rect")
-    fp.smd("1", -px, py, m["pad_w"], m["pad_h"], "rect")
+    fp.smd("1", px, py, m["pad_w"], m["pad_h"], "rect", paste_margin=m["leg_paste_margin"])
+    fp.smd("1", -px, py, m["pad_w"], m["pad_h"], "rect", paste_margin=m["leg_paste_margin"])
     d = m["neg_pad_d"]
+    # zone_connect 2: the ground pour joins the contact solid, not through thermal spokes
     fp.items.append(
         f'\t(pad "2" smd circle\n\t\t(at 0 0)\n\t\t(size {f(d)} {f(d)})\n'
-        f'\t\t(layers "F.Cu" "F.Mask")\n\t)')
+        f'\t\t(layers "F.Cu" "F.Mask")\n\t\t(zone_connect 2)\n\t)')
 
     # fab: plate, cell, pads, insertion direction
     fp.poly("F.Fab", g["outline"])
@@ -520,7 +525,8 @@ def epd():
         "Good Display GDEY0213B74 2.13in e-paper (SSD1680), mechanical outline only, front side. Origin = glass centre. "
         "Glass 59.2x29.2x1.0, active area 48.55x23.70 starting 7.95 mm from the FPC-side glass edge (centred in Y). "
         "FPC 12.5 wide, 14.3 long, 0.3 thick, leaves the left short edge 8.15 mm from the top glass edge. "
-        "Edge.Cuts: 1.4x14.0 rounded FPC fold slot per hardware/board.yaml (slot centre x=-32.3 rel. glass centre). "
+        f"Edge.Cuts: {f(sw)}x{f(sh)} rounded FPC fold slot per hardware/board.yaml (slot centre x={f(scx)} rel. glass "
+        "centre), covering the flex's 14.3 mm wide flare where it passes. "
         "3D model: glass on 0.2 mm adhesive, FPC folded 180 deg through the slot to the back side.",
         "e-paper EPD Good Display GDEY0213B74 2.13 outline",
         "exclude_from_pos_files exclude_from_bom",
@@ -560,8 +566,9 @@ def main():
     my2450()
     sidelooker("LED_Vishay_VSMB2948SL_SideView", "VSMB2948SL", "940 nm IR emitter", "K", "A",
                "https://www.vishay.com/docs/83498/vsmb2948sl.pdf", "LCSC C6604342")
-    sidelooker("PhotoTransistor_Vishay_VEMT2523SLX01_SideView", "VEMT2523SLX01", "NPN phototransistor detector",
-               "C", "E", "https://www.vishay.com/docs/84167/vemt2523slx01.pdf", "LCSC C511451")
+    sidelooker("PhotoTransistor_Vishay_VEMT2023SLX01_SideView", "VEMT2023SLX01",
+               "NPN phototransistor detector with daylight-blocking filter",
+               "C", "E", "https://www.vishay.com/docs/84166/vemt2023slx01.pdf", "LCSC C2843576")
     epd()
 
 

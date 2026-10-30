@@ -12,8 +12,11 @@
 # board's top (IR) edge, for parts whose pads are symmetric.
 #
 # C6604342 (VSMB2948SL, D4) and C7427088 (ANR3015, L1) have no EasyEDA footprint
-# (the API answers 404); D4 is checked against C511451's, the same Vishay
-# side-view package, as an assumption (docs/assembly-review.md A-05).
+# (the API answers 404, again on 2026-10-30); D4 is checked against C511451's (the
+# VEMT2523SLX01, no longer fitted), the same Vishay side-view package, as an
+# assumption (docs/assembly-review.md A-05). Note that EasyEDA draws the VEMT2023SLX01
+# (C2843576, now Q5) the other way round from the VEMT2523SLX01: the same package can
+# appear either way in JLCPCB's library, which is why D4 stays on the preview checklist.
 # SPDX-License-Identifier: CERN-OHL-S-2.0
 parts:
   C964845:
@@ -39,13 +42,13 @@ parts:
       - ["1", 1.15, -0.95]
       - ["2", 1.15, 0.95]
       - ["3", -1.15, 0]
-  C469327:
+  C179399:
     refs: Q3
-    footprint: SOT-323_L2.0-W1.3-P1.30-LS2.1-BR
+    footprint: SOT-23-3_L2.9-W1.3-P1.90-LS2.4-BR
     pads:
-      - ["1", 0.8, -0.65]
-      - ["2", 0.8, 0.65]
-      - ["3", -0.8, 0]
+      - ["1", 1, -0.95]
+      - ["2", 1, 0.95]
+      - ["3", -1, 0]
   C20917:
     refs: Q4
     footprint: SOT-23-3_L2.9-W1.3-P1.90-LS2.4-BR
@@ -54,13 +57,21 @@ parts:
       - ["2", 1, 0.95]
       - ["3", -1, 0]
   C511451:
-    refs: Q5
+    refs: ""            # VEMT2523SLX01: not fitted since IR-1; kept as D4's reference package
     footprint: SENSOR-SMD_VEMT2523SLX01
     body: lens arc at +y (silkscreen ARC above the body)
     toward_top_edge: [0, 1]
     pads:
       - ["1", 1.65, 0]
       - ["2", -1.65, 0]
+  C2843576:
+    refs: Q5
+    footprint: LED-SMD_VISHAY_VEMT2023SLX01
+    body: lens dome (silkscreen arc) at -y; pin-1 dot by pad 1 at -x
+    toward_top_edge: [0, -1]
+    pads:
+      - ["1", -1.6, 0]
+      - ["2", 1.6, 0]
   C324726:
     refs: J1
     footprint: FFC-SMD_24P-P0.50_FH34SRJ-24S-0.5SH

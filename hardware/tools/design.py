@@ -60,11 +60,14 @@ PARTS = [
         pcb=("B", 58.0, 22.5, 90), volts="6.3V X5R"),
     cap("C2", "47u", "VBAT", "GND", "power", "0805", "C16780", "CL21A476MQYNNNE",
         pcb=("B", 58.0, 17.0, 90), volts="6.3V X5R"),
-    part("TP1", "Connector:TestPoint", "VBAT", "TestPoint:TestPoint_Pad_D1.0mm",
-         {"1": "VBAT"}, "power", desc="Test point (current measurement)", bom=False,
-         pcb=("B", 56.5, 31.5, 0)),
-    part("TP2", "Connector:TestPoint", "GND", "TestPoint:TestPoint_Pad_D1.0mm",
-         {"1": "GND"}, "power", desc="Test point", bom=False, pcb=("B", 59.0, 31.5, 0)),
+    # Test points TP1-TP5: one row of 1.5 mm pads on a 2.54 mm grid on the back, for
+    # current measurement (TP1/TP2) and for a pogo-pin programming fixture (all five:
+    # JLCPCB's factory programming, docs/pcb-design.md "Factory programming").
+    part("TP1", "Connector:TestPoint", "VBAT", "TestPoint:TestPoint_Pad_D1.5mm",
+         {"1": "VBAT"}, "power", desc="Test point: VBAT (current measurement, programming supply)",
+         bom=False),
+    part("TP2", "Connector:TestPoint", "GND", "TestPoint:TestPoint_Pad_D1.5mm",
+         {"1": "GND"}, "power", desc="Test point: GND", bom=False),
 
     # ---------------- MCU ----------------
     part("U1", "MCU_ST_STM32U0:STM32U083KCUx", "STM32U083KCU6",
@@ -92,6 +95,12 @@ PARTS = [
          "mcu", desc="SWD programming pads for a Tag-Connect TC2030-NL cable", bom=False,
          datasheet="https://www.tag-connect.com/wp-content/uploads/bsk-pdf-manager/TC2030-CTX_1.pdf",
          pcb=("B", 72.5, 29.0, 0)),
+    part("TP3", "Connector:TestPoint", "SWDIO", "TestPoint:TestPoint_Pad_D1.5mm",
+         {"1": "SWDIO"}, "mcu", desc="Test point: SWDIO (programming fixture)", bom=False),
+    part("TP4", "Connector:TestPoint", "SWCLK", "TestPoint:TestPoint_Pad_D1.5mm",
+         {"1": "SWCLK"}, "mcu", desc="Test point: SWCLK (programming fixture)", bom=False),
+    part("TP5", "Connector:TestPoint", "NRST", "TestPoint:TestPoint_Pad_D1.5mm",
+         {"1": "NRST"}, "mcu", desc="Test point: NRST (programming fixture)", bom=False),
 
     # ---------------- RTC ----------------
     part("U2", "irl2fa:RV-3032-C7", "RV-3032-C7",
@@ -113,7 +122,7 @@ PARTS = [
     # ---------------- input ----------------
     part("SW1", "irl2fa:Nav_Switch_5way", "SKRHABE010", "irl2fa:SW_Nav_Alps_SKRHABE010",
          {"1": "JOY_A", "2": "JOY_CENTER", "3": "JOY_C", "4": "JOY_B", "5": "GND",
-          "6": "JOY_D", "MP": None}, "input", "C139794", "SKRHABE010", "Alps Alpine",
+          "6": "JOY_D", "MP": "GND"}, "input", "C139794", "SKRHABE010", "Alps Alpine",
          "https://tech.alpsalpine.com/e/products/detail/SKRHABE010/",
          "5-way navigation switch: the only control", pcb=("F", 72.8, 17.0, 45)),
 
@@ -141,12 +150,12 @@ PARTS = [
          pcb=None),   # placed by PLACEMENT below, centred on the glass
     part("L1", "Device:L", "47u", "Inductor_SMD:L_APV_ANR3015",
          {"1": "VEPD", "2": "EPD_SW"}, "display", "C7427088", "ANR3015T470M", "APV",
-         desc="47 uH 500 mA booster inductor", pcb=("B", 16.0, 6.0, 0)),
-    part("Q3", "Transistor_FET:Si1308EDL", "Si1308EDL", "Package_TO_SOT_SMD:SOT-323_SC-70",
-         {"1": "EPD_GDR", "2": "EPD_RESE", "3": "EPD_SW"}, "display", "C469327",
-         "Si1308EDL-T1-GE3", "Vishay",
-         "https://www.vishay.com/docs/63399/si1308edl.pdf",
-         "Booster switch N-FET", pcb=("B", 16.0, 10.0, 0)),
+         desc="47 uH 0.36 A booster inductor", pcb=("B", 16.0, 6.0, 0)),
+    part("Q3", "Transistor_FET:Q_NMOS_GSD", "NX3008NBK", "Package_TO_SOT_SMD:SOT-23",
+         {"1": "EPD_GDR", "2": "EPD_RESE", "3": "EPD_SW"}, "display", "C179399",
+         "NX3008NBK,215", "Nexperia",
+         "https://assets.nexperia.com/documents/data-sheet/NX3008NBK.pdf",
+         "Booster switch N-FET, Vgs(th) 1.1 V max (SSD1680 asks <= 1.3 V)", pcb=("B", 16.0, 10.0, 0)),
     res("R6", "1M", "EPD_GDR", "GND", "display", "C26083", pcb=("B", 13.5, 11.5, 90),
         mpn="0402WGF1004TCE"),
     res("R7", "2.2", "EPD_RESE", "GND", "display", "C25101", pcb=("B", 18.5, 11.5, 90),
@@ -177,22 +186,22 @@ PARTS += [
     # ---------------- IR link ----------------
     part("D4", "Device:LED", "VSMB2948SL", "irl2fa:LED_Vishay_VSMB2948SL_SideView",
          {"1": "IR_LED_K", "2": "IR_LED_A"}, "ir", "C6604342", "VSMB2948SL", "Vishay",
-         "https://www.vishay.com/docs/84176/vsmb2948sl.pdf",
+         "https://www.vishay.com/docs/83498/vsmb2948sl.pdf",
          "940 nm side-looking IR emitter", pcb=("B", BOARD["ir"]["emitter"]["x"],
                                                 BOARD["ir"]["emitter"]["y"], 0)),
-    res("R8", "100", "VBAT", "IR_LED_A", "ir", "C25076", pcb=("B", 55.0, 4.0, 90),
-        mpn="0402WGF1000TCE"),
+    res("R8", "68", "VBAT", "IR_LED_A", "ir", "C25131", pcb=("B", 55.0, 4.0, 90),
+        mpn="0402WGF680JTCE"),
     part("Q4", "Transistor_FET:AO3400A", "AO3400A", "Package_TO_SOT_SMD:SOT-23",
          {"1": "IR_TX", "2": "GND", "3": "IR_LED_K"}, "ir", "C20917", "AO3400A", "AOS",
          "https://www.aosmd.com/res/datasheets/AO3400A.pdf",
          "IR LED driver (Vth <= 1.45 V, works from a flat cell)", pcb=("B", 58.0, 6.0, 0)),
     res("R9", "100k", "IR_TX", "GND", "ir", "C25741", pcb=("B", 61.0, 6.5, 90),
         mpn="0402WGF1003TCE"),
-    part("Q5", "Device:Q_Photo_NPN", "VEMT2523SLX01",
-         "irl2fa:PhotoTransistor_Vishay_VEMT2523SLX01_SideView",
-         {"1": "IR_RX_PWR", "2": "IR_RX"}, "ir", "C511451", "VEMT2523SLX01", "Vishay",
-         "https://www.vishay.com/docs/81596/vemt2500x01.pdf",
-         "Side-looking IR phototransistor", pcb=("B", BOARD["ir"]["detector"]["x"],
+    part("Q5", "Device:Q_Photo_NPN", "VEMT2023SLX01",
+         "irl2fa:PhotoTransistor_Vishay_VEMT2023SLX01_SideView",
+         {"1": "IR_RX_PWR", "2": "IR_RX"}, "ir", "C2843576", "VEMT2023SLX01", "Vishay",
+         "https://www.vishay.com/docs/84166/vemt2023slx01.pdf",
+         "Side-looking IR phototransistor with daylight-blocking filter", pcb=("B", BOARD["ir"]["detector"]["x"],
                                                  BOARD["ir"]["detector"]["y"], 0)),
     res("R10", "10k", "IR_RX", "GND", "ir", "C25744", pcb=("B", 25.0, 4.0, 90),
         mpn="0402WGF1002TCE"),
@@ -229,11 +238,16 @@ BLOCK_TITLES = {
 _G = BOARD["display"]["glass"]
 PLACEMENT = {
     "BT1": ("B", BOARD["battery"]["x"], BOARD["battery"]["y"], 180),   # closed end towards the IR edge
-    "Q1": ("B", 58.0, 25.0, 90),
+    "Q1": ("B", 56.2, 22.2, 0),     # above the test-pad row's labels
     "C1": ("B", 59.2, 9.8, 90),
     "C2": ("B", 59.6, 21.4, 90),
-    "TP1": ("B", 55.2, 29.5, 0),
-    "TP2": ("B", 57.8, 29.5, 0),
+    # Test-pad row on the bottom edge: 2.54 mm pitch, right of the cell's insertion
+    # path (x 25.9..51.1) and below J3. Fixture order GND, VBAT, SWDIO, SWCLK, NRST.
+    "TP2": ("B", 52.9, 29.5, 0),
+    "TP1": ("B", 52.9 + 2.54, 29.5, 0),
+    "TP3": ("B", 52.9 + 2 * 2.54, 29.5, 0),
+    "TP4": ("B", 52.9 + 3 * 2.54, 29.5, 0),
+    "TP5": ("B", 52.9 + 4 * 2.54, 29.5, 0),
     "U1": ("B", 64.6, 16.0, 90),
     "C3": ("B", 63.0, 20.4, 0),
     "C4": ("B", 64.6, 11.6, 0),

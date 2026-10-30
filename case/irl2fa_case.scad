@@ -58,14 +58,14 @@ cap_roof        = 0.6;    // minimum material above the stem top, at the bottom 
 cap_dish        = 0.3;    // finger dish depth
 cap_top_round   = 0.8;    // round-over on the cap's top edge
 stem_shape      = "square";// "square" | "round"
-// SKRHABE010 keytop stem (Alps SKRH catalog, Drawing No.2; not in board.yaml): a
+// SKRHABE010 keytop stem (Alps SKRH catalog, Drawing No.2; from board.yaml): a
 // 1.95 +-0.05 mm square with R0.5 corners, its flats at 45 deg to the switch body.
 // The body is turned 45 deg on this board, so the flats are parallel to the board
 // edges. Only the top 1.7 mm ("keytop fitting area 1.7 max") may go into the cap.
-stem_square     = 1.95;   // across flats
-stem_corner_r   = 0.5;
+stem_square     = joystick_stem_square;    // across flats
+stem_corner_r   = joystick_stem_corner_r;
 stem_angle      = 0;      // flats relative to the board's x axis
-stem_fit_max    = 1.7;    // deepest the cap may reach down the stem
+stem_fit_max    = joystick_stem_fit_max;   // deepest the cap may reach down the stem
 stem_socket_extra = 0.20; // socket = stem + this (before the crush ribs)
 stem_rib_interference = 0.10; // radial interference of each crush rib on the stem
 stem_rib_count  = 3;      // crush ribs in a round socket (a square socket gets one per face)

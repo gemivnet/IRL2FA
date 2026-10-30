@@ -119,7 +119,7 @@ any of that.
 
 | Option | Cost | Notes |
 |-|-|-|
-| **VSMB2948SL + VEMT2523SLX01** ✔ (side-looking pair) | ~$0.75 | 20 mA LED drive, 4.8 kbaud NRZ UART. The phototransistor (20-40 µs edges) is the speed limit. It is wired as an emitter follower, which avoids the Miller slow-down. Emitter stock is low (176): the Everlight IR12-21C is a fallback with less range. |
+| **VSMB2948SL + VEMT2023SLX01** ✔ (side-looking pair) | ~$0.95 | 18-28 mA LED drive (R8 = 68 Ω), 4.8 kbaud NRZ UART. The phototransistor (20-45 µs edges) is the speed limit. It is wired as an emitter follower, which avoids the Miller slow-down. The VEMT2023SLX01 ([C2843576](https://www.lcsc.com/product-detail/C2843576.html), Extended) is the daylight-filter version of the VEMT2523SLX01 (same package, pads and lead order): with the clear-lens part, room light could hold the receiver "on" ([electrical review](electrical-review.md) IR-1). Worst-case range on axis about 3.5 cm (`hardware/spice/ir_rx.cir`). Emitter stock is low (176): the Everlight IR12-21C is a fallback with less range. |
 | Vishay TFBS4711 IrDA transceiver | ~$4.80 | 115 kbit/s, 10 nA shutdown, but low stock and costly |
 | 38 kHz receiver (TSOP75238) | ~$1.35 | Only ~1-2 kbit/s and needs ≥ 2.5 V |
 
@@ -130,7 +130,8 @@ any of that.
 | Bulk capacitor | 2 × 47 µF X5R 0805 ([C16780](https://www.lcsc.com/product-detail/C16780.html)) | MLCC leakage is in the nA range. Tantalum/polymer parts are specified up to 6-63 µA, which would dominate sleep current. |
 | Reverse-battery and panel switch P-FETs | AO3401A ([C15127](https://www.lcsc.com/product-detail/C15127.html), Basic) | IGSS 100 nA max. The DMP2035U's 10 µA gate leakage would drain the cell. |
 | IR LED switch | AO3400A ([C20917](https://www.lcsc.com/product-detail/C20917.html), Basic) | Vth ≤ 1.45 V still turns on fully from a 2.5 V cell. A 2N7002 (Vth up to 2.5 V) may not. |
-| Booster | 47 µH ANR3015, Si1308EDL, 3 × MBR0530, 2.2 Ω, 1 MΩ, 1 µF/50 V 0603 | Good Display reference circuit. The 50 V 0603 parts keep their capacitance at ±20 V bias. |
+| Booster | 47 µH ANR3015 (0.36 A Isat), NX3008NBK ([C179399](https://www.lcsc.com/product-detail/C179399.html)), 3 × MBR0530, 2.2 Ω, 1 MΩ, 1 µF/50 V 0603 | Good Display reference circuit. The 50 V 0603 parts keep their capacitance at ±20 V bias. The switch is Solomon's suggestion (SSD1680 Table 13-1), not Good Display's Si1308EDL: its Vgs(th) is 1.1 V max against the controller's 1.3 V limit, where the Si1308EDL's is 1.5 V ([electrical review](electrical-review.md) EPD-1). 30 V, 400 mA, 2.1 Ω max at 2.5 V; the booster's 0.19 A peak and 21.7 V are inside it. |
+| IR LED resistor | R8 = 68 Ω 0402 ([C25131](https://www.lcsc.com/product-detail/C25131.html), Extended) | 28 mA from a fresh cell, 18 mA from a flat one: about 20 % more range than 100 Ω (IR-2), with 53-59 mW in R8 against its 62.5 mW, only while transmitting. JLCPCB has no Basic 68 Ω 0402; 75 Ω ([C25133](https://www.lcsc.com/product-detail/C25133.html), "Preferred") would save the feeder fee for about 13 % instead of 20 % more range. |
 
 The full research notes behind this page, with a source for every figure, are
 in [research/parts-research-2026-10-29.md](research/parts-research-2026-10-29.md).

@@ -24,8 +24,10 @@ display:                     # Good Display GDEY0213B74, front side
   fpc_length: 14.3          # from the glass edge (GDEY0213B74; the PDi panel's is 15.3)
   adhesive: 0.2
 
-fpc_slot:                    # FPC folds through this slot to the back (2.7 mm from the glass edge to its centre)
-  {x: 1.9, y: 8.5, w: 1.4, h: 14.0}
+fpc_slot:                    # FPC folds through this slot to the back (2.7 mm from the glass edge to its centre).
+  # Covers the flex's 14.30 mm flare (6.77 below the glass top) +-0.5 mm and 0.2 mm clear
+  # along its straight part, y 7.0..22.6 (docs/mechanical-review.md MECH-01)
+  {x: 1.9, y: 6.3, w: 1.4, h: 17.0}
 
 joystick:                    # Alps SKRHABE010, front side, rotated 45 deg
   part: SKRHABE010
@@ -33,7 +35,10 @@ joystick:                    # Alps SKRHABE010, front side, rotated 45 deg
   y: 15.5
   body: 7.5
   body_height: 1.8
-  stem_diameter: 3.0
+  shoulder_diameter: 3.0     # round shoulder below the keytop stem (not what the cap grips)
+  stem_square: 1.95          # keytop stem across flats, flats at 45 deg to the body (Alps Drawing No.2)
+  stem_corner_r: 0.5         # its corner radius
+  stem_fit_max: 1.7          # "keytop fitting area 1.7 max": deepest a cap may reach down the stem
   stem_top: 5.0              # stem top above the PCB front surface (Alps drawing)
 
 ir:                          # side-looking, back side, aimed through the TOP edge (y = 0)

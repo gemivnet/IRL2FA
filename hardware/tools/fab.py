@@ -98,18 +98,20 @@ JLC = {
                  "assumed centred with terminals along x like ours"),
     "C15127": (180, (0.0, 0.0), "AO3401A SOT-23: EasyEDA SOT-23_L2.9-W1.3-P1.90-LS2.4-BR has pins 1,2 "
                "at +x and pin 3 at -x; KiCad SOT-23 has pins 1,2 at -x. The well-known SOT-23 180"),
-    "C469327": (180, (0.0, 0.0), "Si1308EDL SC-70: EasyEDA SOT-323_L2.0-W1.3-P1.30-LS2.1-BR, pins 1,2 at "
-                "+x, pin 3 at -x; KiCad SOT-323_SC-70 is the other way round"),
+    "C179399": (180, (0.0, 0.0), "NX3008NBK,215 SOT-23: EasyEDA SOT-23-3_L2.9-W1.3-P1.90-LS2.4-BR (fetched "
+                "2026-10-30), pins 1,2 at +x (1 at -y, y up) and pin 3 at -x; KiCad SOT-23 has pins 1,2 at -x. "
+                "The SOT-23 180, as C15127/C20917"),
     "C20917": (180, (0.0, 0.0), "AO3400A SOT-23: EasyEDA SOT-23-3_L2.9-W1.3-P1.90-LS2.4-BR, pins 1,2 at +x"),
-    "C511451": (0, (0.0, 0.0), "VEMT2523SLX01: EasyEDA SENSOR-SMD_VEMT2523SLX01, pad 1 (C) at +x, lens "
-                "arc on the silkscreen at +y; ours has pad 1 = C at +x, lens at -y in KiCad's y-down "
-                "frame, i.e. the same way up"),
+    "C2843576": (180, (0.0, 0.0), "VEMT2023SLX01: EasyEDA LED-SMD_VISHAY_VEMT2023SLX01 (fetched 2026-10-30) "
+                 "is drawn the other way round from the VEMT2523SLX01's: pad 1 (C) at -x (x = -1.6), pad 2 "
+                 "at +x, pin-1 dot by pad 1, lens dome (silkscreen arc) at -y (y up). Ours has pad 1 = C "
+                 "at +x and the lens at +y (y up): turning theirs 180 lands both pads and the lens"),
     "C25744": (0, (0.0, 0.0), "0402 resistor, EasyEDA R0402"),
     "C25900": (0, (0.0, 0.0), "0402 resistor, EasyEDA R0402"),
     "C25741": (0, (0.0, 0.0), "0402 resistor, EasyEDA R0402"),
     "C26083": (0, (0.0, 0.0), "0402 resistor, EasyEDA R0402"),
     "C25101": (0, (0.0, 0.0), "0402 resistor, EasyEDA R0402"),
-    "C25076": (0, (0.0, 0.0), "0402 resistor, EasyEDA R0402"),
+    "C25131": (0, (0.0, 0.0), "0402 resistor, EasyEDA R0402 (fetched 2026-10-30), pad 1 at -x"),
     "C139794": (0, (0.0, 0.0), "SKRHABE010: EasyEDA SW-SMD_SKRHABE010, pads 1-3 at -x (1 at top), 4-6 at "
                 "+x (4 at top), small guide boss at the top, as ours"),
     "C22459164": (0, (0.0, 0.0), "STM32U083KCU6 UFQFPN-32: EasyEDA UFQFPN-32_L5.0-W5.0-P0.50-TL-EP3.5, "

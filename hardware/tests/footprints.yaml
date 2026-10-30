@@ -136,13 +136,14 @@ footprints:
     envelope: [-0.9, -1.37, 0.9, 1.18]          # lens tip 2.55 from the body back
     tol: {body: 0.2}
 
-  irl2fa:PhotoTransistor_Vishay_VEMT2523SLX01_SideView:
-    part: Vishay VEMT2523SLX01 (LCSC C511451)
-    datasheet: https://www.vishay.com/docs/84167/vemt2523slx01.pdf
+  irl2fa:PhotoTransistor_Vishay_VEMT2023SLX01_SideView:
+    part: Vishay VEMT2023SLX01 (LCSC C2843576)
+    datasheet: https://www.vishay.com/docs/84166/vemt2023slx01.pdf
     source: >-
-      Doc 84167 rev 1.0 p.4, drawing 6.544-5410.01-4: same package and IPC-7351 pad
-      proposal as the VSMB2948SL (0.9 x 1.2, 4.2 outer span). Front view: Emitter right,
-      Collector left, so C at +x (pad 1), E at -x.
+      Doc 84166 rev 1.0 p.4, drawing 6.544-5410.01-4 ("refers to VEMT2x23SLX01", the same
+      drawing as the VEMT2523SLX01's doc 84167): same package and IPC-7351 pad proposal as
+      the VSMB2948SL (0.9 x 1.2, 4.2 outer span). Front view: Emitter right, Collector left,
+      so C at +x (pad 1), E at -x. p.5 tape table: Lead I = Collector.
     pads:
       - {num: "1", at: [1.65, 0], size: [0.9, 1.2]}
       - {num: "2", at: [-1.65, 0], size: [0.9, 1.2]}
@@ -221,7 +222,7 @@ footprints:
     tol: {edge_out: 0.15, edge_in: 0.05, body: 0.1}
 
   Package_TO_SOT_SMD:SOT-23:
-    part: AOS AO3401A (LCSC C15127), AO3400A (LCSC C20917)
+    part: AOS AO3401A (LCSC C15127), AO3400A (LCSC C20917); Nexperia NX3008NBK (LCSC C179399)
     datasheet: https://www.aosmd.com/sites/default/files/res/package/SOT23.pdf
     source: >-
       AOS "SOT23 Package Outline" PO-00001 rev N, "Recommended land pattern": pads
@@ -231,6 +232,11 @@ footprints:
       KiCad's IPC pads are 1.475 x 0.6 at x +-0.9375: they reach 0.6 further in under
       the body (heel) and are 0.1 narrower each side than AOS's 0.8 (still wider than the
       0.5 max lead). Accepted: heel_out 0.65, edge_out 0.1 elsewhere, edge_in 0.1.
+      NX3008NBK (Q3): Nexperia data sheet (5 Nov 2022) Fig. 19 "Reflow soldering footprint
+      for SOT23": lands 0.6 x 0.7, 1.9 pitch, rows 2.0 apart, i.e. x 0.65..1.35 from the
+      centre line after the same rotation. KiCad's pads (x 0.2..1.675, 0.6 wide) cover
+      them completely; the AOS pattern above is the stricter of the two, so it is the one
+      checked. Pinout G-S-D (NX3008NBK Table 2) as the AOS parts.
     pads:
       - {num: "1", at: [-1.2, -0.95], size: [0.8, 0.8]}
       - {num: "2", at: [-1.2, 0.95], size: [0.8, 0.8]}
@@ -239,27 +245,6 @@ footprints:
     pitch: {pads: ["1", "2"], value: 1.9}
     body: {size: [1.6, 2.9]}
     tol: {edge_out: 0.1, heel_out: 0.65, edge_in: 0.1, body: 0.2}
-
-  Package_TO_SOT_SMD:SOT-323_SC-70:
-    part: Vishay Si1308EDL (LCSC C469327)
-    datasheet: https://datasheet.lcsc.com/datasheet/pdf/a865757ba512c18824d75705c123f47e.pdf?productCode=C469327
-    source: >-
-      Vishay AN826 (doc 72601, rev 21-Jan-08) p.17 "Recommended minimum pads for SC-70:
-      3-lead" (included in the Si1308EDL datasheet): pads 0.559 x 0.648, 2.438 overall
-      height (rows 1.79 apart), 1.803 overall width, pin 3 centred. Package doc 71153:
-      e1 1.30 nom, D 2.00 x E1 1.25. Pinout G-S-D (AN813 fig.1). Rotated +90 deg into
-      KiCad's orientation. These are MINIMUM pads, so KiCad's larger pads are fine
-      (edge_out 0.35). Ambiguity: AN826's inch figures give a 1.245 pin pitch against
-      the package's 1.30 e1; KiCad uses 1.30, which leaves its 0.5 wide pads up to 0.057
-      inside the 0.559 minimum pad edge. Documented, edge_in 0.07.
-    pads:
-      - {num: "1", at: [-0.895, -0.6225], size: [0.648, 0.559]}
-      - {num: "2", at: [-0.895, 0.6225], size: [0.648, 0.559]}
-      - {num: "3", at: [0.895, 0], size: [0.648, 0.559]}
-    pin1: [-1, -1]
-    pitch: {pads: ["1", "2"], value: 1.3}
-    body: {size: [1.25, 2.0]}
-    tol: {edge_out: 0.35, edge_in: 0.07, pitch: 0.06, body: 0.15}
 
   Inductor_SMD:L_APV_ANR3015:
     part: APV ANR3015T470M (LCSC C7427088)
@@ -387,14 +372,15 @@ footprints:
       - {num: "1", at: [0, 0], size: [4.4, 4.4], shape: circle, drill: [2.2, 2.4]}
     pin1: [0, 0]
 
-  TestPoint:TestPoint_Pad_D1.0mm:
+  TestPoint:TestPoint_Pad_D1.5mm:
     part: probe pad (no part)
     datasheet: none
     source: >-
-      Design choice, no datasheet: 1.0 mm round SMD pad for a probe or pogo pin
-      (VBAT current measurement, GND).
+      Design choice, no datasheet: 1.5 mm round SMD pad for a probe or pogo pin (VBAT
+      current measurement, GND, and the five-pad programming row TP1-TP5 on a 2.54 mm
+      grid; JLCPCB's programming fixtures want pads of 1.0 mm or more).
     pads:
-      - {num: "1", at: [0, 0], size: [1.0, 1.0], shape: circle}
+      - {num: "1", at: [0, 0], size: [1.5, 1.5], shape: circle}
     pin1: [0, 0]
 
 # Pin functions per part, from the datasheet pinouts, compared with the
@@ -407,13 +393,13 @@ parts:
     {"1": G, "2": S, "3": D}
   AO3400A:        # AOS AO3400A datasheet p.1
     {"1": G, "2": S, "3": D}
-  Si1308EDL:      # Vishay AN813 fig.1, SOT-323 SC-70 (3-leads): G 1, S 2, D 3
+  NX3008NBK:      # Nexperia NX3008NBK data sheet Table 2 (SOT23): G 1, S 2, D 3
     {"1": G, "2": S, "3": D}
   MBR0530:        # cathode bar = pad 1 (K)
     {"1": K, "2": A}
   VSMB2948SL:     # Vishay doc 83498 p.5: cathode / anode
     {"1": K, "2": A}
-  VEMT2523SLX01:  # Vishay doc 84167 p.4: collector / emitter
+  VEMT2023SLX01:  # Vishay doc 84166 p.4: collector / emitter
     {"1": C, "2": E}
   SKRHABE010:     # Alps SKRH Drawing No.2 circuit diagram
     {"1": A, "2": CENTER, "3": C, "4": B, "5": COMMON, "6": D}

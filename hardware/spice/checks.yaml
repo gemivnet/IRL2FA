@@ -9,7 +9,7 @@ epd_boost.cir:
   vgl_end:   {max: -20.5, unit: V, why: "PREVGL must be below VGL (-20 V)"}
   t_vgh:     {max: 0.030, unit: s, why: "booster up within the soft-start budget"}
   il_peak:   {max: 0.36, unit: A, why: "L1 ANR3015T470M Isat 0.36 A (APV catalogue p.5), not 500 mA"}
-  vds_max:   {max: 27.0, unit: V, why: "Si1308EDL and MBR0530 rated 30 V (10 % margin)"}
+  vds_max:   {max: 27.0, unit: V, why: "NX3008NBK and MBR0530 rated 30 V (10 % margin)"}
 load_switch.cir:
   vbat_min:  {min: 2.40, unit: V, why: "panel inrush must not brown out the MCU"}
   vepd_end:  {min: 2.70, unit: V, why: "panel supply after switch-on"}
@@ -17,8 +17,15 @@ reverse_battery.cir:
   vbat_min:  {min: -0.30, unit: V, why: "reversed cell blocked"}
   ileak:     {max: 1.0e-6, unit: A, why: "reverse current (model is ideal; AO3401A IDSS is 1 uA max)"}
 ir_led.cir:
-  iled_fresh: {max: 0.025, unit: A, why: "IR LED current, fresh cell"}
-  iled_flat:  {min: 0.010, unit: A, why: "IR LED current, nearly flat cell (2.5 V)"}
+  iled_fresh: {max: 0.035, unit: A, why: "IR LED current, fresh cell (R8 68 ohm; R8 at most 62.5 mW, LED 100 mA abs. max)"}
+  pr8_fresh:  {max: 0.0625, unit: W, why: "R8 0402 thick film rated 62.5 mW"}
+  iled_flat:  {min: 0.017, unit: A, why: "IR LED current, nearly flat cell (2.5 V): what ir_rx.cir assumes"}
+ir_burst.cir:
+  vbat_min_halfused: {min: 2.0, unit: V, why: "a 90 % duty IR burst from a half-used cell keeps the MCU (1.71 V min) running"}
+  iled_end_halfused: {min: 0.015, unit: A, why: "LED current at the end of a 9-bit run still covers the 3 cm range (ir_rx.cir)"}
+  vbat_min_fresh:    {min: 2.4, unit: V, why: "fresh cell (15 ohm)"}
 ir_rx.cir:
   v1_mid:   {min: 1.75, unit: V, why: "lone 1 bit reaches VIH (0.7 x 2.5 V) at the USART sample point, worst-case parts 2 cm apart"}
   v0_mid:   {max: 0.75, unit: V, why: "lone 0 bit after five 1s falls below VIL (0.3 x 2.5 V) at the sample point"}
+  v1_mid_3cm: {min: 1.75, unit: V, why: "the same at 3 cm, the documented worst-case range (IR-2, R8 68 ohm)"}
+  v0_mid_3cm: {max: 0.75, unit: V, why: "the same at 3 cm"}

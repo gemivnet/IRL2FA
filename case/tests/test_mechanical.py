@@ -48,7 +48,7 @@ GDWT = "Good Display GDEM0213B74WT spec, p.6 (same panel and flex, fully dimensi
 ALPS = "Alps SKRH catalog (update 2510), p.2, Drawing No.2 (SKRHABE010)"
 HRS = "Hirose FH34SRJ catalog (2018.11), p.3-4"
 MY = "MYOUNG drawing MY-CP-0106 rev A/0 (LCSC C964845)"
-VSH = "Vishay VSMB2948SL doc 83498 p.5 / VEMT2523SLX01 doc 84167 (drawing 6.544-5410.02-4)"
+VSH = "Vishay VSMB2948SL doc 83498 p.5 / VEMT2023SLX01 doc 84166 (drawing 6.544-5410.01-4, VEMT2x23SLX01)"
 MURATA = "Murata CR2450R data sheet (Dec 2019), p.1"
 
 DRAWINGS = {
@@ -161,7 +161,7 @@ def glb_points(per_mesh: int = 300) -> dict[str, np.ndarray]:
         z = v[:, 1] - (0.795 if front else -0.085 + t)
         name = g.rsplit("_", 1)[0] if g[-1].isdigit() else g
         for k in ("SW_Nav_Alps_SKRHABE010", "EPD_GoodDisplay_GDEY0213B74_Outline", "BatteryHolder_MYOUNG",
-                  "Hirose_FH34SRJ", "LED_Vishay_VSMB2948SL", "PhotoTransistor_Vishay_VEMT2523SLX01"):
+                  "Hirose_FH34SRJ", "LED_Vishay_VSMB2948SL", "PhotoTransistor_Vishay_VEMT2023SLX01"):
             if g.startswith(k):
                 name = k
         out.setdefault(name, []).append(np.c_[v[:, 0] - ORIGIN[0], v[:, 2] - ORIGIN[1], z])
@@ -251,7 +251,7 @@ def test_battery_clip_model_matches_drawing():
     assert b["holder_height"] == pytest.approx(dwg("clip_height"))
 
 
-@pytest.mark.parametrize("name,ref", [("LED_Vishay_VSMB2948SL", "D4"), ("PhotoTransistor_Vishay_VEMT2523SLX01", "Q5")])
+@pytest.mark.parametrize("name,ref", [("LED_Vishay_VSMB2948SL", "D4"), ("PhotoTransistor_Vishay_VEMT2023SLX01", "Q5")])
 def test_ir_model_matches_drawing(name, ref):
     p = model(name)
     t = board()["board"]["thickness"]
@@ -298,8 +298,6 @@ def fpc_flare_span():
         y0 + dwg("fpc_flare_w") + tol("fpc_edge_from_top") + tol("fpc_flare_w") / 2
 
 
-@pytest.mark.xfail(reason="MECH-01: the 14.0 mm slot is shorter than the 14.3 mm flex flare that passes through it",
-                   strict=True)
 def test_fpc_flare_fits_the_slot():
     s = board()["fpc_slot"]
     g = board()["display"]["glass"]
@@ -408,7 +406,43 @@ def test_cell_lands_on_its_negative_pad():
         assert math.hypot(x - b["x"], y - b["y"]) - 6.15 / 2 >= b["cell_diameter"] / 2 - 0.05
 
 
-@pytest.mark.xfail(reason="MECH-05: a tented via (EPD_PWR_N) sits in the strip the cell slides over", strict=True)
+def test_nothing_on_bcu_under_the_negative_cap_but_the_contact():
+    """MECH-04: copper under solder mask stands higher than the bare contact pad, so on
+    B.Cu under the cell's negative cap (Ø21) there is only pad 2 and its one spoke,
+    straight down (+y), whose solder mask is open. No other track, no pour."""
+    b = board()["battery"]
+    cx, cy = b["x"], b["y"]
+    r_cap = dwg("cell_neg_d") / 2
+    spoke = 0.6 + 1e-3                      # half width of the spoke's corridor (gen_pcb.py SPOKE_W)
+
+    def in_spoke(x, y):
+        return abs(x - cx) <= spoke and y > cy
+
+    bad = []
+    for s in (c for c in pcb_tree() if isinstance(c, list) and c and c[0] in ("segment", "arc")):
+        if _find(s, "layer")[1] != "B.Cu":
+            continue
+        (x0, y0), (x1, y1) = ((float(_find(s, k)[1]) - ORIGIN[0], float(_find(s, k)[2]) - ORIGIN[1])
+                              for k in ("start", "end"))
+        hw = float(_find(s, "width")[1]) / 2
+        for i in range(21):
+            x, y = x0 + (x1 - x0) * i / 20, y0 + (y1 - y0) * i / 20
+            if math.hypot(x - cx, y - cy) < r_cap + hw - 0.05 and not (in_spoke(x - hw, y) and in_spoke(x + hw, y)):
+                bad.append(f"track at ({x:.2f}, {y:.2f})")
+                break
+    for z in (c for c in pcb_tree() if isinstance(c, list) and c and c[0] == "zone"):
+        for fp in (c for c in z if isinstance(c, list) and c and c[0] == "filled_polygon"):
+            if _find(fp, "layer")[1] != "B.Cu":
+                continue
+            for xy in (c for c in _find(fp, "pts") if isinstance(c, list) and c[0] == "xy"):
+                x, y = float(xy[1]) - ORIGIN[0], float(xy[2]) - ORIGIN[1]
+                r = math.hypot(x - cx, y - cy)
+                if 6.0 + 0.05 < r < r_cap - 0.05 and not in_spoke(x, y):
+                    bad.append(f"pour at ({x:.2f}, {y:.2f})")
+                    break
+    assert not bad, f"B.Cu copper under the cell's negative cap: {bad[:5]}"
+
+
 def test_cell_insertion_strip_has_no_vias():
     b = board()["battery"]
     r = b["cell_diameter"] / 2 + 0.3

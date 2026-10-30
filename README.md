@@ -105,6 +105,12 @@ You need a PCB, a display, a coin cell, a printed case and four screws. Everythi
    - Add [`irl2fa-bom-jlcpcb.csv`](hardware/fab/irl2fa-bom-jlcpcb.csv) and [`irl2fa-cpl-jlcpcb.csv`](hardware/fab/irl2fa-cpl-jlcpcb.csv). Every part has an LCSC number. The [BOM](docs/bill-of-materials.md) lists JLCPCB's stock, Basic/Extended parts and alternatives. The MCU and the RTC are often short, so check them before paying.
    - The placement file is already corrected for JLCPCB's own footprints. On the placement preview, check the polarised parts against the [expected-view table](docs/assembly-review.md#what-the-placement-preview-must-show), especially the IR LED and phototransistor (lenses at the top edge) and the coin-cell clip (open end at the bottom edge).
    - Paste the [order remark](docs/assembly-review.md#order-remark) into the remark box.
+   - **Optional: have JLCPCB flash the firmware.** In the Standard PCBA options, open the advanced options and choose **programming**. JLCPCB asks for:
+     - the MCU: **STM32U083KCU6**;
+     - the programming interface: SWD on five test pads on the back, along the bottom edge, 1.5 mm round on a 2.54 mm grid: **TP2 GND, TP1 VBAT (supply 3.0 V), TP3 SWDIO, TP4 SWCLK, TP5 NRST**. Positions and a board image are in [docs/pcb-design.md](docs/pcb-design.md#factory-programming); attach [`docs/images/pcb/pcb-back.png`](docs/images/pcb/pcb-back.png);
+     - the firmware: `irl2fa-stm32u083-<version>.bin` from the [latest release](https://github.com/gemivnet/IRL2FA/releases), written from the start of flash (0x08000000).
+
+     It costs about $8 in engineering fees plus operator time per board. JLCPCB decides per order whether it can program a part, so the option can be refused. A freshly programmed chip runs ST's bootloader, not the firmware, until it has seen a power-on reset ([firmware review](docs/firmware-hardware-review.md) F4): the board must be power-cycled after the first flash. Inserting the coin cell does that; a board that is checked still on the fixture after programming looks dead, and is not.
    - To solder it yourself, use the [interactive BOM](https://irl2fa.com/ibom.html).
 2. **Buy the display.** A [Good Display GDEY0213B74](https://www.good-display.com/product/391.html) (about $5), or the GDEM0213B74WT if it has to work below 0 °C.
 3. **Print the case.**
@@ -112,7 +118,7 @@ You need a PCB, a display, a coin cell, a printed case and four screws. Everythi
    - Settings and assembly: [docs/case-design.md](docs/case-design.md).
 4. **Flash the firmware.**
    - Get `irl2fa-stm32u083-<version>.bin` from the [latest release](https://github.com/gemivnet/IRL2FA/releases), or build it with `firmware/port/stm32u0/build.sh`.
-   - Flash it through a Tag-Connect TC2030-NL cable and any ST-Link: [firmware/port/stm32u0/README.md](firmware/port/stm32u0/README.md).
+   - Flash it through a Tag-Connect TC2030-NL cable and any ST-Link: [firmware/port/stm32u0/README.md](firmware/port/stm32u0/README.md). The test pads TP1-TP5 on the back carry the same signals for a pogo-pin fixture or probe clips. Skip this step if JLCPCB programmed the boards.
 5. **Assemble.**
    - Thread the display's flex cable through the slot from the front and lock it into the connector on the back (J1), then stick the display down on the front. Done the other way round, the flex has to be bent back over the glass at its glued root to reach the slot.
    - Slide the CR2450 under its clip from the bottom edge and screw the case together. Flash first (step 4): the Tag-Connect pads are on the back, inside the case.
