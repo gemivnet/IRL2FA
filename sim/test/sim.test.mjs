@@ -391,6 +391,9 @@ function hold(w, d, btn, ms) {
   settle(w, d);
 }
 
+// Fixed wording on the simple-mode contact screen (firmware/core/app.c).
+const SIMPLE_TEXT = ['will say:', 'Also OK:', "If they don't say this word,", 'hang up and call them back.'];
+
 test('simple mode: set up in Settings, shows only the caller\'s word, up/down only, out with the family PIN', async () => {
   const { a, b, w } = await newWorld();
   await pairBoth(w, a, b);
@@ -432,10 +435,16 @@ test('simple mode: set up in Settings, shows only the caller\'s word, up/down on
       const wa = a.contactWords(0, 0), wb = b.contactWords(0, 0);
       const fb = b.framebuffer();
       const hear = b.word(wb.receive), say = b.word(wb.give);
+      // The SAY word can't be looked for where it is legitimately part of
+      // other text on the screen ("will" in "Susan will say:", "all" in
+      // "call", or inside the caller's word or the "Also OK" word): there a
+      // pixel search finds it although it isn't drawn as a word.
+      const prev = b.word(b.contactWords(0, -1).receive);
+      const shown = [...SIMPLE_TEXT, 'Susan', hear, prev].join(' ').toLowerCase();
       ok = hear === a.word(wa.give) &&
            findText(fb, b.probeText(FONT.HUGE, 0, 0, 0, hear)) &&
            findText(fb, b.probeText(FONT.LARGE, 0, 0, 0, 'Susan')) &&
-           !fonts.some((f) => findText(fb, b.probeText(f, 0, 0, 0, say)));
+           (shown.includes(say) || !fonts.some((f) => findText(fb, b.probeText(f, 0, 0, 0, say))));
       if (ok && win === 0) console.log(`  simple mode: "Susan will say: ${hear}"; its own SAY word "${say}" not drawn`);
     }
     assert.ok(ok, `window ${win}: caller's word shown, own SAY word not`);
@@ -468,7 +477,9 @@ test('simple mode: set up in Settings, shows only the caller\'s word, up/down on
   // right one opens the normal menus.
   hold(w, b, BTN.CENTER, 6000);
   assert.equal(b.screen(), 'simple', 'not after 6 s');
-  hold(w, b, BTN.CENTER, 11000); // counted from when the core sees the press
+  // 10 s counted from when the core sees the press, which a full refresh
+  // (3 s, the core blocked) starting just then can delay: hold 14 s.
+  hold(w, b, BTN.CENTER, 14000);
   assert.equal(b.screen(), 'pin');
   for (const x of [BTN.DOWN, BTN.DOWN, BTN.DOWN, BTN.DOWN, BTN.DOWN, BTN.DOWN]) press(w, b, x);
   press(w, b, BTN.CENTER);
