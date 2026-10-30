@@ -492,31 +492,31 @@
     "netclass_patterns": [
       {
         "netclass": "Power",
-        "pattern": "GND"
+        "pattern": "/GND"
       },
       {
         "netclass": "Power",
-        "pattern": "VBAT"
+        "pattern": "/VBAT"
       },
       {
         "netclass": "Power",
-        "pattern": "VBAT_RAW"
+        "pattern": "/VBAT_RAW"
       },
       {
         "netclass": "Power",
-        "pattern": "VEPD"
+        "pattern": "/VEPD"
       },
       {
         "netclass": "Power",
-        "pattern": "EPD_SW"
+        "pattern": "/EPD_SW"
       },
       {
         "netclass": "Power",
-        "pattern": "EPD_RESE"
+        "pattern": "/EPD_RESE"
       },
       {
         "netclass": "Power",
-        "pattern": "IR_LED_*"
+        "pattern": "/IR_LED_*"
       }
     ]
   },
