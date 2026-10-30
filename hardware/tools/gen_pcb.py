@@ -281,7 +281,9 @@ def step_finish():
     for z in list(board.Zones()):
         if not z.GetIsRuleArea():
             board.Remove(z)
-    gnd = board.FindNet("GND")
+    gnd = board.FindNet("/GND") or board.FindNet("GND")  # schematic nets carry the sheet path
+    if gnd is None:
+        raise SystemExit("no GND net on the board: the pours would float")
     layers = [pcbnew.F_Cu, pcbnew.B_Cu] + ([pcbnew.In1_Cu, pcbnew.In2_Cu] if board.GetCopperLayerCount() == 4 else [])
     for layer in layers:
         z = pcbnew.ZONE(board)
