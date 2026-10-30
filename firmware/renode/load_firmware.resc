@@ -1,0 +1,10 @@
+# Puts a factory image (bootloader + application, as programmed over SWD;
+# firmware/tools/sign_image.py factory) into the emulated flash and loads
+# both programs' symbols for the debug blocks. Expects $factory, $bootelf and
+# $appelf. The core starts from the vector table at 0 (flash is aliased
+# there), i.e. in the bootloader, exactly as on the chip.
+# SPDX-License-Identifier: AGPL-3.0-or-later
+sysbus LoadBinary $factory 0x08000000
+sysbus LoadSymbolsFrom $bootelf
+sysbus LoadSymbolsFrom $appelf
+cpu VectorTableOffset 0x0

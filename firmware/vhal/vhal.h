@@ -42,6 +42,15 @@ typedef enum {
     VHAL_CUT_GARBAGE = 2, /* the affected bytes are left as noise */
 } vhal_cut_t;
 void vhal_fail_mode(vhal_cut_t mode);
+
+/* Firmware updates (hal.h): an image for "Send it to another" (header +
+ * payload, NULL for none), the running version, whether the app asked for
+ * the bootloader's receiver, and a bootloader report for the next start.
+ * Kept across vhal_reset(). */
+void vhal_set_update_image(const uint8_t *img, size_t len);
+void vhal_set_fw_version(uint32_t ver);
+int vhal_update_entered(void);
+void vhal_set_update_result(int r, uint32_t version);
 int vhal_fail_tripped(void);              /* 1 once a cut has happened */
 uint32_t vhal_flash_ops(void);            /* erase + write calls so far */
 

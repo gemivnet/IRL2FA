@@ -17,6 +17,7 @@ CORE="firmware/core/hash.c firmware/core/base32.c firmware/core/totp.c
       firmware/core/words.c firmware/core/wordlist.c firmware/core/pairing.c
       firmware/core/store.c firmware/core/gfx.c firmware/core/fonts.c
       firmware/core/timeutil.c firmware/core/app.c firmware/core/buttons.c
+      firmware/core/fwlink.c firmware/core/fwimage.c firmware/core/lzma_dec.c
       firmware/core/third_party/monocypher/monocypher.c
       firmware/vhal/vhal.c sim/sim_main.c"
 

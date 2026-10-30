@@ -24,7 +24,7 @@ anything.
 | Medium | 940 nm IR, side-looking LED and phototransistor on the top edge |
 | Range | a few cm; the devices are held top edge to top edge |
 | Coding | plain UART, 4800 baud 8N1, inverted (idle = LED off) |
-| Framing | `'I' '2' type len payload[len] crc16` (CRC-16/CCITT-FALSE over type..payload) |
+| Framing | `'I' '2' type len payload[len] crc16` (CRC-16/CCITT-FALSE over type..payload); types 1-2 here, 0x21-0x23 for [firmware updates](firmware-updates.md#transfer-protocol) |
 
 The link is half-duplex and lossy: the phototransistor also sees its own LED,
 so a frame that arrives while the receiving device is transmitting is lost.

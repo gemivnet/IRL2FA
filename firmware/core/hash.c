@@ -34,6 +34,9 @@ static void store64be(uint8_t *p, uint64_t v)
     store32be(p + 4, (uint32_t)v);
 }
 
+/* The bootloader only needs SHA-512 (Ed25519 and the image digest):
+ * IRL2FA_HASH_SHA512_ONLY leaves the others out of it. */
+#ifndef IRL2FA_HASH_SHA512_ONLY
 /* ---- SHA-1 ---- */
 
 static void sha1_block(uint32_t h[5], const uint8_t *b)
@@ -91,6 +94,8 @@ static void sha256_block(uint32_t h[8], const uint8_t *b)
     }
     h[0] += a; h[1] += bb; h[2] += c; h[3] += d; h[4] += e; h[5] += f; h[6] += g; h[7] += hh;
 }
+
+#endif /* IRL2FA_HASH_SHA512_ONLY */
 
 /* ---- SHA-512 ---- */
 
@@ -185,11 +190,15 @@ void hash_init(hash_ctx_t *ctx, hash_alg_t alg)
 
 static void hash_block(hash_ctx_t *ctx, const uint8_t *b)
 {
+#ifdef IRL2FA_HASH_SHA512_ONLY
+    sha512_block(ctx->s.h64, b);
+#else
     switch (ctx->alg) {
     case HASH_SHA1: sha1_block(ctx->s.h32, b); break;
     case HASH_SHA256: sha256_block(ctx->s.h32, b); break;
     default: sha512_block(ctx->s.h64, b); break;
     }
+#endif
 }
 
 void hash_update(hash_ctx_t *ctx, const void *data, size_t len)

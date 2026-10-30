@@ -206,3 +206,54 @@ void hal_device_uid(uint8_t uid[12])
 {
     for (int i = 0; i < 12; i++) uid[i] = v.rng_key[i % 8] ^ (uint8_t)(0xa5 + i);
 }
+
+/* ---- firmware updates: the simulator has no bootloader; the tests give
+ * the device an image to send and see the receiver being asked for. ---- */
+
+static struct {
+    const uint8_t *img; /* header + payload, or NULL */
+    size_t len;
+    uint32_t version;
+    int entered;
+    int result;
+    uint32_t result_version;
+} upd = {NULL, 0, 0x000100u, 0, -1, 0};
+
+void vhal_set_update_image(const uint8_t *img, size_t len)
+{
+    upd.img = img;
+    upd.len = len;
+}
+
+void vhal_set_fw_version(uint32_t ver) { upd.version = ver; }
+int vhal_update_entered(void) { return upd.entered; }
+void vhal_set_update_result(int r, uint32_t version)
+{
+    upd.result = r;
+    upd.result_version = version;
+}
+
+uint32_t hal_fw_version(void) { return upd.version; }
+void hal_update_enter(void) { upd.entered++; }
+
+bool hal_update_image(uint8_t hdr[128])
+{
+    if (!upd.img || upd.len < 128) return false;
+    memcpy(hdr, upd.img, 128);
+    return true;
+}
+
+bool hal_update_read(uint32_t off, uint8_t *buf, size_t len)
+{
+    if (!upd.img || off > upd.len || len > upd.len - off || 128u > upd.len - off - len) return false;
+    memcpy(buf, upd.img + 128 + off, len);
+    return true;
+}
+
+int hal_update_result(uint32_t *version)
+{
+    int r = upd.result;
+    *version = upd.result_version;
+    upd.result = -1;
+    return r;
+}

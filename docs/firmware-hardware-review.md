@@ -190,7 +190,12 @@ device. ... only program option bytes in a safe environment-safe supply". The
 README's RDP level 1 recipe runs on the board's CR2450.
 
 **Fix.** README, Readout protection: set RDP with a fresh cell or a bench supply
-on the battery contacts. The firmware never writes option bytes.
+on the battery contacts. Since the firmware updates
+([firmware-updates.md](firmware-updates.md#readout-protection-on-the-first-wake)),
+the bootloader sets RDP level 1 itself, once, and only when the owner first
+wakes the device with the joystick, with a signed application and a cell
+measured at ≥ 2.9 V twice (2.96 V without the
+VREFINT calibration). The application still never writes option bytes.
 
 ### F8 (low): TRNG ran in a configuration ST never characterised
 
@@ -254,7 +259,7 @@ Verdict: **OK** = matches the source; **Fixed** = finding above, fixed;
 | Vector table: 16 system + 32 device entries, order and names | header `IRQn_Type` | OK (now checked automatically) |
 | Reset_Handler: .data copy, .bss zero, init_array, no FPU/VTOR setup needed on M0+ booting from flash | Armv6-M; RM0503 2.5 | OK |
 | Boot: flash aliased at 0, EMPTY flag | RM0503 2.5, 2.5.4 | Fixed (F4, procedure) |
-| Option bytes / RDP: firmware never writes them; RDP1 recipe | RM0503 3.4.2, 3.5.1 | OK; Fixed (F7, procedure) |
+| Option bytes / RDP: only the bootloader writes them, once, at the owner's first wake on a healthy cell (firmware-updates.md); RDP1 recipe | RM0503 3.4.2, 3.5.1 | OK; Fixed (F7, procedure) |
 | UID at 0x1FFF6E50, flash size at 0x1FFF6EA0 | RM0503 39 | OK |
 
 ### RCC, clocks, flash latency

@@ -24,7 +24,11 @@ struct irl2fa_debug {
     uint32_t epd_timeouts;
     char screen[16];       /* app_screen_name() after the last poll */
 };
-__attribute__((used)) volatile struct irl2fa_debug irl2fa_debug;
+/* At a fixed address (flash_layout.ld __app_debug, outside .bss), so every
+ * build of the application puts it in the same place: the update tests
+ * install one build over another and keep reading it. */
+__attribute__((used, section(".irl2fa_debug"))) volatile struct irl2fa_debug irl2fa_debug;
+_Static_assert(sizeof(struct irl2fa_debug) <= 64, "flash_layout.ld: 64 bytes for the debug block");
 
 static void debug_update(void)
 {
@@ -38,7 +42,7 @@ static void debug_update(void)
     irl2fa_debug.i2c_errors = board_i2c_errors;
     irl2fa_debug.epd_timeouts = board_epd_timeouts;
 }
-#define DEBUG_INIT() (irl2fa_debug.magic = 0x47424449u)
+#define DEBUG_INIT() (memset((void *)&irl2fa_debug, 0, sizeof(irl2fa_debug)), irl2fa_debug.magic = 0x47424449u)
 #define DEBUG_UPDATE() debug_update()
 #define DEBUG_SLEEP() (irl2fa_debug.sleeps++)
 #else
@@ -61,6 +65,7 @@ int main(void)
         if (wait == APP_SLEEP) {
             DEBUG_SLEEP();
             hal_sleep(app_wake_at());
+            board_request_lock();
             app_wake();
             continue;
         }

@@ -103,8 +103,50 @@ def app():
     write("app", "ir-noise", [clock, DOWN, DOWN, CENTER, 4, 12] + list(b"I2\x01\x20" + bytes(8)) + [PEER_STEP])
 
 
+def crc16(data):
+    crc = 0xFFFF  # CRC-16/CCITT-FALSE, as core/pairing.c
+    for b in data:
+        crc ^= b << 8
+        for _ in range(8):
+            crc = ((crc << 1) ^ 0x1021) & 0xFFFF if crc & 0x8000 else (crc << 1) & 0xFFFF
+    return crc
+
+
+def frame(t, payload):
+    body = bytes([t, len(payload)]) + bytes(payload)
+    return b"I2" + body + crc16(body).to_bytes(2, "big")
+
+
+def fwupdate():
+    """fuzz_fwupdate: first byte = target (0 LZMA, 1 image, 2 IR receiver,
+    3 journal, 4 sender). The image is the test fixture (signed with the
+    public test key), so the receiver seed runs a whole install."""
+    import sys
+    sys.path.insert(0, os.path.join(HERE, "..", "tests", "data"))
+    import make_fw_fixtures as fx
+    plain = fx.sample_plain(fx.SAMPLE_SIZE)
+    image = fx.sign_image.make_image(plain, fx.SAMPLE_VERSION, fx.TEST_SEED)
+    hdr, payload = image[:128], image[128:]
+    write("fwupdate", "lzma-sample", bytes([0, 54, 1]) + struct.pack("<H", fx.SAMPLE_SIZE) + payload)
+    write("fwupdate", "image-sample", bytes([1]) + image)
+    stream = frame(0x21, hdr)
+    for off in range(0, len(payload), 128):
+        stream += frame(0x22, struct.pack("<I", off) + payload[off:off + 128])
+    write("fwupdate", "receive-sample", bytes([2]) + stream)
+    write("fwupdate", "receive-noise", bytes([2]) + frame(0x21, hdr) + b"I2\x22\x05\x00\x00\x00" +
+          frame(0x22, struct.pack("<I", 128) + payload[:128]) + frame(0x23, bytes(10)))
+    rec = lambda t, v: (bytes([t]) + struct.pack("<I", v) + b"\xa5" +  # noqa: E731
+                        crc16(bytes([t]) + struct.pack("<I", v) + b"\xa5").to_bytes(2, "big"))
+    page = rec(1, 5) + rec(2, 0x100) + rec(3, 0x200) + b"\x00" * 8 + rec(4, 0x200)
+    write("fwupdate", "journal", bytes([3]) + page + b"\xff" * (2048 - len(page)) + rec(1, 4))
+    status = lambda st, nxt: frame(0x23, bytes([st, 0]) + struct.pack("<II", nxt, 0))  # noqa: E731
+    write("fwupdate", "sender-replies", bytes([4]) + status(1, 0) + status(1, 128) + status(1, 256) +
+          status(2, len(payload)) + status(3, len(payload)))
+
+
 if __name__ == "__main__":
     pairing()
     base32()
     store()
     app()
+    fwupdate()

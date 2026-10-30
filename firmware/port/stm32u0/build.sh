@@ -7,7 +7,9 @@
 #   BUILD_DIR=/abs/dir firmware/port/stm32u0/build.sh ...
 #   NO_DOCKER=1 firmware/port/stm32u0/build.sh     # use the host toolchain
 #
-# Outputs: $BUILD_DIR/irl2fa.{elf,bin,hex,map,size.txt}
+# Outputs: $BUILD_DIR/irl2fa.{elf,bin,hex,map,size.txt} (application),
+#          $BUILD_DIR/boot.{elf,bin,hex,map} (bootloader),
+#          $BUILD_DIR/irl2fa-dev.irl2fa, irl2fa-factory.{bin,hex} (docs/firmware-updates.md)
 # SPDX-License-Identifier: AGPL-3.0-or-later
 set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -20,7 +22,8 @@ inner() {
     cmake -S . -B "$BUILD_DIR" -DCMAKE_BUILD_TYPE=Release \
         -DCMAKE_TOOLCHAIN_FILE=cmake/arm-none-eabi.cmake "$@" >/dev/null
     cmake --build "$BUILD_DIR" -- --no-print-directory
-    python3 "$HERE/size_report.py" "$BUILD_DIR/irl2fa.elf" | tee "$BUILD_DIR/size-report.txt"
+    python3 "$HERE/size_report.py" "$BUILD_DIR/irl2fa.elf" "$BUILD_DIR/boot.elf" "$BUILD_DIR/irl2fa-dev.irl2fa" \
+        | tee "$BUILD_DIR/size-report.txt"
 }
 
 if [[ "${1:-}" == "--inner" ]]; then

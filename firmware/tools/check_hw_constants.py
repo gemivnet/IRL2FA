@@ -14,7 +14,9 @@ from the silicon is everything written by hand around it:
     every register offset and bit they emulate. A model that disagrees
     with the silicon would hide a firmware bug instead of catching it;
   * the vector table in startup_stm32u083.c, against IRQn_Type;
-  * the linker script memory sizes, against the header's memory map.
+  * the flash map (port/stm32u0/flash_layout.ld, flash_layout.h, the two
+    linker scripts and tools/sign_image.py): against the header's memory
+    map, and against each other.
 
 The header is compiled with the host C compiler and the values printed, so
 macro arithmetic and struct layout (offsetof) are evaluated exactly as the
@@ -38,6 +40,10 @@ REPL = ROOT / "firmware/renode/stm32u083.repl"
 MODELS = ROOT / "firmware/renode/models/STM32U0_System.cs"
 STARTUP = PORT / "startup_stm32u083.c"
 LINKER = PORT / "stm32u083kc.ld"
+BOOT_LINKER = PORT / "boot/boot.ld"
+LAYOUT_LD = PORT / "flash_layout.ld"
+LAYOUT_H = PORT / "flash_layout.h"
+SIGN_TOOL = ROOT / "firmware/tools/sign_image.py"
 
 # Renode peripheral name in the .repl -> CMSIS base address macro.
 REPL_BASES = {
@@ -170,7 +176,7 @@ def main() -> int:
     for tag, _ in tags:
         exprs[f"tag:{tag}"] = f"{tag}_BASE"
     for name in u0map:
-        if name in ("FlashKey1", "FlashKey2", "ScbScr", "ScbScrSleepDeep"):
+        if name in ("FlashKey1", "FlashKey2", "OptKey1", "OptKey2", "ScbScr", "ScbScrSleepDeep"):
             continue  # not in the device header; see the comments in U0Map
         exprs[f"map:{name}"] = u0map_expr(name)
     for name, expr in REPL_SIZES.items():
@@ -233,18 +239,83 @@ def main() -> int:
     if len(vectors) != max(by_number) + 1:
         fail(f"vector table has {len(vectors)} device entries, IRQn_Type {max(by_number) + 1}", errors)
 
-    # 4. Linker script memory map.
-    ld = LINKER.read_text()
-    mem = {m.group(1): (int(m.group(2), 16), int(m.group(3)) * 1024)
-           for m in re.finditer(r"(\w+)\s*\(\w+\)\s*:\s*ORIGIN\s*=\s*(0x[0-9A-Fa-f]+)\s*,\s*LENGTH\s*=\s*(\d+)K", ld)}
-    checked += 3
-    if mem["FLASH"][0] != values["ld:flash_base"]:
-        fail("linker: FLASH origin is not FLASH_BASE", errors)
-    if mem["FLASH"][1] + mem["STORE"][1] != values["ld:flash_total"] or mem["STORE"][0] != mem["FLASH"][0] + mem["FLASH"][1]:
-        fail("linker: FLASH + STORE do not tile the 256 KB main flash", errors)
-    if (mem["RAM"][0] != values["ld:sram_base"] or values["ld:sram2_base"] != values["ld:sram_base"] + values["ld:sram1_size"]
-            or mem["RAM"][1] != values["ld:sram1_size"] + 0x2000):
-        fail("linker: RAM is not SRAM1 (32 KB) followed by SRAM2 (8 KB) at 0x20000000", errors)
+    # 4. The flash map: flash_layout.ld against the header, then the C
+    # header, the linker scripts and the image tool against it.
+    def ld_value(text: str) -> int:
+        text = text.strip()
+        m = re.fullmatch(r"(\d+)K", text)
+        return int(m.group(1)) * 1024 if m else int(text, 0)
+
+    lay = {k: ld_value(v) for k, v in re.findall(r"^(__\w+)\s*=\s*([0-9A-Fa-fxXK]+)\s*;", LAYOUT_LD.read_text(), re.M)}
+    base = values["ld:flash_base"]
+    regions = [("boot", "__boot_start", "__boot_size"), ("app", "__app_slot_start", "__app_slot_size"),
+               ("staging", "__staging_start", "__staging_size"), ("log", "__log_start", "__log_size"),
+               ("store", "__store_start", "__store_size")]
+    checked += 4
+    if lay["__flash_base"] != base or lay["__boot_start"] != base:
+        fail("flash_layout.ld: flash does not start at FLASH_BASE", errors)
+    at = base
+    for name, start, size in regions:
+        if lay[start] != at or lay[start] % 2048 or lay[size] % 2048:
+            fail(f"flash_layout.ld: {name} is not page-aligned right after the previous region", errors)
+        at = lay[start] + lay[size]
+    if at != base + values["ld:flash_total"]:
+        fail("flash_layout.ld: the regions do not tile the 256 KB main flash", errors)
+    if (lay["__ram_start"] != values["ld:sram_base"] or values["ld:sram2_base"] != values["ld:sram_base"] + values["ld:sram1_size"]
+            or lay["__ram_size"] != values["ld:sram1_size"] + 0x2000 or lay["__mailbox"] + 16 != lay["__ram_start"] + lay["__ram_size"]):
+        fail("flash_layout.ld: RAM is not SRAM1 (32 KB) + SRAM2 (8 KB) at 0x20000000 with the mailbox on top", errors)
+
+    hdefs = {k: int(v, 0) for k, v in re.findall(r"#define (FL_\w+) (0x[0-9A-Fa-f]+|\d+)u", LAYOUT_H.read_text())}
+    pairs = {"FL_BOOT_SIZE": "__boot_size", "FL_APP_SIZE": "__app_slot_size", "FL_STAGING_SIZE": "__staging_size",
+             "FL_LOG_SIZE": "__log_size", "FL_STORE_SIZE": "__store_size"}
+    offs = {"FL_APP_OFF": "__app_slot_start", "FL_STAGING_OFF": "__staging_start", "FL_LOG_OFF": "__log_start",
+            "FL_STORE_OFF": "__store_start"}
+    for h, l in pairs.items():
+        checked += 1
+        if hdefs.get(h) != lay[l]:
+            fail(f"flash_layout.h {h} != flash_layout.ld {l}", errors)
+    for h, l in offs.items():
+        checked += 1
+        if hdefs.get(h, -1) + base != lay[l]:
+            fail(f"flash_layout.h {h} != flash_layout.ld {l}", errors)
+    checked += 1
+    if hdefs.get("FL_MAILBOX_ADDR") != lay["__mailbox"]:
+        fail("flash_layout.h FL_MAILBOX_ADDR != flash_layout.ld __mailbox", errors)
+    checked += 1
+    if hdefs.get("FL_BOOT_DEBUG_ADDR") != lay["__boot_debug"] or lay["__boot_debug"] + 32 != lay["__mailbox"]:
+        fail("flash_layout: the boot debug block is not the 32 bytes below the mailbox", errors)
+    checked += 2
+    if lay["__app_debug"] + 64 != lay["__boot_debug"]:
+        fail("flash_layout: the application debug block is not the 64 bytes below the bootloader's", errors)
+    if hdefs.get("FL_APP_DEBUG_ADDR") != lay["__app_debug"]:
+        fail("flash_layout.h FL_APP_DEBUG_ADDR != flash_layout.ld __app_debug", errors)
+
+    tool = SIGN_TOOL.read_text()
+    tdefs = {k: int(v, 0) for k, v in re.findall(r"^(\w+) = (0x[0-9A-Fa-f]+)\b", tool, re.M)}
+    for t, l in (("BOOT_SIZE", "__boot_size"), ("APP_SIZE", "__app_slot_size"), ("STAGING_SIZE", "__staging_size")):
+        checked += 1
+        if tdefs.get(t) != lay[l]:
+            fail(f"sign_image.py {t} != flash_layout.ld {l}", errors)
+    for t, l in (("APP_ADDR", "__app_slot_start"), ("STAGING_ADDR", "__staging_start")):
+        checked += 1
+        if tdefs.get(t, -1) + base != lay[l]:
+            fail(f"sign_image.py {t} != flash_layout.ld {l}", errors)
+    checked += 1
+    if tdefs.get("HW_ID") != hdefs.get("FL_HW_ID"):
+        fail("sign_image.py HW_ID != flash_layout.h FL_HW_ID", errors)
+
+    def memory(path: Path) -> dict[str, int]:
+        m = re.search(r"FLASH\s*\(rx\)\s*:\s*ORIGIN\s*=\s*(0x[0-9A-Fa-f]+)\s*,\s*LENGTH\s*=\s*([^\n]+)", path.read_text())
+        length = eval(re.sub(r"(\d+)K", r"(\1*1024)", m.group(2)), {"__builtins__": {}})  # noqa: S307 (own file)
+        return {"origin": int(m.group(1), 16), "length": length}
+
+    app, boot = memory(LINKER), memory(BOOT_LINKER)
+    checked += 2
+    if app["origin"] != lay["__app_slot_start"] + lay["__app_offset"] or \
+            app["origin"] + app["length"] != lay["__app_slot_start"] + lay["__app_slot_size"]:
+        fail("stm32u083kc.ld: FLASH is not the application slot after its 256-byte header", errors)
+    if boot["origin"] != lay["__boot_start"] or boot["length"] != lay["__boot_size"]:
+        fail("boot/boot.ld: FLASH is not the bootloader region", errors)
 
     for e in errors:
         print("MISMATCH:", e)

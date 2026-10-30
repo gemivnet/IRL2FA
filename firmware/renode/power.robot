@@ -18,6 +18,8 @@ Resource          ${RENODEKEYWORDS}
 
 *** Variables ***
 ${ELF}            ${CURDIR}/../build/stm32u0/irl2fa.elf
+${BOOT_ELF}       ${CURDIR}/../build/stm32u0/boot.elf
+${FACTORY}        ${CURDIR}/../build/stm32u0/irl2fa-factory.bin
 ${OUT}            ${CURDIR}/../build/renode
 ${MODEL}          ${CURDIR}/../../hardware/power/model.json
 ${UNIX}           1800000000    # 2027-01-15 08:00:00 UTC
@@ -39,7 +41,10 @@ Create Device
     Execute Command    $rngseed=${seed}
     Execute Command    $unix=${UNIX}
     Execute Command    include @${CURDIR}/board_init.resc
-    Execute Command    sysbus LoadELF @${ELF}
+    Execute Command    $factory=@${FACTORY}
+    Execute Command    $bootelf=@${BOOT_ELF}
+    Execute Command    $appelf=@${ELF}
+    Execute Command    include @${CURDIR}/load_firmware.resc
     ${full}    ${partial}=    Power Model Epd Ms    ${MODEL}
     Execute Command    sysbus.spi1.epd FullRefreshMs ${full}
     Execute Command    sysbus.spi1.epd PartialRefreshMs ${partial}

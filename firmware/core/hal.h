@@ -68,4 +68,19 @@ void hal_sleep(int64_t wake_at);
 /* ---- identity ---- */
 void hal_device_uid(uint8_t uid[12]);
 
+/* ---- firmware updates (docs/firmware-updates.md) ----
+ * Versions are (major << 16) | (minor << 8) | patch. */
+uint32_t hal_fw_version(void);            /* the running image's, 0 if unknown */
+/* Restarts into the bootloader's IR update receiver. Returns only where
+ * there is none (the simulator). */
+void hal_update_enter(void);
+/* This device's own signed update image (the staging slot, when it holds
+ * the image now running): its 128-byte header, false if there is none. */
+bool hal_update_image(uint8_t hdr[128]);
+bool hal_update_read(uint32_t off, uint8_t *buf, size_t len); /* its payload */
+/* What the bootloader reported about the last update, once after the
+ * restart: -1 nothing, else a fw_err_t (0 = installed), the version in
+ * *version. */
+int hal_update_result(uint32_t *version);
+
 #endif

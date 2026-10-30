@@ -22,6 +22,16 @@ def decode_debug_block(monitor_output):
     }
 
 
+def decode_boot_block(monitor_output):
+    """Parses `sysbus ReadBytes <irl2fa_boot_debug> 32` (struct
+    irl2fa_boot_debug in firmware/port/stm32u0/boot/boot_main.c)."""
+    b = _bytes(monitor_output)
+    if len(b) < 32:
+        raise AssertionError(f"short boot debug block: {monitor_output!r}")
+    names = ("magic", "phase", "app_err", "install_err", "rx_state", "rx_next", "rdp", "battery_mv")
+    return dict(zip(names, struct.unpack("<8I", b[:32])))
+
+
 def monitor_int(monitor_output):
     """Renode prints integers as 0x...; returns the value."""
     m = re.search(r"0x[0-9A-Fa-f]+|-?\d+", monitor_output)

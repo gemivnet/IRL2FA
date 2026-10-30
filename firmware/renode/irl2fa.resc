@@ -3,6 +3,8 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 $name?="irl2fa"
 $elf?=@firmware/build/stm32u0/irl2fa.elf
+$bootelf?=@firmware/build/stm32u0/boot.elf
+$factory?=@firmware/build/stm32u0/irl2fa-factory.bin
 $rngseed?=1
 $unix?=1800000000
 
@@ -14,4 +16,5 @@ include @firmware/renode/models/PowerMonitor.cs
 mach create $name
 machine LoadPlatformDescription @firmware/renode/irl2fa.repl
 include @firmware/renode/board_init.resc
-sysbus LoadELF $elf
+$appelf=$elf
+include @firmware/renode/load_firmware.resc

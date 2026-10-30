@@ -36,6 +36,7 @@ pwr: Miscellaneous.STM32U0_PWR @ sysbus 0x40007000
 flash_ctrl: Miscellaneous.STM32U0_FLASH @ sysbus 0x40022000
     flash: flash
     nvic: nvic
+    rcc: rcc
 
 exti: Miscellaneous.STM32U0_EXTI @ sysbus 0x40021800
     [0-2] -> nvic@[5-7]

@@ -122,7 +122,7 @@ You need a PCB, a display, a coin cell, a printed case and four screws. Everythi
    - **Optional: have JLCPCB flash the firmware.** In the Standard PCBA options, open the advanced options and choose **programming**. JLCPCB asks for:
      - the MCU: **STM32U083KCU6**;
      - the programming interface: SWD on five test pads on the back, along the bottom edge, 1.5 mm round on a 2.54 mm grid: **TP2 GND, TP1 VBAT (supply 3.0 V), TP3 SWDIO, TP4 SWCLK, TP5 NRST**. Positions and a board image are in [docs/pcb-design.md](docs/pcb-design.md#factory-programming); attach [`docs/images/pcb/pcb-back.png`](docs/images/pcb/pcb-back.png);
-     - the firmware: `irl2fa-stm32u083-<version>.bin` from the [latest release](https://github.com/gemivnet/IRL2FA/releases), written from the start of flash (0x08000000).
+     - the firmware: the factory image `irl2fa-factory-<version>.bin` from the [latest release](https://github.com/gemivnet/IRL2FA/releases) (bootloader + signed firmware in one file), written from the start of flash (0x08000000). Do not send the application's `.elf` alone: it does not start without the bootloader. The chip is left unprotected: it only turns on readout protection when its owner first wakes it with the joystick, never on the fixture.
 
      It costs about $8 in engineering fees plus operator time per board. JLCPCB decides per order whether it can program a part, so the option can be refused. A freshly programmed chip runs ST's bootloader, not the firmware, until it has seen a power-on reset ([firmware review](docs/firmware-hardware-review.md) F4): the board must be power-cycled after the first flash. Inserting the coin cell does that; a board that is checked still on the fixture after programming looks dead, and is not.
    - To solder it yourself, use the [interactive BOM](https://irl2fa.com/ibom.html).
@@ -131,8 +131,10 @@ You need a PCB, a display, a coin cell, a printed case and four screws. Everythi
    - Files: [`case/stl/`](case/stl/) or [`case/3mf/irl2fa-all.3mf`](case/3mf/), in PETG or PLA with no supports.
    - Settings and assembly: [docs/case-design.md](docs/case-design.md).
 4. **Flash the firmware.**
-   - Get `irl2fa-stm32u083-<version>.bin` from the [latest release](https://github.com/gemivnet/IRL2FA/releases), or build it with `firmware/port/stm32u0/build.sh`.
+   - Get the factory image `irl2fa-factory-<version>.hex` (bootloader + signed firmware, for the whole chip) from the [latest release](https://github.com/gemivnet/IRL2FA/releases), or build `firmware/build/stm32u0/irl2fa-factory.hex` with `firmware/port/stm32u0/build.sh` (unsigned: a development unit).
    - Flash it through a Tag-Connect TC2030-NL cable and any ST-Link: [firmware/port/stm32u0/README.md](firmware/port/stm32u0/README.md). The test pads TP1-TP5 on the back carry the same signals for a pogo-pin fixture or probe clips. Skip this step if JLCPCB programmed the boards.
+   - The chip stays unprotected until its owner first wakes it with the joystick on a healthy cell; then it turns on readout protection itself ([details](docs/firmware-updates.md#readout-protection-on-the-first-wake)).
+   - Later versions go on over infrared, no cable: see [Updating](#updating).
 5. **Assemble.**
    - Thread the display's flex cable through the slot from the front and lock it into the connector on the back (J1), then stick the display down on the front. Done the other way round, the flex has to be bent back over the glass at its glued root to reach the slot.
    - Slide the CR2450 under its clip from the bottom edge and screw the case together. Flash first (step 4): the Tag-Connect pads are on the back, inside the case.
@@ -141,6 +143,22 @@ You need a PCB, a display, a coin cell, a printed case and four screws. Everythi
 Built one? Please [file a build report](https://github.com/gemivnet/IRL2FA/issues/new?template=build_report.yml).
 
 > **Status:** v0.1 is a complete, simulated and checked design, but no board has been built yet. The first boards will confirm the panel orientation, the IR range and the real sleep current. Until a build report says otherwise, treat it as a prototype.
+
+## Updating
+
+New firmware goes on over infrared, from another IRL2FA or from a computer
+with a ~$5 USB infrared adapter. Settings → Firmware update → Receive an
+update (with the PIN, if set), then send the release's `.irl2fa` file:
+
+```sh
+python3 firmware/tools/irl2fa_update.py --port /dev/ttyUSB0 irl2fa-v0.2.0.irl2fa
+```
+
+or, from a device that already runs it, Settings → Firmware update → Send it
+to another. About two minutes. Codes, contacts and settings stay. The
+bootloader accepts only firmware signed with the IRL2FA release key, never an
+older version, and a cell pulled at any moment leaves a device that starts.
+Details, the adapter, and the security model: [docs/firmware-updates.md](docs/firmware-updates.md).
 
 ## Every change is simulated
 

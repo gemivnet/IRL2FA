@@ -13,6 +13,8 @@ Resource          ${RENODEKEYWORDS}
 
 *** Variables ***
 ${ELF}            ${CURDIR}/../build/stm32u0/irl2fa.elf
+${BOOT_ELF}       ${CURDIR}/../build/stm32u0/boot.elf
+${FACTORY}        ${CURDIR}/../build/stm32u0/irl2fa-factory.bin
 ${OUT}            ${CURDIR}/../build/renode
 ${UNIX}           1800000000    # 2027-01-15 08:00:00 UTC
 @{DEVICES}
@@ -38,7 +40,10 @@ Create Device
         # A fresh RTC: power-on flag set, no "time valid" marker.
         Execute Command    sysbus.i2c1.rtc PowerOnReset
     END
-    Execute Command    sysbus LoadELF @${ELF}
+    Execute Command    $factory=@${FACTORY}
+    Execute Command    $bootelf=@${BOOT_ELF}
+    Execute Command    $appelf=@${ELF}
+    Execute Command    include @${CURDIR}/load_firmware.resc
     # Looked up once: a reset makes Renode forget the symbols.
     ${addr}=    Execute Command    sysbus GetSymbolAddress "irl2fa_debug"
     Set To Dictionary    ${DEBUG_ADDR}    ${name}=${addr.strip()}
