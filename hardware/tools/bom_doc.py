@@ -136,7 +136,7 @@ def main():
     out += ["", f"**Electronics, one kit (minimum-order quantities, so you get spares):** ${t1:.2f}  ",
             f"**Electronics per board at 100 boards:** ${t100:.2f}", "",
             "Not in the table, but on the board: the Tag-Connect TC2030 pads (J3, no part: the cable "
-            "presses onto the pads), the test points TP1/TP2 and the mounting holes.", "",
+            "presses onto the pads), the test pads TP1-TP5 (current measurement and factory programming) and the mounting holes.", "",
             "## Bought separately", "", "| Item | Qty | Unit | Where |", "|-|-|-|-|"]
     te = 0.0
     for e in EXTRA:

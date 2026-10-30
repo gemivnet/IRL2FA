@@ -1,0 +1,42 @@
+* IR transmit on a CR2450: the coin cell's budget for the LED pulses with R8 = 68 ohm.
+* The USART output is inverted (idle = LED off), so a 0 bit lights the LED: a stream
+* of 0x00 bytes (start bit + 8 zeros on, stop bit off) is the worst case, 90 % duty
+* at 4800 baud. A pairing sends about 2.4 kB, so about 5 s of this
+* (hardware/power/measured.json); the cell and its bulk capacitors (2 x 47 uF X5R,
+* derated to 25 uF each, plus 4.7 uF) settle within milliseconds, so 0.2 s shows the
+* steady state. Loads besides the LED: MCU 1.2 mA running, IR receiver 0.3 mA.
+* Checks, with a half-used cell (40 ohm): VBAT stays above the MCU's 1.71 V minimum
+* with margin (2.0 V), and the LED current at the end of a 9-bit run stays at 15 mA
+* or more: the receiver bench's 3 cm case (ir_rx.cir, 0.26 mA at 18 mA) still has
+* 0.22 mA then, above the 0.19 mA its 3.5 cm case shows still reads as a 1.
+.include models.lib
+.param rint=40
+X1 vraw 0 CELL voc=3.0 rint={rint}
+XQ1 vraw 0 vbat PFET
+C1 vbat 0 25u
+C2 vbat 0 25u
+C3 vbat 0 4.7u
+Imcu vbat 0 1.2m
+Irx vbat 0 0.3m
+Vs vbat va 0
+R8 va a 68
+D4 a k IRLED
+XQ4 k g 0 NFET_LED
+* 9 bits on, 1 bit off, 208.3 us bits
+Vtx g 0 PULSE(0 2.5 1m 1u 1u 1.8740m 2.0833m)
+.tran 5u 200m
+.control
+run
+meas tran vmin MIN v(vbat) from=1m to=200m
+* the end of an on-run (9 bits) near the end: the lowest LED current
+meas tran iled_end FIND i(Vs) AT=198.6m
+echo "RESULT vbat_min_halfused $&vmin"
+echo "RESULT iled_end_halfused $&iled_end"
+alterparam rint=15
+reset
+run
+meas tran vmin2 MIN v(vbat) from=1m to=200m
+echo "RESULT vbat_min_fresh $&vmin2"
+quit
+.endc
+.end

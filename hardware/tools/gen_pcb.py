@@ -127,30 +127,82 @@ def add_edge_keepout(board, band=0.45):
         board.Add(z)
 
 
-def add_cell_via_keepout(board, segments=48):
-    """No vias under the coin cell: it lies on the board (the clip presses it
-    onto the negative pad) and slides in over it, so a via whose tenting is
-    imperfect could short its + can. Tracks under solder mask are fine."""
-    bt = design.BOARD["battery"]
-    r = bt["cell_diameter"] / 2 + 0.2
+def rule_area(board, name, points, layers, tracks=True, vias=True, pour=True):
+    """A rule area (keep-out) over `points` (board mm) on `layers`; the flags
+    say what is still allowed."""
     z = pcbnew.ZONE(board)
     z.SetIsRuleArea(True)
-    z.SetDoNotAllowTracks(False)
-    z.SetDoNotAllowVias(True)
+    z.SetDoNotAllowTracks(not tracks)
+    z.SetDoNotAllowVias(not vias)
     z.SetDoNotAllowPads(False)
     z.SetDoNotAllowFootprints(False)
-    z.SetDoNotAllowCopperPour(False)
+    z.SetDoNotAllowCopperPour(not pour)
     ls = pcbnew.LSET()
-    ls.AddLayer(pcbnew.F_Cu)
-    ls.AddLayer(pcbnew.B_Cu)
+    for layer in layers:
+        ls.AddLayer(layer)
     z.SetLayerSet(ls)
-    z.SetZoneName("no vias under the cell")
+    z.SetZoneName(name)
     poly = z.Outline()
     poly.NewOutline()
-    for i in range(segments):
-        a = 2 * math.pi * i / segments
-        poly.Append(pt(bt["x"] + r * math.cos(a), bt["y"] + r * math.sin(a)))
+    for x, y in points:
+        poly.Append(pt(x, y))
     board.Add(z)
+    return z
+
+
+def circle_pts(cx, cy, r, segments=48):
+    return [(cx + r * math.cos(2 * math.pi * i / segments), cy + r * math.sin(2 * math.pi * i / segments))
+            for i in range(segments)]
+
+
+# The cell's insertion path: it slides in from the bottom edge over this strip
+# (docs/mechanical-review.md MECH-05), as wide as the cell plus 0.35 mm a side.
+CELL_PATH_MARGIN = 0.35
+# Under the cell's negative cap (Ø21, Murata CR2450R p.1) nothing on B.Cu may stand
+# higher than the bare contact pad: copper under solder mask does (MECH-04). The
+# only copper there is the pad's own connection, one spoke running straight down
+# to the pour, with the solder mask opened over it so it is bare like the pad.
+NEG_CAP_R = 10.5
+PAD2_R = 6.0            # BT1 pad 2, the contact (gen_footprints.py MY2450 neg_pad_d / 2)
+SPOKE_W = 1.2
+
+
+def add_cell_keepouts(board):
+    """Rule areas for the coin cell:
+    - no vias under the cell or in its insertion path (MECH-05): it lies on the
+      board and slides in over it, so a via whose tenting is imperfect could
+      short its + can;
+    - no tracks and no pour on B.Cu under the negative cap, except the contact
+      pad's spoke (MECH-04)."""
+    bt = design.BOARD["battery"]
+    cx, cy, rc = bt["x"], bt["y"], bt["cell_diameter"] / 2
+    layers = (pcbnew.F_Cu, pcbnew.B_Cu)
+    rule_area(board, "no vias under the cell", circle_pts(cx, cy, rc + CELL_PATH_MARGIN), layers, vias=False)
+    x0, x1 = cx - rc - CELL_PATH_MARGIN, cx + rc + CELL_PATH_MARGIN
+    rule_area(board, "no vias in the cell's insertion path",
+              [(x0, cy), (x1, cy), (x1, B["height"]), (x0, B["height"])], layers, vias=False)
+    # a ring from the pad's edge to the cap's edge, open where the spoke runs out. It
+    # stops at the pad: a pad inside a keep-out makes Freerouting give up on its net.
+    r, ri, hw = NEG_CAP_R, PAD2_R, SPOKE_W / 2
+    ao, ai = math.asin(hw / r), math.asin(hw / ri)
+    n = 72
+    pts = []
+    for i in range(n + 1):           # outer edge, from the corridor's left wall (y down) the long way round
+        a = math.pi / 2 + ao + (2 * math.pi - 2 * ao) * i / n
+        pts.append((cx + r * math.cos(a), cy + r * math.sin(a)))
+    for i in range(n + 1):           # inner edge (the pad's), back again
+        a = math.pi / 2 + 2 * math.pi - ai - (2 * math.pi - 2 * ai) * i / n
+        pts.append((cx + ri * math.cos(a), cy + ri * math.sin(a)))
+    rule_area(board, "nothing higher than the cell contact under the cell's negative cap",
+              pts, (pcbnew.B_Cu,), tracks=False, vias=False, pour=False)
+    # the spoke's solder-mask opening, from the pad's edge to the cap's edge
+    m = pcbnew.PCB_SHAPE(board, pcbnew.SHAPE_T_RECT)
+    m.SetStart(pt(cx - hw, cy + 5.9))
+    m.SetEnd(pt(cx + hw, cy + r + 0.1))
+    m.SetLayer(pcbnew.B_Mask)
+    m.SetFilled(True)
+    m.SetWidth(0)
+    board.Add(m)
 
 
 def flip(fp):
@@ -238,7 +290,7 @@ def step_place(netlist):
 
     add_outline(board)
     add_edge_keepout(board)
-    add_cell_via_keepout(board)
+    add_cell_keepouts(board)
     board.Save(str(PCB))
     print("placed", len(board.GetFootprints()), "footprints")
 
@@ -247,11 +299,13 @@ def step_dsn():
     board = pcbnew.LoadBoard(str(PCB))
     dsn = HW / "build" / "irl2fa.dsn"
     dsn.parent.mkdir(exist_ok=True)
-    for z in list(board.Zones()):
-        if not z.GetIsRuleArea():
-            board.Remove(z)
-    for t in list(board.GetTracks()):
+    # collect first, then remove: Remove() while iterating leaves pcbnew 9's list wrappers dangling
+    tracks = list(board.GetTracks())
+    zones = [z for z in board.Zones() if not z.GetIsRuleArea()]
+    for t in tracks:
         board.Remove(t)
+    for z in zones:
+        board.Remove(z)
     board.Save(str(PCB))
     pcbnew.ExportSpecctraDSN(board, str(dsn))
     print("wrote", dsn)
@@ -281,7 +335,9 @@ def step_finish():
     for z in list(board.Zones()):
         if not z.GetIsRuleArea():
             board.Remove(z)
-    gnd = board.FindNet("GND")
+    gnd = board.FindNet("/GND") or board.FindNet("GND")  # schematic nets carry the sheet path
+    if gnd is None:
+        raise SystemExit("no GND net on the board: the pours would float")
     layers = [pcbnew.F_Cu, pcbnew.B_Cu] + ([pcbnew.In1_Cu, pcbnew.In2_Cu] if board.GetCopperLayerCount() == 4 else [])
     for layer in layers:
         z = pcbnew.ZONE(board)
@@ -302,9 +358,12 @@ def step_finish():
     print("zones filled")
 
 
-SILK_REF = 0.8          # reference designator height, mm (JLCPCB's legible minimum)
-SILK_REF_SMALL = 0.65   # fallback where 0.8 mm has no free place (DRC minimum is 0.6)
+SILK_REF = 1.0          # text height, mm: JLCPCB's minimum (docs/assembly-review.md A-07)
+SILK_STROKE = 0.153     # stroke, mm: JLCPCB's 0.15 minimum plus rounding margin
 SILK_GAP = 0.15         # clearance from silk text to pads, other silk and bodies
+# Test-pad labels for the programming fixture (TP1-TP5 on the back, one row).
+# Short names, so neighbouring labels fit the 2.54 mm pitch at 1.0 mm text.
+TP_LABELS = {"TP2": "GND", "TP1": "VBAT", "TP3": "DIO", "TP4": "CLK", "TP5": "RST"}
 
 
 class Obstacles:
@@ -458,9 +517,7 @@ def step_silk():
             obs.boxes[layer].append(box)
 
     w, h = B["width"], B["height"]
-    marks = [("IRL2FA", 1.2, w / 2, h - 1.6), ("v0.1  irl2fa.com", 0.7, w / 2, h - 0.6),
-             ("CERN-OHL-S-2.0", 0.7, 11.0, h - 1.0)]
-    for text, size, px, py in marks:
+    def marking(text, size):
         t = existing.get(text)
         if t is None:
             t = pcbnew.PCB_TEXT(board)
@@ -469,7 +526,34 @@ def step_silk():
         t.SetLayer(pcbnew.B_SilkS)
         t.SetMirrored(True)
         t.SetTextSize(pcbnew.VECTOR2I(mm(size), mm(size)))
-        t.SetTextThickness(mm(size * 0.15))
+        t.SetTextThickness(mm(max(SILK_STROKE, size * 0.15)))
+        return t
+
+    # the test-pad labels first: each must sit next to its own pad
+    for k, (ref, text) in enumerate(TP_LABELS.items()):
+        fp = board.FindFootprintByReference(ref)
+        if fp is None:
+            continue
+        t = marking(text, SILK_REF)
+        px, py = (pcbnew.ToMM(v) - o for v, o in zip((fp.GetPosition().x, fp.GetPosition().y), ORIGIN))
+        t.SetTextAngleDegrees(0)
+        tb = text_box(t)
+        tw, th = tb[2] - tb[0], tb[3] - tb[1]
+        crt_r = 1.32                 # TestPoint_Pad_D1.5mm courtyard radius (1.25) and its line
+        cands = []
+        for line in (k % 2, 1 - k % 2):   # alternate lines above the row
+            y = py - crt_r - SILK_GAP - 0.02 - th / 2 - line * (th + SILK_GAP + 0.02)
+            for dx in (0, -0.4, 0.4, -0.8, 0.8, -1.2, 1.2):
+                cands.append((px + dx, y, 0))
+        for side in (1, -1):         # or beside the pad
+            cands.append((px + side * (1.25 + SILK_GAP + 0.05 + tw / 2), py, 0))
+        if not place_text(t, obs, cands):
+            raise SystemExit(f"no free place for the {ref} label {text!r}")
+
+    marks = [("IRL2FA", 1.2, w / 2, h - 1.6), ("v0.1  irl2fa.com", SILK_REF, w / 2, h - 0.6),
+             ("CERN-OHL-S-2.0", SILK_REF, 11.0, h - 1.0)]
+    for text, size, px, py in marks:
+        t = marking(text, size)
         grid = [(px + dx * 0.5, py + dy * 0.5, 0) for dx in range(-150, 151) for dy in range(-60, 61)]
         grid.sort(key=lambda c: (c[0] - px) ** 2 + (c[1] - py) ** 2)
         if not place_text(t, obs, grid):
@@ -479,8 +563,8 @@ def step_silk():
     fps = sorted(board.GetFootprints(), key=lambda f: -len(list(f.Pads())))
     for fp in fps:
         ref = fp.Reference()
-        if fp.GetReference().startswith("H"):  # mounting holes: unlabelled
-            ref.SetVisible(False)
+        if fp.GetReference().startswith("H") or fp.GetReference() in TP_LABELS:
+            ref.SetVisible(False)   # mounting holes unlabelled; test pads carry their signal name
             continue
         ref.SetVisible(True)  # re-runs start over, including labels hidden last time
         ref.SetKeepUpright(True)
@@ -490,16 +574,12 @@ def step_silk():
         own = obs.boxes[layer].index((x0, y0, x1, y1)) if (x0, y0, x1, y1) in obs.boxes[layer] else None
         if own is not None:
             saved = obs.boxes[layer].pop(own)
-        ok = False
-        for size in (SILK_REF, SILK_REF_SMALL):  # the smaller size only where the full one can't fit
-            ref.SetTextSize(pcbnew.VECTOR2I(mm(size), mm(size)))
-            ref.SetTextThickness(mm(0.12 if size < SILK_REF else 0.15))
-            ref.SetTextAngleDegrees(0)
-            tb = text_box(ref)
-            tw, th = tb[2] - tb[0], tb[3] - tb[1]
-            ok = place_text(ref, obs, ring((x0 + x1) / 2, (y0 + y1) / 2, x0, y0, x1, y1, tw, th))
-            if ok:
-                break
+        ref.SetTextSize(pcbnew.VECTOR2I(mm(SILK_REF), mm(SILK_REF)))
+        ref.SetTextThickness(mm(SILK_STROKE))
+        ref.SetTextAngleDegrees(0)
+        tb = text_box(ref)
+        tw, th = tb[2] - tb[0], tb[3] - tb[1]
+        ok = place_text(ref, obs, ring((x0 + x1) / 2, (y0 + y1) / 2, x0, y0, x1, y1, tw, th))
         if own is not None:
             obs.boxes[layer].append(saved)
         if not ok:

@@ -337,4 +337,4 @@ the `.scad`:
 - The front side carries nothing except the display, its FPC and the joystick.
   The glass rib reaches down to 0.7 mm above the PCB front.
 - IR lens centre about 1.15 mm below the PCB back, lens Ø ≈ 1.8 mm (Vishay
-  VSMB2948SL / VEMT2523SLX01 STEP).
+  VSMB2948SL / VEMT2023SLX01 STEP).

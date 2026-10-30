@@ -33,7 +33,7 @@
    "jlc_stock": 6785,
    "jlc_type": "Extended",
    "mpn": "SKRHABE010",
-   "stock": 6714
+   "stock": 6712
   },
   "C15127": {
    "breaks": [
@@ -63,11 +63,11 @@
     ]
    ],
    "datasheet": "https://datasheet.lcsc.com/datasheet/pdf/fee353dd1e9e0bc90b295f14f381aa4c.pdf?productCode=C15127",
-   "jlc_available": 889322,
-   "jlc_stock": 1020223,
+   "jlc_available": 888793,
+   "jlc_stock": 1019938,
    "jlc_type": "Basic",
    "mpn": "AO3401A",
-   "stock": 549375
+   "stock": 527000
   },
   "C15195": {
    "breaks": [
@@ -93,11 +93,11 @@
     ]
    ],
    "datasheet": "https://datasheet.lcsc.com/datasheet/pdf/02336ea48ea44ca18c72517dd3cb7b47.pdf?productCode=C15195",
-   "jlc_available": 5094805,
-   "jlc_stock": 6131829,
+   "jlc_available": 5092220,
+   "jlc_stock": 6130394,
    "jlc_type": "Basic",
    "mpn": "CL05B103KB5NNNC",
-   "stock": 2241600
+   "stock": 2192500
   },
   "C1525": {
    "breaks": [
@@ -123,45 +123,45 @@
     ]
    ],
    "datasheet": "https://datasheet.lcsc.com/datasheet/pdf/02336ea48ea44ca18c72517dd3cb7b47.pdf?productCode=C1525",
-   "jlc_available": 28045383,
-   "jlc_stock": 35977090,
+   "jlc_available": 28057138,
+   "jlc_stock": 35991605,
    "jlc_type": "Basic",
    "mpn": "CL05B104KO5NNNC",
-   "stock": 5827400
+   "stock": 5574000
   },
   "C15849": {
    "breaks": [
     [
      50,
-     0.014
+     0.0142
     ],
     [
      500,
-     0.0108
+     0.0109
     ],
     [
      1500,
-     0.0093
+     0.0095
     ],
     [
      4000,
-     0.0083
+     0.0084
     ],
     [
      24000,
-     0.0079
+     0.008
     ],
     [
      48000,
-     0.0076
+     0.0077
     ]
    ],
    "datasheet": "https://datasheet.lcsc.com/datasheet/pdf/02336ea48ea44ca18c72517dd3cb7b47.pdf?productCode=C15849",
-   "jlc_available": 9077352,
-   "jlc_stock": 12320726,
+   "jlc_available": 9077240,
+   "jlc_stock": 12320549,
    "jlc_type": "Basic",
    "mpn": "CL10A105KB8NNNC",
-   "stock": 54800
+   "stock": 0
   },
   "C16780": {
    "breaks": [
@@ -191,11 +191,11 @@
     ]
    ],
    "datasheet": "https://datasheet.lcsc.com/datasheet/pdf/02336ea48ea44ca18c72517dd3cb7b47.pdf?productCode=C16780",
-   "jlc_available": 854298,
-   "jlc_stock": 1041762,
+   "jlc_available": 854890,
+   "jlc_stock": 1042354,
    "jlc_type": "Basic",
    "mpn": "CL21A476MQYNNNE",
-   "stock": 295490
+   "stock": 320910
   },
   "C1779": {
    "breaks": [
@@ -225,11 +225,45 @@
     ]
    ],
    "datasheet": "https://datasheet.lcsc.com/datasheet/pdf/02336ea48ea44ca18c72517dd3cb7b47.pdf?productCode=C1779",
-   "jlc_available": 1464705,
-   "jlc_stock": 1870540,
+   "jlc_available": 1421913,
+   "jlc_stock": 1827748,
    "jlc_type": "Basic",
    "mpn": "CL21A475KAQNNNE",
-   "stock": 351060
+   "stock": 266500
+  },
+  "C179399": {
+   "breaks": [
+    [
+     10,
+     0.0407
+    ],
+    [
+     100,
+     0.0319
+    ],
+    [
+     300,
+     0.0275
+    ],
+    [
+     3000,
+     0.0242
+    ],
+    [
+     6000,
+     0.0216
+    ],
+    [
+     9000,
+     0.0202
+    ]
+   ],
+   "datasheet": "https://datasheet.lcsc.com/datasheet/pdf/ac8ff0702207b5d15c658aa779d9c57b.pdf?productCode=C179399",
+   "jlc_available": 3292,
+   "jlc_stock": 3484,
+   "jlc_type": "Extended",
+   "mpn": "NX3008NBK,215",
+   "stock": 3480
   },
   "C19666": {
    "breaks": [
@@ -259,11 +293,11 @@
     ]
    ],
    "datasheet": "https://datasheet.lcsc.com/datasheet/pdf/02336ea48ea44ca18c72517dd3cb7b47.pdf?productCode=C19666",
-   "jlc_available": 3470592,
-   "jlc_stock": 4249929,
+   "jlc_available": 3471366,
+   "jlc_stock": 4250673,
    "jlc_type": "Basic",
    "mpn": "CL10A475KO8NNNC",
-   "stock": 1507940
+   "stock": 1435690
   },
   "C20917": {
    "breaks": [
@@ -293,11 +327,11 @@
     ]
    ],
    "datasheet": "https://datasheet.lcsc.com/datasheet/pdf/130876b936da464599428c58fd8de8f6.pdf?productCode=C20917",
-   "jlc_available": 910671,
-   "jlc_stock": 1062486,
+   "jlc_available": 910237,
+   "jlc_stock": 1062042,
    "jlc_type": "Basic",
    "mpn": "AO3400A",
-   "stock": 547565
+   "stock": 510925
   },
   "C22459164": {
    "breaks": [
@@ -379,7 +413,37 @@
    "jlc_stock": 3619689,
    "jlc_type": "Extended",
    "mpn": "0402WGF220KTCE",
-   "stock": 3583500
+   "stock": 3582500
+  },
+  "C25131": {
+   "breaks": [
+    [
+     100,
+     0.0011
+    ],
+    [
+     1000,
+     0.0008
+    ],
+    [
+     3000,
+     0.0007
+    ],
+    [
+     10000,
+     0.0006
+    ],
+    [
+     50000,
+     0.0005
+    ]
+   ],
+   "datasheet": "https://datasheet.lcsc.com/datasheet/pdf/0a975aaa49b7c97f38a963127be4a823.pdf?productCode=C25131",
+   "jlc_available": 186850,
+   "jlc_stock": 187062,
+   "jlc_type": "Extended",
+   "mpn": "0402WGF680JTCE",
+   "stock": 187000
   },
   "C25741": {
    "breaks": [
@@ -401,11 +465,11 @@
     ]
    ],
    "datasheet": "https://datasheet.lcsc.com/datasheet/pdf/0a975aaa49b7c97f38a963127be4a823.pdf?productCode=C25741",
-   "jlc_available": 6607211,
-   "jlc_stock": 8375946,
+   "jlc_available": 6605103,
+   "jlc_stock": 8374073,
    "jlc_type": "Basic",
    "mpn": "0402WGF1003TCE",
-   "stock": 1653300
+   "stock": 1591500
   },
   "C25744": {
    "breaks": [
@@ -431,8 +495,8 @@
     ]
    ],
    "datasheet": "https://datasheet.lcsc.com/datasheet/pdf/0a975aaa49b7c97f38a963127be4a823.pdf?productCode=C25744",
-   "jlc_available": 11551561,
-   "jlc_stock": 16832723,
+   "jlc_available": 11550923,
+   "jlc_stock": 16833845,
    "jlc_type": "Basic",
    "mpn": "0402WGF1002TCE",
    "stock": 0
@@ -461,11 +525,11 @@
     ]
    ],
    "datasheet": "https://datasheet.lcsc.com/datasheet/pdf/0a975aaa49b7c97f38a963127be4a823.pdf?productCode=C25900",
-   "jlc_available": 12909585,
-   "jlc_stock": 14869971,
+   "jlc_available": 12908038,
+   "jlc_stock": 14868294,
    "jlc_type": "Basic",
    "mpn": "0402WGF4701TCE",
-   "stock": 7683500
+   "stock": 7463600
   },
   "C26083": {
    "breaks": [
@@ -491,11 +555,45 @@
     ]
    ],
    "datasheet": "https://datasheet.lcsc.com/datasheet/pdf/0a975aaa49b7c97f38a963127be4a823.pdf?productCode=C26083",
-   "jlc_available": 2458857,
-   "jlc_stock": 2931303,
+   "jlc_available": 2458534,
+   "jlc_stock": 2930825,
    "jlc_type": "Basic",
    "mpn": "0402WGF1004TCE",
-   "stock": 1137900
+   "stock": 1119300
+  },
+  "C2843576": {
+   "breaks": [
+    [
+     1,
+     0.6722
+    ],
+    [
+     10,
+     0.5473
+    ],
+    [
+     30,
+     0.4848
+    ],
+    [
+     100,
+     0.424
+    ],
+    [
+     500,
+     0.3862
+    ],
+    [
+     1000,
+     0.3682
+    ]
+   ],
+   "datasheet": "https://datasheet.lcsc.com/datasheet/pdf/c8d00512e47524637a99f5ec90062a76.pdf?productCode=C2843576",
+   "jlc_available": 455,
+   "jlc_stock": 505,
+   "jlc_type": "Extended",
+   "mpn": "VEMT2023SLX01",
+   "stock": 404
   },
   "C324726": {
    "breaks": [
@@ -525,11 +623,11 @@
     ]
    ],
    "datasheet": "https://datasheet.lcsc.com/datasheet/pdf/4fa13630ce538d3df6cea685e5f75b4e.pdf?productCode=C324726",
-   "jlc_available": 10131,
-   "jlc_stock": 10185,
+   "jlc_available": 10126,
+   "jlc_stock": 10180,
    "jlc_type": "Extended",
    "mpn": "FH34SRJ-24S-0.5SH(50)",
-   "stock": 10065
+   "stock": 9990
   },
   "C469327": {
    "breaks": [
@@ -631,7 +729,7 @@
    "jlc_stock": 400,
    "jlc_type": "Extended",
    "mpn": "RV-3032-C7-32.768kHz-2.5PPM-TA-QC",
-   "stock": 219
+   "stock": 0
   },
   "C52923": {
    "breaks": [
@@ -661,11 +759,11 @@
     ]
    ],
    "datasheet": "https://datasheet.lcsc.com/datasheet/pdf/02336ea48ea44ca18c72517dd3cb7b47.pdf?productCode=C52923",
-   "jlc_available": 8071548,
-   "jlc_stock": 10320019,
+   "jlc_available": 8068713,
+   "jlc_stock": 10317914,
    "jlc_type": "Basic",
    "mpn": "CL05A105KA5NQNC",
-   "stock": 2068700
+   "stock": 1674700
   },
   "C6604342": {
    "breaks": [

@@ -294,9 +294,8 @@ def test_vias_are_tented():
         assert 0.6 not in sizes, f"{name} opens the 0.6 mm vias"
 
 
-@pytest.mark.xfail(strict=True, reason="A-07: silkscreen text is 0.65-0.8 mm high with 0.105-0.15 mm "
-                                      "strokes; JLCPCB's minimum is 1.0 mm / 0.15 mm")
 def test_silkscreen_meets_jlc_minimums(board):
+    """A-07: every visible silkscreen text at least 1.0 mm high with 0.15 mm strokes."""
     small = []
     texts = [d for d in board.GetDrawings() if d.GetClass() == "PCB_TEXT"]
     for fp in board.GetFootprints():
@@ -311,9 +310,8 @@ def test_silkscreen_meets_jlc_minimums(board):
     assert not small, f"{len(small)} silkscreen texts below 1.0 mm / 0.15 mm: " + ", ".join(small[:8])
 
 
-@pytest.mark.xfail(strict=True, reason="A-08: both copper pours have no net (net 0): they are "
-                                      "floating copper, not the ground pour docs/pcb-design.md describes")
 def test_copper_pours_are_ground(board):
+    """A-08: the pours are ground, not floating copper."""
     pours = [z for z in board.Zones() if not z.GetIsRuleArea() and z.GetParentFootprint() is None]
     assert pours, "no copper pours"
     for z in pours:

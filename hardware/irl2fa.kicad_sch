@@ -3539,7 +3539,7 @@
 			)
 			(embedded_fonts no)
 		)
-		(symbol "Transistor_FET:Si1308EDL"
+		(symbol "Transistor_FET:Q_NMOS_GSD"
 			(pin_names
 				(offset 0)
 				(hide yes)
@@ -3547,7 +3547,6 @@
 			(exclude_from_sim no)
 			(in_bom yes)
 			(on_board yes)
-			(embedded_fonts no)
 			(property "Reference" "Q"
 				(at 5.08 1.905 0)
 				(effects
@@ -3557,7 +3556,7 @@
 					(justify left)
 				)
 			)
-			(property "Value" "Si1308EDL"
+			(property "Value" "Q_NMOS_GSD"
 				(at 5.08 0 0)
 				(effects
 					(font
@@ -3566,28 +3565,16 @@
 					(justify left)
 				)
 			)
-			(property "Footprint" "Package_TO_SOT_SMD:SOT-323_SC-70"
-				(at 5.08 -1.905 0)
-				(effects
-					(font
-						(size 1.27 1.27)
-						(italic yes)
-					)
-					(justify left)
-					(hide yes)
-				)
-			)
-			(property "Datasheet" "https://www.vishay.com/docs/63399/si1308edl.pdf"
-				(at 5.08 -3.81 0)
+			(property "Footprint" ""
+				(at 5.08 2.54 0)
 				(effects
 					(font
 						(size 1.27 1.27)
 					)
-					(justify left)
 					(hide yes)
 				)
 			)
-			(property "Description" "30V Vds, 1.4A Id, N-Channel MOSFET, SC-70"
+			(property "Datasheet" "~"
 				(at 0 0 0)
 				(effects
 					(font
@@ -3596,7 +3583,7 @@
 					(hide yes)
 				)
 			)
-			(property "ki_keywords" "N-Channel MOSFET"
+			(property "Description" "N-MOSFET transistor, gate/source/drain"
 				(at 0 0 0)
 				(effects
 					(font
@@ -3605,7 +3592,7 @@
 					(hide yes)
 				)
 			)
-			(property "ki_fp_filters" "SOT?323*"
+			(property "ki_keywords" "transistor NMOS N-MOS N-MOSFET"
 				(at 0 0 0)
 				(effects
 					(font
@@ -3614,7 +3601,7 @@
 					(hide yes)
 				)
 			)
-			(symbol "Si1308EDL_0_1"
+			(symbol "Q_NMOS_GSD_0_1"
 				(polyline
 					(pts
 						(xy 0.254 1.905)
@@ -3799,7 +3786,7 @@
 					)
 				)
 			)
-			(symbol "Si1308EDL_1_1"
+			(symbol "Q_NMOS_GSD_1_1"
 				(pin input line
 					(at -5.08 0 0)
 					(length 2.54)
@@ -3855,6 +3842,7 @@
 					)
 				)
 			)
+			(embedded_fonts no)
 		)
 		(symbol "Device:D_Schottky"
 			(pin_numbers
@@ -5492,7 +5480,7 @@
 				(justify left)
 			)
 		)
-		(property "Footprint" "TestPoint:TestPoint_Pad_D1.0mm"
+		(property "Footprint" "TestPoint:TestPoint_Pad_D1.5mm"
 			(at 284.48 30.48 0)
 			(effects
 				(font
@@ -5510,7 +5498,7 @@
 				(hide yes)
 			)
 		)
-		(property "Description" "Test point (current measurement)"
+		(property "Description" "Test point: VBAT (current measurement, programming supply)"
 			(at 284.48 30.48 0)
 			(effects
 				(font
@@ -5581,7 +5569,7 @@
 				(justify left)
 			)
 		)
-		(property "Footprint" "TestPoint:TestPoint_Pad_D1.0mm"
+		(property "Footprint" "TestPoint:TestPoint_Pad_D1.5mm"
 			(at 297.18 30.48 0)
 			(effects
 				(font
@@ -5599,7 +5587,7 @@
 				(hide yes)
 			)
 		)
-		(property "Description" "Test point"
+		(property "Description" "Test point: GND"
 			(at 297.18 30.48 0)
 			(effects
 				(font
@@ -8024,6 +8012,273 @@
 		(at 182.88 50.8)
 		(uuid "42638f94-0b4b-5941-9142-cabbc2530b5f")
 	)
+	(symbol
+		(lib_id "Connector:TestPoint")
+		(at 22.86 124.46 0)
+		(unit 1)
+		(exclude_from_sim no)
+		(in_bom no)
+		(on_board yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(uuid "322ed11d-f30b-5cef-baa9-e57b595740b3")
+		(property "Reference" "TP3"
+			(at 24.86 123.19 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Value" "SWDIO"
+			(at 24.86 125.73 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Footprint" "TestPoint:TestPoint_Pad_D1.5mm"
+			(at 22.86 124.46 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Datasheet" ""
+			(at 22.86 124.46 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Description" "Test point: SWDIO (programming fixture)"
+			(at 22.86 124.46 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(pin "1"
+			(uuid "d482c7b8-543a-512b-9afb-6865548199ca")
+		)
+		(instances
+			(project "irl2fa"
+				(path "/0dba1c95-445c-502a-9bfd-1af126d3c360"
+					(reference "TP3")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(wire
+		(pts
+			(xy 22.86 124.46)
+			(xy 22.86 127)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "3b99b0a0-57d3-51bf-8027-718267187567")
+	)
+	(label "SWDIO"
+		(at 22.86 127 270)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify right bottom)
+		)
+		(uuid "e7d898b3-d5b3-5697-9429-fc60583ae35f")
+	)
+	(symbol
+		(lib_id "Connector:TestPoint")
+		(at 35.56 124.46 0)
+		(unit 1)
+		(exclude_from_sim no)
+		(in_bom no)
+		(on_board yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(uuid "ae258995-89ce-57c8-8081-d271d997b558")
+		(property "Reference" "TP4"
+			(at 37.56 123.19 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Value" "SWCLK"
+			(at 37.56 125.73 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Footprint" "TestPoint:TestPoint_Pad_D1.5mm"
+			(at 35.56 124.46 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Datasheet" ""
+			(at 35.56 124.46 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Description" "Test point: SWCLK (programming fixture)"
+			(at 35.56 124.46 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(pin "1"
+			(uuid "4abbd0dc-5b17-5327-bd3f-91dbef3436ee")
+		)
+		(instances
+			(project "irl2fa"
+				(path "/0dba1c95-445c-502a-9bfd-1af126d3c360"
+					(reference "TP4")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(wire
+		(pts
+			(xy 35.56 124.46)
+			(xy 35.56 127)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "b728f1fe-a6f0-5fa1-9383-5ceadeeab28d")
+	)
+	(label "SWCLK"
+		(at 35.56 127 270)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify right bottom)
+		)
+		(uuid "98b11d45-cf8e-5340-b881-5e22ddbff510")
+	)
+	(symbol
+		(lib_id "Connector:TestPoint")
+		(at 50.8 124.46 0)
+		(unit 1)
+		(exclude_from_sim no)
+		(in_bom no)
+		(on_board yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(uuid "76cb2964-8799-546a-ac28-2f8a3b65adca")
+		(property "Reference" "TP5"
+			(at 52.8 123.19 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Value" "NRST"
+			(at 52.8 125.73 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Footprint" "TestPoint:TestPoint_Pad_D1.5mm"
+			(at 50.8 124.46 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Datasheet" ""
+			(at 50.8 124.46 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Description" "Test point: NRST (programming fixture)"
+			(at 50.8 124.46 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(pin "1"
+			(uuid "d7006dd5-1bb9-5418-abe1-021e928d6bcd")
+		)
+		(instances
+			(project "irl2fa"
+				(path "/0dba1c95-445c-502a-9bfd-1af126d3c360"
+					(reference "TP5")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(wire
+		(pts
+			(xy 50.8 124.46)
+			(xy 50.8 127)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "f427d588-1a57-5f45-b24f-56c09eecc4b1")
+	)
+	(label "NRST"
+		(at 50.8 127 270)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify right bottom)
+		)
+		(uuid "e9e3be3a-2ea6-52a4-a28c-b2de331e05fd")
+	)
 	(text "RTC: RV-3032-C7 (temperature compensated)"
 		(exclude_from_sim no)
 		(at 205 89 0)
@@ -9105,9 +9360,27 @@
 		)
 		(uuid "bcd70e32-f6c2-5301-be3b-957d5ed2ad11")
 	)
-	(no_connect
-		(at 238.76 170.18)
-		(uuid "608927e2-1bde-5275-a935-8205c697bc80")
+	(wire
+		(pts
+			(xy 238.76 170.18)
+			(xy 238.76 172.72)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "234b084f-5c26-5a49-8ab3-57c89f5886c2")
+	)
+	(label "GND"
+		(at 238.76 172.72 270)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify right bottom)
+		)
+		(uuid "67cbacb8-a571-5204-8ee8-f25b9de60ed2")
 	)
 	(wire
 		(pts
@@ -10123,7 +10396,7 @@
 				(hide yes)
 			)
 		)
-		(property "Description" "47 uH 500 mA booster inductor"
+		(property "Description" "47 uH 0.36 A booster inductor"
 			(at 116.84 175.26 0)
 			(effects
 				(font
@@ -10219,7 +10492,7 @@
 		(uuid "a15b64de-5c11-58f9-a315-a764d90a7623")
 	)
 	(symbol
-		(lib_id "Transistor_FET:Si1308EDL")
+		(lib_id "Transistor_FET:Q_NMOS_GSD")
 		(at 147.32 180.34 0)
 		(unit 1)
 		(exclude_from_sim no)
@@ -10237,7 +10510,7 @@
 				(justify left)
 			)
 		)
-		(property "Value" "Si1308EDL"
+		(property "Value" "NX3008NBK"
 			(at 151.86 181.61 0)
 			(effects
 				(font
@@ -10246,7 +10519,7 @@
 				(justify left)
 			)
 		)
-		(property "Footprint" "Package_TO_SOT_SMD:SOT-323_SC-70"
+		(property "Footprint" "Package_TO_SOT_SMD:SOT-23"
 			(at 147.32 180.34 0)
 			(effects
 				(font
@@ -10255,7 +10528,7 @@
 				(hide yes)
 			)
 		)
-		(property "Datasheet" "https://www.vishay.com/docs/63399/si1308edl.pdf"
+		(property "Datasheet" "https://assets.nexperia.com/documents/data-sheet/NX3008NBK.pdf"
 			(at 147.32 180.34 0)
 			(effects
 				(font
@@ -10264,7 +10537,7 @@
 				(hide yes)
 			)
 		)
-		(property "Description" "Booster switch N-FET"
+		(property "Description" "Booster switch N-FET, Vgs(th) 1.1 V max (SSD1680 asks <= 1.3 V)"
 			(at 147.32 180.34 0)
 			(effects
 				(font
@@ -10273,7 +10546,7 @@
 				(hide yes)
 			)
 		)
-		(property "LCSC" "C469327"
+		(property "LCSC" "C179399"
 			(at 147.32 180.34 0)
 			(effects
 				(font
@@ -10282,7 +10555,7 @@
 				(hide yes)
 			)
 		)
-		(property "MPN" "Si1308EDL-T1-GE3"
+		(property "MPN" "NX3008NBK,215"
 			(at 147.32 180.34 0)
 			(effects
 				(font
@@ -10291,7 +10564,7 @@
 				(hide yes)
 			)
 		)
-		(property "Manufacturer" "Vishay"
+		(property "Manufacturer" "Nexperia"
 			(at 147.32 180.34 0)
 			(effects
 				(font
@@ -12541,7 +12814,7 @@
 				(hide yes)
 			)
 		)
-		(property "Datasheet" "https://www.vishay.com/docs/84176/vsmb2948sl.pdf"
+		(property "Datasheet" "https://www.vishay.com/docs/83498/vsmb2948sl.pdf"
 			(at 317.5 154.94 0)
 			(effects
 				(font
@@ -12664,7 +12937,7 @@
 				(justify left)
 			)
 		)
-		(property "Value" "100"
+		(property "Value" "68"
 			(at 344.9 168.91 0)
 			(effects
 				(font
@@ -12691,7 +12964,7 @@
 				(hide yes)
 			)
 		)
-		(property "Description" "Resistor 100 1% 0402"
+		(property "Description" "Resistor 68 1% 0402"
 			(at 342.9 167.64 0)
 			(effects
 				(font
@@ -12700,7 +12973,7 @@
 				(hide yes)
 			)
 		)
-		(property "LCSC" "C25076"
+		(property "LCSC" "C25131"
 			(at 342.9 167.64 0)
 			(effects
 				(font
@@ -12709,7 +12982,7 @@
 				(hide yes)
 			)
 		)
-		(property "MPN" "0402WGF1000TCE"
+		(property "MPN" "0402WGF680JTCE"
 			(at 342.9 167.64 0)
 			(effects
 				(font
@@ -12954,7 +13227,7 @@
 	)
 	(symbol
 		(lib_id "Device:R")
-		(at 302.26 210.82 0)
+		(at 391.16 165.1 0)
 		(unit 1)
 		(exclude_from_sim no)
 		(in_bom yes)
@@ -12963,7 +13236,7 @@
 		(fields_autoplaced yes)
 		(uuid "f69f289b-c410-5a2b-b621-6e8c949ac6cf")
 		(property "Reference" "R9"
-			(at 304.26 209.55 0)
+			(at 393.16 163.83 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -12972,7 +13245,7 @@
 			)
 		)
 		(property "Value" "100k"
-			(at 304.26 212.09 0)
+			(at 393.16 166.37 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -12981,7 +13254,7 @@
 			)
 		)
 		(property "Footprint" "Resistor_SMD:R_0402_1005Metric"
-			(at 302.26 210.82 0)
+			(at 391.16 165.1 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -12990,7 +13263,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 302.26 210.82 0)
+			(at 391.16 165.1 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -12999,7 +13272,7 @@
 			)
 		)
 		(property "Description" "Resistor 100k 1% 0402"
-			(at 302.26 210.82 0)
+			(at 391.16 165.1 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -13008,7 +13281,7 @@
 			)
 		)
 		(property "LCSC" "C25741"
-			(at 302.26 210.82 0)
+			(at 391.16 165.1 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -13017,7 +13290,7 @@
 			)
 		)
 		(property "MPN" "0402WGF1003TCE"
-			(at 302.26 210.82 0)
+			(at 391.16 165.1 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -13026,7 +13299,7 @@
 			)
 		)
 		(property "Manufacturer" "UNI-ROYAL"
-			(at 302.26 210.82 0)
+			(at 391.16 165.1 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -13051,8 +13324,8 @@
 	)
 	(wire
 		(pts
-			(xy 302.26 207.01)
-			(xy 302.26 204.47)
+			(xy 391.16 161.29)
+			(xy 391.16 158.75)
 		)
 		(stroke
 			(width 0)
@@ -13061,7 +13334,7 @@
 		(uuid "2c9ef885-e73f-52c9-a7f1-725bd11caaf6")
 	)
 	(label "IR_TX"
-		(at 302.26 204.47 90)
+		(at 391.16 158.75 90)
 		(fields_autoplaced yes)
 		(effects
 			(font
@@ -13073,8 +13346,8 @@
 	)
 	(wire
 		(pts
-			(xy 302.26 214.63)
-			(xy 302.26 217.17)
+			(xy 391.16 168.91)
+			(xy 391.16 171.45)
 		)
 		(stroke
 			(width 0)
@@ -13083,7 +13356,7 @@
 		(uuid "51c574c6-066f-5f7d-92f0-8f2d03d7a532")
 	)
 	(label "GND"
-		(at 302.26 217.17 270)
+		(at 391.16 171.45 270)
 		(fields_autoplaced yes)
 		(effects
 			(font
@@ -13095,7 +13368,7 @@
 	)
 	(symbol
 		(lib_id "Device:Q_Photo_NPN")
-		(at 312.42 218.44 0)
+		(at 299.72 218.44 0)
 		(unit 1)
 		(exclude_from_sim no)
 		(in_bom yes)
@@ -13104,7 +13377,7 @@
 		(fields_autoplaced yes)
 		(uuid "84ba195d-3fec-526d-a5c9-1765197f18c0")
 		(property "Reference" "Q5"
-			(at 316.96 217.17 0)
+			(at 304.26 217.17 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -13112,8 +13385,8 @@
 				(justify left)
 			)
 		)
-		(property "Value" "VEMT2523SLX01"
-			(at 316.96 219.71 0)
+		(property "Value" "VEMT2023SLX01"
+			(at 304.26 219.71 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -13121,8 +13394,8 @@
 				(justify left)
 			)
 		)
-		(property "Footprint" "irl2fa:PhotoTransistor_Vishay_VEMT2523SLX01_SideView"
-			(at 312.42 218.44 0)
+		(property "Footprint" "irl2fa:PhotoTransistor_Vishay_VEMT2023SLX01_SideView"
+			(at 299.72 218.44 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -13130,8 +13403,8 @@
 				(hide yes)
 			)
 		)
-		(property "Datasheet" "https://www.vishay.com/docs/81596/vemt2500x01.pdf"
-			(at 312.42 218.44 0)
+		(property "Datasheet" "https://www.vishay.com/docs/84166/vemt2023slx01.pdf"
+			(at 299.72 218.44 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -13139,8 +13412,8 @@
 				(hide yes)
 			)
 		)
-		(property "Description" "Side-looking IR phototransistor"
-			(at 312.42 218.44 0)
+		(property "Description" "Side-looking IR phototransistor with daylight-blocking filter"
+			(at 299.72 218.44 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -13148,8 +13421,8 @@
 				(hide yes)
 			)
 		)
-		(property "LCSC" "C511451"
-			(at 312.42 218.44 0)
+		(property "LCSC" "C2843576"
+			(at 299.72 218.44 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -13157,8 +13430,8 @@
 				(hide yes)
 			)
 		)
-		(property "MPN" "VEMT2523SLX01"
-			(at 312.42 218.44 0)
+		(property "MPN" "VEMT2023SLX01"
+			(at 299.72 218.44 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -13167,7 +13440,7 @@
 			)
 		)
 		(property "Manufacturer" "Vishay"
-			(at 312.42 218.44 0)
+			(at 299.72 218.44 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -13192,8 +13465,8 @@
 	)
 	(wire
 		(pts
-			(xy 314.96 213.36)
-			(xy 314.96 210.82)
+			(xy 302.26 213.36)
+			(xy 302.26 210.82)
 		)
 		(stroke
 			(width 0)
@@ -13202,7 +13475,7 @@
 		(uuid "4dfd743c-7db9-5519-aa50-7f40ac28ca0f")
 	)
 	(label "IR_RX_PWR"
-		(at 314.96 210.82 90)
+		(at 302.26 210.82 90)
 		(fields_autoplaced yes)
 		(effects
 			(font
@@ -13214,8 +13487,8 @@
 	)
 	(wire
 		(pts
-			(xy 314.96 223.52)
-			(xy 314.96 226.06)
+			(xy 302.26 223.52)
+			(xy 302.26 226.06)
 		)
 		(stroke
 			(width 0)
@@ -13224,7 +13497,7 @@
 		(uuid "1bbbf0ac-9b25-5937-a306-62dab4d62fbb")
 	)
 	(label "IR_RX"
-		(at 314.96 226.06 270)
+		(at 302.26 226.06 270)
 		(fields_autoplaced yes)
 		(effects
 			(font
@@ -13236,7 +13509,7 @@
 	)
 	(symbol
 		(lib_id "Device:R")
-		(at 340.36 210.82 0)
+		(at 327.66 210.82 0)
 		(unit 1)
 		(exclude_from_sim no)
 		(in_bom yes)
@@ -13245,7 +13518,7 @@
 		(fields_autoplaced yes)
 		(uuid "88b41c91-3b56-50f3-a904-a86cbe4a3e52")
 		(property "Reference" "R10"
-			(at 342.36 209.55 0)
+			(at 329.66 209.55 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -13254,7 +13527,7 @@
 			)
 		)
 		(property "Value" "10k"
-			(at 342.36 212.09 0)
+			(at 329.66 212.09 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -13263,7 +13536,7 @@
 			)
 		)
 		(property "Footprint" "Resistor_SMD:R_0402_1005Metric"
-			(at 340.36 210.82 0)
+			(at 327.66 210.82 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -13272,7 +13545,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 340.36 210.82 0)
+			(at 327.66 210.82 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -13281,7 +13554,7 @@
 			)
 		)
 		(property "Description" "Resistor 10k 1% 0402"
-			(at 340.36 210.82 0)
+			(at 327.66 210.82 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -13290,7 +13563,7 @@
 			)
 		)
 		(property "LCSC" "C25744"
-			(at 340.36 210.82 0)
+			(at 327.66 210.82 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -13299,7 +13572,7 @@
 			)
 		)
 		(property "MPN" "0402WGF1002TCE"
-			(at 340.36 210.82 0)
+			(at 327.66 210.82 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -13308,7 +13581,7 @@
 			)
 		)
 		(property "Manufacturer" "UNI-ROYAL"
-			(at 340.36 210.82 0)
+			(at 327.66 210.82 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -13333,8 +13606,8 @@
 	)
 	(wire
 		(pts
-			(xy 340.36 207.01)
-			(xy 340.36 204.47)
+			(xy 327.66 207.01)
+			(xy 327.66 204.47)
 		)
 		(stroke
 			(width 0)
@@ -13343,7 +13616,7 @@
 		(uuid "d0ef62dd-0b52-5377-8301-211fb2aaab12")
 	)
 	(label "IR_RX"
-		(at 340.36 204.47 90)
+		(at 327.66 204.47 90)
 		(fields_autoplaced yes)
 		(effects
 			(font
@@ -13355,8 +13628,8 @@
 	)
 	(wire
 		(pts
-			(xy 340.36 214.63)
-			(xy 340.36 217.17)
+			(xy 327.66 214.63)
+			(xy 327.66 217.17)
 		)
 		(stroke
 			(width 0)
@@ -13365,7 +13638,7 @@
 		(uuid "5635991c-7d43-5b5a-bf60-96017cc3ac50")
 	)
 	(label "GND"
-		(at 340.36 217.17 270)
+		(at 327.66 217.17 270)
 		(fields_autoplaced yes)
 		(effects
 			(font
