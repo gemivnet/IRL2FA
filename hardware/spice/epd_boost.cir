@@ -3,7 +3,10 @@
 * The SSD1680 regulates VGH at 20 V; its loop is modelled as a gate enable
 * that stops switching above 22 V on PREVGH. Checks: PREVGH/PREVGL reach
 * +/-20 V within the soft-start budget, the inductor peak current stays
-* inside L1's 500 mA rating and the switch never sees more than 30 V.
+* inside L1's saturation current and the switch never sees more than 30 V.
+* L1 = APV ANR3015T470M: DCR 1.625 ohm max, Isat 0.36 A / Irms 0.36 A (guaranteed
+* columns, APV ANR catalogue rev 2026-08-05 p.5). Good Display's "Io = 500 mA" is a
+* loose reference: their NR3015T470M is itself 0.32 A Isat.
 * Assumed switching: 2.5 us on / 8 us off (about 95 kHz), starting 1 ms after
 * the panel is powered. Assumed regulator loads: 0.5 mA on each rail.
 .include models.lib
@@ -11,7 +14,7 @@
 Vin vepd 0 PWL(0 0 200u 3.0)
 C4 vepd 0 4.7u
 L1 vepd lx 47u
-RL1 lx sw 0.6
+RL1 lx sw 1.625
 Csw sw 0 60p
 S1 sw rese gdr 0 SWM
 .model SWM SW(Ron=0.185 Roff=10Meg Vt=1.5 Vh=0.3)

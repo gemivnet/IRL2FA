@@ -1,0 +1,226 @@
+# Datasheet facts transcribed for hardware/tests/test_electrical.py. Every entry
+# names its primary source (URL + page/figure/table). The test compares the
+# schematic netlist, hardware/pins.yaml and the routed board against these, NOT
+# against our own design files. See docs/electrical-review.md for the review
+# these come from.
+#
+# SPDX-License-Identifier: CERN-OHL-S-2.0
+
+# ---------------------------------------------------------------------------- symbols
+# Schematic symbol pin number -> pin name, per the part's datasheet. The KiCad
+# footprint pad numbers are checked against the same datasheets by
+# test_footprints.py (footprints.yaml), so symbol name == datasheet function.
+symbol_pins:
+  Transistor_FET:AO3401A:
+    source: "AOS AO3401A rev 3.1, p.1 'SOT23 Top View': 1 G, 2 S, 3 D (https://www.aosmd.com/res/datasheets/AO3401A.pdf)"
+    pins: {"1": G, "2": S, "3": D}
+  Transistor_FET:AO3400A:
+    source: "AOS AO3400A rev 3, p.1 'SOT23 Top View': 1 G, 2 S, 3 D (https://www.aosmd.com/res/datasheets/AO3400A.pdf)"
+    pins: {"1": G, "2": S, "3": D}
+  Transistor_FET:Si1308EDL:
+    source: "Vishay Si1308EDL doc 63399 rev C, p.1 'SOT-323 Top View': 1 G, 2 S, 3 D (https://www.vishay.com/docs/63399/si1308edl.pdf)"
+    pins: {"1": G, "2": S, "3": D}
+  Device:LED:
+    source: "VSMB2948SL doc 83498 rev 1.1, p.5 package drawing (Cathode / Anode) and tape table (Lead I = Cathode); footprint pad 1 = Lead I"
+    pins: {"1": K, "2": A}
+  Device:D_Schottky:
+    source: "MBR0530 (JSCJ) SOD-123: band = cathode; KiCad D_SOD-123 pad 1 = cathode"
+    pins: {"1": K, "2": A}
+  Device:Q_Photo_NPN:
+    source: "VEMT2523SLX01 doc 84167 rev 1.0, p.4 package drawing (Collector / Emitter) and p.5 tape table (Lead I = Collector)"
+    pins: {"1": C, "2": E}
+  Device:Battery_Cell:
+    source: "MYOUNG MY-CP-0106: both clip legs are + (pad 1); the board pad under the cell is - (pad 2)"
+    pins: {"1": "+", "2": "-"}
+  irl2fa:RV-3032-C7:
+    source: "Micro Crystal RV-3032-C7 Application Manual rev 1.3 (May 2023), section 2.2 Pin description, p.10"
+    pins: {"1": VBACKUP, "2": SDA, "3": "~{INT}", "4": EVI, "5": VSS, "6": VDD, "7": CLKOUT, "8": SCL}
+  irl2fa:Nav_Switch_5way:
+    source: "Alps SKRHABE010 product page (LCSC C139794 PDF) p.3 circuit diagram: 1 A, 2 Center, 3 C, 4 B, 5 Common, 6 D"
+    pins: {"1": A, "2": Center, "3": C, "4": B, "5": Common, "6": D}
+  Connector:Conn_ARM_SWD_TagConnect_TC2030-NL:
+    source: "Tag-Connect TC2030-CTX datasheet p.1 '6-Pin TC2030 Footprint': 1 VCC, 2 SWDIO, 3 nRESET, 4 SWCLK, 5 GND, 6 SWO"
+    pins: {"1": VCC, "2": SWDIO, "3": "~{RESET}", "4": SWCLK, "5": GND, "6": SWO}
+
+# ---------------------------------------------------------------------------- MCU
+mcu:
+  pinout_source: >-
+    ST DS14463 rev 2 (STM32U083xC), Figure 3 'UFQFPN32 pinout', p.25
+    (LCSC copy https://datasheet.lcsc.com/datasheet/pdf/1d8e3bb2642efa1578790415a746a5f0.pdf?productCode=C22459164);
+    identical to DS14548 rev 2 (STM32U073) Figure 3.
+  # package pin -> pad name (alternate names after the slash)
+  pinout:
+    1: VDD
+    2: PC14
+    3: PC15
+    4: PF2
+    5: VDDA
+    6: PA0
+    7: PA1
+    8: PA2
+    9: PA3
+    10: PA4
+    11: PA5
+    12: PA6
+    13: PA7
+    14: PB0
+    15: PB1
+    16: VSS
+    17: VDD        # drawn VDDUSB in Figure 3; must be connected (DS 3.6.1); tied to VDD
+    18: PA8
+    19: PA9
+    20: PA10
+    21: PA11
+    22: PA12
+    23: PA13
+    24: PA14
+    25: PA15
+    26: PB3
+    27: PB4
+    28: PB5
+    29: PB6
+    30: PB7
+    31: PF3
+    32: VSS
+    33: EP
+  af_source: >-
+    ST DS14463 rev 2, Table 13 'Port A alternate functions' (p.36-37) and Table 14
+    'Port B alternate functions' (p.38); same rows in DS14548 rev 2 p.36-38.
+  # Only the rows this design uses: pin -> {AF number: function}
+  af:
+    PA4:  {5: SPI1_NSS, 7: USART2_CK}
+    PA5:  {1: TIM2_CH1, 5: SPI1_SCK, 7: USART3_TX}
+    PA7:  {3: I2C2_SCL, 4: I2C3_SCL, 5: SPI1_MOSI, 7: USART3_RX}
+    PA9:  {0: MCO, 4: I2C1_SCL, 5: I2C2_SCL, 7: USART1_TX}
+    PA10: {4: I2C1_SDA, 5: I2C2_SDA, 7: USART1_RX}
+    PA13: {0: SWDIO, 1: IR_OUT}
+    PA14: {0: SWCLK, 1: LPTIM1_CH1}
+    PB6:  {3: I2C4_SCL, 4: I2C1_SCL, 5: I2C2_SCL, 6: LPUART3_TX, 7: USART1_TX}
+    PB7:  {3: I2C4_SDA, 4: I2C1_SDA, 5: I2C2_SDA, 6: LPUART3_RX, 7: USART1_RX}
+  # Function each pins.yaml net needs from its pin
+  net_function:
+    EPD_SCK: SPI1_SCK
+    EPD_SDI: SPI1_MOSI
+    IR_TX: USART1_TX
+    IR_RX: USART1_RX
+    I2C_SCL: I2C1_SCL
+    I2C_SDA: I2C1_SDA
+    SWDIO: SWDIO
+    SWCLK: SWCLK
+  # DS14548 Table 64 (p.82): VIH >= 0.7 VDD, VIL <= 0.3 VDD (tested in production)
+  vih_frac: 0.7
+  vil_frac: 0.3
+
+# ---------------------------------------------------------------------------- e-paper FPC
+panel:
+  part: GDEY0213B74
+  source: >-
+    Good Display GDEY0213B74 spec rev 1.0 (2021-03-17), section 5 'Input/Output Pin
+    Assignment' p.8, section 12 'Reference Circuit' p.29, mechanical drawing p.7
+    (https://www.good-display.com/product/391.html)
+  # FPC pin -> what the reference circuit (p.29) connects to it.
+  #   nc        : must stay unconnected (pins 1, 4 'Do not connect'; 19 VPP test)
+  #   open_ok   : may stay open (TSCL/TSDA: external temperature sensor not used)
+  #   gnd       : ground
+  #   cap       : 'C' pin, needs its own >= 25 V capacitor to GND (p.29 table)
+  #   supply    : VCI / VDDIO, same switched supply (p.8: VDDIO 'should be connected with VCI')
+  #   net:<NAME>: a named signal
+  pins:
+    1: nc
+    2: net:EPD_GDR
+    3: net:EPD_RESE
+    4: nc
+    5: cap          # VSH2
+    6: open_ok      # TSCL
+    7: open_ok      # TSDA
+    8: gnd          # BS1 low = 4-wire SPI (p.9 note 5-5); firmware drives D/C
+    9: net:EPD_BUSY
+    10: net:EPD_RST
+    11: net:EPD_DC
+    12: net:EPD_CS
+    13: net:EPD_SCK
+    14: net:EPD_SDI
+    15: supply      # VDDIO
+    16: supply      # VCI
+    17: gnd         # VSS
+    18: cap         # VDD (1.8 V core regulator)
+    19: nc          # VPP (OTP test)
+    20: cap         # VSH1
+    21: cap         # VGH = PREVGH
+    22: cap         # VSL
+    23: cap         # VGL = PREVGL
+    24: cap         # VCOM
+  # p.7 drawing, front view: FPC leaves the left short edge, pin 1 at the top;
+  # FPC top edge 8.15 +-0.3 below the glass top edge; pin 1 centre 0.50 in from the
+  # FPC edge; P0.5 x 23 = 11.50 between pin 1 and pin 24.
+  fpc_edge_from_glass_top: 8.15
+  fpc_edge_tol: 0.3
+  pin1_from_fpc_edge: 0.50
+  pitch: 0.5
+
+fpc_connector:
+  source: >-
+    Hirose FH34SRJ catalogue (Nov.1.2018) p.1-2: 'Top and Bottom contact'; ordering code
+    field 3 'RJ: Top and Bottom contact, halogen-free'; p.4 recommended FPC: contact No.1
+    lands on the same physical position whichever face the FPC contacts are on.
+  # The panel FPC folds 180 deg through the slot, so its contact face ends up facing
+  # away from the board. A dual-contact connector accepts it either way; a
+  # bottom-contact-only part would not touch it.
+  dual_contact_mpn_prefix: FH34SRJ
+
+# ---------------------------------------------------------------------------- voltages
+# Highest |voltage| each net (or capacitor pin pair) reaches, with its source.
+net_vmax:
+  VBAT:        {v: 3.6, source: "STM32U083 VDD max 3.6 V (DS14548 Table 22); a fresh CR2450 is <= 3.3 V"}
+  VBAT_RAW:    {v: 3.6, source: "as VBAT"}
+  VEPD:        {v: 3.6, source: "VBAT through Q2"}
+  NRST:        {v: 3.6, source: "VDD domain"}
+  EPD_VDD:     {v: 1.9, source: "SSD1680 rev 0.14 Table 11-1: VDD 1.7-1.9 V"}
+  EPD_VSH1:    {v: 17.0, source: "SSD1680 Table 11-1: VSH1 2.4..17 V"}
+  EPD_VSH2:    {v: 17.0, source: "SSD1680 Table 11-1: VSH2 2.4..17 V"}
+  EPD_VSL:     {v: 17.0, source: "SSD1680 Table 11-1: VSL -17..-9 V"}
+  EPD_VCOM:    {v: 20.0, source: "SSD1680 Table 11-1: VCOM_AC VSL+VCOM_DC .. VSH1+VCOM_DC, VCOM_DC -3..-0.2 V"}
+  EPD_PREVGH:  {v: 22.5, source: "VGH 20 V (SSD1680 Table 11-2: 19.5-20.5) + booster overshoot; SPICE epd_boost vds_max 22.3 V"}
+  EPD_PREVGL:  {v: 22.5, source: "as PREVGH, negative"}
+  EPD_SW:      {v: 22.8, source: "PREVGH + MBR0530 Vf; SPICE epd_boost vds_max"}
+  EPD_NEG:     {v: 22.8, source: "charge pump node swings to -(PREVGH + Vf)"}
+pair_vmax:
+  # capacitor between two non-ground nets
+  EPD_SW|EPD_NEG: {v: 23.2, source: "SW at 22.8 V while D2 clamps NEG at -0.4 V"}
+
+samsung_mlcc:
+  source: "Samsung Electro-Mechanics MLCC catalogue (LCSC C16780 PDF) p.4 'Part Numbering': char 3 dielectric, char 10 rated voltage"
+  dielectric: {A: X5R, B: X7R, C: C0G, F: Y5V, X: X6S, Y: X7S, Z: X7T}
+  voltage: {R: 4, Q: 6.3, P: 10, O: 16, A: 25, L: 35, B: 50, C: 100, D: 200}
+display_cap_min_v:
+  v: 25
+  source: "GDEY0213B74 p.29 table: C1-C12 0603/0805 X5R/X7R, voltage rating >= 25 V"
+
+# ---------------------------------------------------------------------------- booster
+booster:
+  source: "GDEY0213B74 p.29 reference circuit"
+  L1: {value: 47u}
+  R7: {value: "2.2"}      # RESE sense, reference R2
+  R6: {value: 1M}         # GDR pull-down, reference R1
+  Q3: {mpn: Si1308EDL}
+  D1: {mpn: MBR0530}
+  D2: {mpn: MBR0530}
+  D3: {mpn: MBR0530}
+  C11: {value: 4.7u}      # flying capacitor, reference C3
+  C10: {value: 4.7u}      # input, reference C4
+
+# ---------------------------------------------------------------------------- RTC
+rtc:
+  source: "RV-3032-C7 Application Manual rev 1.3, 2.2 Pin description p.10"
+  # VBACKUP unused: 'must be tied to VSS with a 10 kOhm resistor'
+  vbackup_resistor: 10k
+  # EVI 'must not be left floating'; CLKOUT push-pull 'do not connect to a Supply Voltage or GND'
+
+# ---------------------------------------------------------------------------- IR detector
+ir_detector:
+  # VEMT2523SLX01 doc 84167 p.1: 'clear epoxy dome lens ... sensitive to visible and near
+  # infrared radiation', bandwidth 470-1090 nm: no daylight filter.
+  # VEMT2023SLX01 (doc 84166, https://www.vishay.com/docs/84166/vemt2023slx01.pdf): same
+  # side-view package and lead assignment (doc 84167 p.5 tape table lists both), with a
+  # daylight-blocking filter matched to 830-950 nm emitters.
+  daylight_filter_mpns: [VEMT2023SLX01]

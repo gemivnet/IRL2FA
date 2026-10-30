@@ -76,7 +76,7 @@ Every push runs the following. Details are in [hardware-testing.md](hardware-tes
 These are modelled or taken from datasheets but not yet measured:
 
 1. **E-paper image orientation.** The firmware assumes the panel's RAM origin from Good Display's drawing. If the picture is upside down, build with `-DEPD_ROTATE_180=ON`.
-2. **IR range and speed.** The plan is 4800 baud over 2-5 cm, set by the phototransistor's 20-40 µs edges.
+2. **IR range and speed.** The plan is 4800 baud, set by the phototransistor's 20-40 µs edges. With worst-case datasheet parts the link reaches about 3 cm on axis (`hardware/spice/ir_rx.cir`); typical parts reach further. Also try it under a desk lamp and near a window: the detector has no daylight filter ([electrical review](electrical-review.md) IR-1).
 3. **Sleep current.** The budget is about 1.2 µA typical; measure at TP1/TP2.
 4. **Joystick direction mapping** after the 45° rotation. If it's wrong, fix it in `pins.yaml` and regenerate `pins.h`.
 5. **Fit of the FPC fold.** The 14.3 mm tail wraps round the 0.8 mm board and reaches about x = 13.0 mm on the back; J1 sits at x = 12.5, the same offset as on the 1.0 mm board, so the end seats with ~0.8 mm to spare. The datasheet tolerance is ±0.3 mm.
