@@ -13,8 +13,15 @@ int main(void);
 void Reset_Handler(void);
 void Default_Handler(void);
 
+typedef void (*vector_t)(void);
+extern const vector_t vector_table[16 + 32];
+
 void Reset_Handler(void)
 {
+    /* The same file starts the bootloader (vector table at 0x08000000) and
+     * the application (0x08004100, entered from the bootloader): point VTOR
+     * at our own table before any interrupt can happen. */
+    SCB->VTOR = (uint32_t)vector_table;
     /* .data from flash, .bss to zero. Not memcpy/memset: they may live in
      * code that expects an initialised C environment. */
     uint32_t *src = &__data_load;
@@ -71,7 +78,6 @@ void USART3_LPUART1_IRQHandler(void) WEAK_ALIAS;
 void USART4_LPUART3_IRQHandler(void) WEAK_ALIAS;
 void RNG_CRYP_IRQHandler(void) WEAK_ALIAS;
 
-typedef void (*vector_t)(void);
 
 __attribute__((section(".isr_vector"), used))
 const vector_t vector_table[16 + 32] = {

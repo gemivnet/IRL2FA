@@ -6,6 +6,7 @@
 #include <string.h>
 
 #include "board.h"
+#include "flash_layout.h"
 #include "buttons.h"
 #include "epd_ssd1680.h"
 #include "hal.h"
@@ -626,15 +627,15 @@ void hal_random(uint8_t *buf, size_t len)
 }
 
 /* ------------------------------------------------------------------ */
-/* flash store: the 40 pages above the image (see stm32u083kc.ld)     */
+/* flash: the driver (any page, flash_layout.h) and the record store  */
 
-extern const uint8_t __store_start[];
-#define STORE_PAGES 40u
-#define STORE_BYTES (STORE_PAGES * HAL_FLASH_PAGE)
+#define STORE_PAGES (FL_STORE_SIZE / FL_PAGE)
+#define STORE_BYTES FL_STORE_SIZE
 #define FLASH_KEY1 0x45670123u
 #define FLASH_KEY2 0xCDEF89ABu
 #define FLASH_SR_ERRORS (FLASH_SR_OPERR | FLASH_SR_PROGERR | FLASH_SR_WRPERR | FLASH_SR_PGAERR | \
                          FLASH_SR_SIZERR | FLASH_SR_PGSERR | FLASH_SR_MISERR | FLASH_SR_FASTERR)
+_Static_assert(STORE_PAGES == 40u && FL_PAGE == HAL_FLASH_PAGE, "store: 40 pages of 2 KB (core/store.h)");
 
 uint32_t hal_flash_pages(void)
 {
@@ -644,15 +645,17 @@ uint32_t hal_flash_pages(void)
 /* Flash ECC (RM0503 3.3.2 and the caution in 3.3.5): every 64-bit
  * double-word carries 8 ECC bits. A program or erase cut short by a power
  * loss can leave a double-word whose ECC no longer matches, and reading it
- * later sets FLASH_ECCR.ECCD and raises an NMI. The store is built to
- * survive exactly those torn writes (core/store.c, tests/test_powercut.c),
- * so a double ECC error inside the store is data, not a fault: store reads
- * are "armed", the NMI handler then clears the flag and returns, and the
- * read hands the store zeros for that double-word (never 0xFF, which would
- * pass for erased, and neither a valid record nor a PIN-log entry). Any
- * other NMI still resets the device. Before this, the NMI fell through to
- * Default_Handler, which resets: the store is mounted at every boot, so one
- * torn double-word was an endless reset loop and a bricked device. */
+ * later sets FLASH_ECCR.ECCD and raises an NMI. The store, and the
+ * bootloader's slots and journal, are built to survive exactly those torn
+ * writes (core/store.c, core/fwimage.c, core/fwlog.c and their power-cut
+ * tests), so a double ECC error there is data, not a fault: their reads are
+ * "armed", the NMI handler then clears the flag and returns, and the read
+ * hands back zeros for that double-word (never 0xFF, which would pass for
+ * erased, and neither a valid record nor a PIN-log entry) and reports the
+ * error. Any other NMI still resets the device. Before this, the NMI fell
+ * through to Default_Handler, which resets: the store is mounted at every
+ * boot, so one torn double-word was an endless reset loop and a bricked
+ * device. */
 static volatile bool ecc_armed;
 static volatile bool ecc_hit;
 
@@ -680,11 +683,11 @@ static void flash_cache_reset(void)
     FLASH->ACR = acr & ~FLASH_ACR_ICRST;
 }
 
-/* Reads the double-word at store offset `off` (8-aligned). False, and
+/* Reads the double-word at flash offset `off` (8-aligned). False, and
  * zeros in w[], if it has a double ECC error. */
-static bool store_dword(uint32_t off, uint32_t w[2])
+static bool flash_dword(uint32_t off, uint32_t w[2])
 {
-    const volatile uint32_t *p = (const volatile uint32_t *)(__store_start + off);
+    const volatile uint32_t *p = (const volatile uint32_t *)(FLASH_BASE + off);
     if (FLASH->ECCR & FLASH_ECCR_ECCC) FLASH->ECCR = (FLASH->ECCR & FLASH_ECCR_ECCCIE) | FLASH_ECCR_ECCC;
     ecc_hit = false;
     ecc_armed = true;
@@ -700,25 +703,23 @@ static bool store_dword(uint32_t off, uint32_t w[2])
     return false;
 }
 
-void hal_flash_read(uint32_t off, void *buf, size_t len)
+bool board_flash_read(uint32_t off, void *buf, size_t len)
 {
-    if (off > STORE_BYTES || len > STORE_BYTES - off) {
-        memset(buf, 0xff, len);
-        board_flash_errors++;
-        return;
-    }
+    if (off > FL_FLASH_SIZE || len > FL_FLASH_SIZE - off) return false;
     uint8_t *dst = buf;
+    bool ok = true;
     while (len) {
         uint32_t w[2];
         uint32_t at = off & 7u;
         size_t n = 8u - at;
         if (n > len) n = len;
-        store_dword(off - at, w);
+        ok = flash_dword(off - at, w) && ok;
         memcpy(dst, (const uint8_t *)w + at, n);
         dst += n;
         off += (uint32_t)n;
         len -= n;
     }
+    return ok;
 }
 
 static bool flash_unlock(void)
@@ -752,13 +753,10 @@ static bool flash_prepare(void)
     return flash_unlock();
 }
 
-void hal_flash_erase(uint32_t page)
+bool board_flash_erase(uint32_t off)
 {
-    if (page >= STORE_PAGES) {
-        board_flash_errors++;
-        return;
-    }
-    uint32_t pnb = ((uint32_t)__store_start - FLASH_BASE) / HAL_FLASH_PAGE + page;
+    uint32_t pnb = off / FL_PAGE;
+    if (off >= FL_FLASH_SIZE) return false;
     bool ok = flash_prepare();
     if (ok) {
         FLASH->CR = (FLASH->CR & ~(FLASH_CR_PNB | FLASH_CR_PG | FLASH_CR_MER1)) | FLASH_CR_PER |
@@ -768,19 +766,20 @@ void hal_flash_erase(uint32_t page)
         FLASH->CR &= ~(FLASH_CR_PER | FLASH_CR_PNB);
     }
     flash_lock();
-    /* Verify: the store relies on erased bytes reading 0xFF. */
-    for (uint32_t i = 0; ok && i < HAL_FLASH_PAGE; i += 8) {
+    /* Verify: everything above relies on erased bytes reading 0xFF. */
+    for (uint32_t i = 0; ok && i < FL_PAGE; i += 8) {
         uint32_t w[2];
-        ok = store_dword(page * HAL_FLASH_PAGE + i, w) && w[0] == 0xFFFFFFFFu && w[1] == 0xFFFFFFFFu;
+        ok = flash_dword(pnb * FL_PAGE + i, w) && w[0] == 0xFFFFFFFFu && w[1] == 0xFFFFFFFFu;
     }
     if (!ok) board_flash_errors++;
+    return ok;
 }
 
-void hal_flash_write(uint32_t off, const void *buf, size_t len)
+bool board_flash_program(uint32_t off, const void *buf, size_t len)
 {
-    if ((off & 7u) || (len & 7u) || off > STORE_BYTES || len > STORE_BYTES - off) {
+    if ((off & 7u) || (len & 7u) || off > FL_FLASH_SIZE || len > FL_FLASH_SIZE - off) {
         board_flash_errors++;
-        return;
+        return false;
     }
     const uint8_t *src = buf;
     bool ok = flash_prepare();
@@ -788,26 +787,59 @@ void hal_flash_write(uint32_t off, const void *buf, size_t len)
         uint32_t w[2];
         memcpy(w, src + i, 8); /* the caller's buffer need not be aligned */
         if (w[0] == 0xFFFFFFFFu && w[1] == 0xFFFFFFFFu) continue; /* already erased */
-        volatile uint32_t *dst = (volatile uint32_t *)(__store_start + off + i);
+        volatile uint32_t *dst = (volatile uint32_t *)(FLASH_BASE + off + i);
         FLASH->CR = (FLASH->CR & ~(FLASH_CR_PER | FLASH_CR_MER1)) | FLASH_CR_PG;
         dst[0] = w[0]; /* a double-word: both words, in order (RM0503) */
         dst[1] = w[1];
         ok = flash_wait();
         FLASH->CR &= ~FLASH_CR_PG;
         uint32_t r[2];
-        ok = ok && store_dword(off + (uint32_t)i, r) && r[0] == w[0] && r[1] == w[1];
+        ok = ok && flash_dword(off + (uint32_t)i, r) && r[0] == w[0] && r[1] == w[1];
     }
     flash_lock();
     if (!ok) board_flash_errors++;
+    return ok;
+}
+
+/* The record store: offsets into its 40 pages (core/hal.h). */
+void hal_flash_read(uint32_t off, void *buf, size_t len)
+{
+    if (off > STORE_BYTES || len > STORE_BYTES - off) {
+        memset(buf, 0xff, len);
+        board_flash_errors++;
+        return;
+    }
+    board_flash_read(FL_STORE_OFF + off, buf, len);
+}
+
+void hal_flash_erase(uint32_t page)
+{
+    if (page >= STORE_PAGES) {
+        board_flash_errors++;
+        return;
+    }
+    board_flash_erase(FL_STORE_OFF + page * FL_PAGE);
+}
+
+void hal_flash_write(uint32_t off, const void *buf, size_t len)
+{
+    if (off > STORE_BYTES || len > STORE_BYTES - off) {
+        board_flash_errors++;
+        return;
+    }
+    board_flash_program(FL_STORE_OFF + off, buf, len);
 }
 
 /* ------------------------------------------------------------------ */
 /* battery: VDDA (= the cell) from the internal reference             */
 
+static uint16_t battery_cached;
+static uint32_t battery_when;
+
 uint16_t hal_battery_mv(void)
 {
-    static uint16_t cached;
-    static uint32_t when;
+    uint16_t cached = battery_cached;
+    uint32_t when = battery_when;
     if (cached && ms_ticks - when < 10000u) return cached;
 
     RCC->APBENR2 |= RCC_APBENR2_ADCEN;
@@ -852,9 +884,18 @@ uint16_t hal_battery_mv(void)
     if (cal == 0u || cal == 0xFFFFu) cal = VREFINT_CAL_NOMINAL;
     uint32_t mv = VREFINT_CAL_VREF * cal / raw;
     if (mv > 3600u) mv = 3600u;
-    cached = (uint16_t)mv;
-    when = ms_ticks;
-    return cached;
+    battery_cached = (uint16_t)mv;
+    battery_when = ms_ticks;
+    return battery_cached;
+}
+
+uint16_t board_battery_mv(bool *calibrated)
+{
+    uint32_t cal = *VREFINT_CAL_ADDR;
+    *calibrated = cal != 0u && cal != 0xFFFFu;
+    battery_cached = 0; /* a fresh measurement, and 0 if it fails */
+    uint16_t mv = hal_battery_mv();
+    return battery_cached ? mv : 0;
 }
 
 /* ------------------------------------------------------------------ */
@@ -918,6 +959,14 @@ void hal_device_uid(uint8_t uid[12])
 }
 
 /* ------------------------------------------------------------------ */
+
+void board_init_boot(void)
+{
+    board_clock_init();
+    systick_start();
+    gpio_init();
+    exti_init();
+}
 
 void board_init(void)
 {

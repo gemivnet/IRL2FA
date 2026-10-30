@@ -7,9 +7,11 @@ SAN ?= -fsanitize=address,undefined -fno-omit-frame-pointer
 
 CORE = core/hash.c core/base32.c core/totp.c core/words.c core/wordlist.c \
        core/pairing.c core/store.c core/gfx.c core/fonts.c core/timeutil.c \
-       core/app.c core/buttons.c core/third_party/monocypher/monocypher.c
+       core/app.c core/buttons.c core/lzma_dec.c core/fwimage.c core/fwlog.c core/fwlink.c \
+       core/fwboot.c core/third_party/monocypher/monocypher.c
 TESTS = tests/test_main.c tests/test_crypto.c tests/test_device.c tests/test_powercut.c \
-        tests/test_app.c tests/test_behaviour.c tests/test_simple.c vhal/vhal.c
+        tests/test_app.c tests/test_behaviour.c tests/test_simple.c tests/test_fwupdate.c \
+        tests/test_app_update.c tests/vflash.c vhal/vhal.c
 
 BUILD = build/host
 
@@ -17,7 +19,7 @@ BUILD = build/host
 test: $(BUILD)/tests
 	./$(BUILD)/tests
 
-$(BUILD)/tests: $(CORE) $(TESTS) $(wildcard core/*.h tests/*.h tests/*.def vhal/*.h)
+$(BUILD)/tests: $(CORE) $(TESTS) $(wildcard core/*.h tests/*.h tests/data/*.h tests/*.def vhal/*.h)
 	@mkdir -p $(BUILD)
 	$(CC) $(CFLAGS) $(SAN) -o $@ $(CORE) $(TESTS)
 
@@ -45,7 +47,7 @@ verify: lint ct coverage fuzz
 # (fuzz/corpus/<name>/, only read) into a scratch corpus. A crash, leak,
 # sanitizer report or timeout fails, leaving the input in
 # build/verify/crash-<name>-<sha1>.
-FUZZERS = pairing store base32 app
+FUZZERS = pairing store base32 app fwupdate
 FUZZ_TIME ?= 60
 FUZZ_CFLAGS = -std=c11 -O1 -g -fsanitize=fuzzer,address,undefined -fno-sanitize-recover=all \
               -fno-omit-frame-pointer
@@ -53,12 +55,14 @@ FUZZ_SRC_pairing = core/pairing.c core/hash.c $(MONO)
 FUZZ_SRC_base32 = core/base32.c
 FUZZ_SRC_store = core/store.c core/hash.c core/buttons.c vhal/vhal.c $(MONO)
 FUZZ_SRC_app = $(CORE) vhal/vhal.c
+FUZZ_SRC_fwupdate = core/fwboot.c core/fwimage.c core/fwlog.c core/fwlink.c core/lzma_dec.c \
+                    core/pairing.c core/hash.c tests/vflash.c $(MONO)
 FUZZ_RUN = -max_total_time=$(FUZZ_TIME) -timeout=10 -rss_limit_mb=2048 -max_len=4096 \
            -print_final_stats=1
 
 fuzz-build: $(FUZZERS:%=$(VERIFY)/fuzz_%)
 
-$(VERIFY)/fuzz_%: fuzz/fuzz_%.c $(CORE) $(wildcard core/*.h vhal/*)
+$(VERIFY)/fuzz_%: fuzz/fuzz_%.c $(CORE) $(wildcard core/*.h vhal/* tests/vflash.* tests/data/*.h)
 	@mkdir -p $(VERIFY)
 	$(CLANG) $(FUZZ_CFLAGS) -o $@ $< $(FUZZ_SRC_$*)
 

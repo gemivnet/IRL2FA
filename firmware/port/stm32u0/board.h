@@ -72,4 +72,17 @@ extern volatile uint32_t board_epd_timeouts;
 /* ---- IR receive buffer, drained by main() into app_ir_rx() ---- */
 size_t board_ir_take(uint8_t *buf, size_t cap);
 
+/* ---- flash, anywhere (offsets from FLASH_BASE, flash_layout.h) ----
+ * Reads survive torn (ECC-bad) double-words: zeros and false. */
+bool board_flash_read(uint32_t off, void *buf, size_t len);
+bool board_flash_erase(uint32_t off);   /* the page holding off */
+bool board_flash_program(uint32_t off, const void *buf, size_t len);
+
+/* ---- the bootloader's subset of board_init(): clocks, SysTick, pins,
+ * joystick interrupts (no RTC, no panel) ---- */
+void board_init_boot(void);
+/* VDDA in mV, and whether it was measured against ST's factory VREFINT
+ * calibration (false: the ES0602 2.1.2 fallback, a typical value). */
+uint16_t board_battery_mv(bool *calibrated);
+
 #endif

@@ -6,6 +6,7 @@
 #include <string.h>
 
 #include "base32.h"
+#include "fwlink.h"
 #include "ct.h"
 #include "gfx.h"
 #include "hal.h"
@@ -75,6 +76,7 @@ typedef enum {
     SCR_ABOUT,
     SCR_SIMPLE,       /* simple mode: one contact's name and HEAR word */
     SCR_SIMPLE_INTRO, /* what simple mode is, before the family PIN is set */
+    SCR_UPDATE,   /* firmware update: sending this device's image (or entering the receiver) */
 } screen_t;
 
 typedef enum {
@@ -82,6 +84,7 @@ typedef enum {
     M_CODE_ACTIONS,
     M_CONTACT_ACTIONS,
     M_SETTINGS,
+    M_UPDATE,
 } menu_id_t;
 
 typedef enum {
@@ -107,6 +110,7 @@ typedef enum {
     P_FAMILY_CONFIRM,
     P_FAMILY_AGAIN,
     P_FAMILY_UNLOCK,  /* leaving simple mode */
+    P_UPDATE,     /* the PIN again before the update receiver */
 } pin_id_t;
 
 static const char CS_LABEL[] =
@@ -193,12 +197,17 @@ static struct {
 
     int simple_rank;        /* simple mode: which contact (0 = first) */
     bool hold_shown;        /* simple mode: "keep holding" is on screen */
+    struct {
+        bool receiving;     /* SCR_UPDATE shows "restarting into the receiver" */
+        fwtx_t tx;          /* else: sending this device's image */
+        unsigned shown;     /* progress on screen, permille */
+    } upd;
 } ui;
 
 static const char *const SCREEN_NAMES[] = {
     "menu", "codes", "code", "contacts", "contact", "pair", "sas", "text",
     "code_opts", "confirm", "time", "tz", "pin", "message", "about",
-    "simple", "simple_intro",
+    "simple", "simple_intro", "update",
 };
 
 /* ------------------------------------------------------------------ */
@@ -358,7 +367,14 @@ static void open_menu(menu_id_t id)
         if (s->pin_set) menu_add("Remove PIN");
         menu_add("About");
         menu_add(s->simple ? "Simple mode: on" : "Simple mode");
+        menu_add("Firmware update");
         menu_add("Erase everything");
+        break;
+    }
+    case M_UPDATE: {
+        uint8_t hdr[FW_HDR_SIZE];
+        menu_add("Receive an update");
+        if (hal_update_image(hdr)) menu_add("Send it to another");
         break;
     }
     }
@@ -371,6 +387,7 @@ static const char *menu_title(void)
     case M_HOME: return "IRL2FA";
     case M_CODE_ACTIONS: return "Code";
     case M_CONTACT_ACTIONS: return "Contact";
+    case M_UPDATE: return "Firmware update";
     default: return "Settings";
     }
 }
@@ -1002,6 +1019,170 @@ static void draw_sleep(void)
 }
 
 /* ------------------------------------------------------------------ */
+/* firmware update (docs/firmware-updates.md)                         */
+
+static void render(bool tick_only);
+
+static void fmt_version(char *buf, size_t cap, uint32_t v)
+{
+    snprintf(buf, cap, "v%u.%u.%u", (unsigned)(v >> 16), (unsigned)((v >> 8) & 0xFF),
+             (unsigned)(v & 0xFF));
+}
+
+static const char *update_error(int e)
+{
+    switch (e) {
+    case FW_E_ROLLBACK: return "Older than this one";
+    case FW_E_HW: return "Made for other hardware";
+    case FW_E_BOOT: return "Needs a newer bootloader";
+    case FW_E_SIGNATURE: return "Not signed by IRL2FA";
+    case FW_E_UNSIGNED: return "Not a release (unsigned)";
+    case FW_E_NOKEY: return "This device takes no updates";
+    case FW_E_SIZE: return "Too big";
+    case FW_E_CANCELLED: return "Cancelled";
+    case FW_E_TIMEOUT: return "The other device went quiet";
+    case FW_E_BATTERY: return "Battery too low";
+    default: return "Transfer failed";
+    }
+}
+
+/* Into the bootloader's receiver: the panel keeps this screen while it
+ * listens (it has no display driver of its own). */
+static void update_receive(void)
+{
+    ui.upd.receiving = true;
+    go(SCR_UPDATE);
+    ui.force_full = true;
+    render(false);
+    hal_update_enter();
+    /* Still here: no bootloader (the simulator). */
+    ui.upd.receiving = false;
+    message_to_menu("Not on this device", "Updates need a real IRL2FA", M_UPDATE);
+}
+
+static bool update_read(void *ctx, uint32_t off, uint8_t *buf, size_t n)
+{
+    (void)ctx;
+    return hal_update_read(off, buf, n);
+}
+
+static void update_send(void)
+{
+    uint8_t hdr[FW_HDR_SIZE];
+    if (!hal_update_image(hdr)) {
+        open_menu(M_UPDATE);
+        return;
+    }
+    memset(&ui.upd, 0, sizeof(ui.upd));
+    fwtx_start(&ui.upd.tx, hdr, update_read, NULL, hal_millis());
+    hal_ir_enable(true);
+    go(SCR_UPDATE);
+}
+
+static void update_stop(void)
+{
+    if (!ui.upd.receiving) hal_ir_enable(false);
+}
+
+static void update_select(int item)
+{
+    if (item == 0) {
+        /* Gated by the PIN, asked again: an unlocked device left on a table
+         * is not enough. */
+        if (store_settings()->pin_set) open_pin(P_UPDATE, "PIN to update");
+        else update_receive();
+    } else {
+        update_send();
+    }
+}
+
+/* The PIN is checked the only way the store can: lock, unlock. A wrong one
+ * counts like any other and leaves the device locked. */
+static void update_pin_submit(void)
+{
+    store_lock();
+    store_status_t st = store_unlock(ui.pin.digits, ui.pin.len);
+    crypto_wipe(ui.pin.digits, sizeof(ui.pin.digits));
+    ui.pin.len = 0;
+    if (st == STORE_OK) {
+        update_receive();
+    } else if (st == STORE_WIPED) {
+        message_to_menu("Too many wrong PINs", "Everything was erased", M_HOME);
+    } else {
+        open_pin(P_UNLOCK, "Wrong PIN");
+    }
+}
+
+static void update_poll(uint32_t now)
+{
+    fwtx_t *tx = &ui.upd.tx;
+    uint8_t frame[FWL_FRAME_MAX];
+    size_t n = fwtx_poll(tx, now, frame, sizeof(frame));
+    if (n) hal_ir_send(frame, n);
+    ui.last_input_ms = now; /* awake while it runs; fwtx's timeouts end it */
+    unsigned p = fwtx_permille(tx);
+    if (p >= ui.upd.shown + 100 || (p == 1000 && ui.upd.shown != 1000)) {
+        ui.upd.shown = p;
+        ui.dirty = true;
+    }
+    if (tx->state == FWTX_DONE) {
+        update_stop();
+        char v[16], line[48];
+        fmt_version(v, sizeof(v), hal_fw_version());
+        snprintf(line, sizeof(line), "The other one now runs %s", v);
+        message_to_menu("Sent", line, M_UPDATE);
+    } else if (tx->state == FWTX_FAILED) {
+        update_stop();
+        message_to_menu("Not sent", update_error(tx->err), M_UPDATE);
+    }
+}
+
+static void draw_update(void)
+{
+    title_bar("Firmware update");
+    char v[16];
+    fmt_version(v, sizeof(v), hal_fw_version());
+    if (ui.upd.receiving) {
+        gfx_text_centered(&font_medium, DISPLAY_W / 2, TITLE_H + 6, "Waiting for the update");
+        gfx_text_centered(&font_small, DISPLAY_W / 2, TITLE_H + 30, "Hold the sender to the top edge.");
+        gfx_text_centered(&font_small, DISPLAY_W / 2, TITLE_H + 43, "This screen stays until it is done");
+        gfx_text_centered(&font_small, DISPLAY_W / 2, TITLE_H + 56, "(a few minutes). Codes are kept.");
+        char buf[40];
+        snprintf(buf, sizeof(buf), "Now %s.  " GFX_LEFT " cancels", v);
+        hint(buf);
+        return;
+    }
+    const fwtx_t *tx = &ui.upd.tx;
+    char buf[40];
+    snprintf(buf, sizeof(buf), "Sending %s", v);
+    gfx_text_centered(&font_medium, DISPLAY_W / 2, TITLE_H + 6, buf);
+    const char *what = "Looking for the other device...";
+    if (tx->state == FWTX_SENDING) what = "Sending...";
+    if (tx->state == FWTX_INSTALLING) what = "The other device is installing";
+    gfx_text_centered(&font_small, DISPLAY_W / 2, TITLE_H + 28, what);
+    int w = DISPLAY_W - 40;
+    gfx_rect(20, TITLE_H + 50, w, 9);
+    gfx_fill(21, TITLE_H + 51, (w - 2) * (int)ui.upd.shown / 1000, 7, true);
+    hint(GFX_LEFT " cancel");
+}
+
+static void update_show_result(void)
+{
+    uint32_t ver;
+    int r = hal_update_result(&ver);
+    if (r < 0 || !store_unlocked() || !time_valid()) return;
+    char v[16];
+    fmt_version(v, sizeof(v), ver);
+    if (r == FW_OK) {
+        char line[32];
+        snprintf(line, sizeof(line), "Now running %s", v);
+        message_to_menu("Firmware updated", line, M_HOME);
+    } else {
+        message_to_menu("Update not installed", update_error(r), M_HOME);
+    }
+}
+
+/* ------------------------------------------------------------------ */
 /* actions                                                            */
 
 static void text_finish(void)
@@ -1122,9 +1303,13 @@ static void menu_select(void)
         else if (item == 5) {
             if (st->simple) ask(C_SIMPLE_OFF, "Turn simple mode off?");
             else go(SCR_SIMPLE_INTRO);
-        } else ask(C_WIPE, "Erase ALL codes & contacts?");
+        } else if (item == 6) open_menu(M_UPDATE);
+        else ask(C_WIPE, "Erase ALL codes & contacts?");
         break;
     }
+    case M_UPDATE:
+        update_select(s);
+        break;
     }
 }
 
@@ -1198,6 +1383,9 @@ static void pin_submit(void)
         memcpy(ui.pin.first, ui.pin.digits, sizeof(ui.pin.first));
         ui.pin.first_len = ui.pin.len;
         open_pin(P_CONFIRM, "Enter it again");
+        break;
+    case P_UPDATE:
+        update_pin_submit();
         break;
     case P_CONFIRM:
         /* The length is public (the screen shows a dot per symbol). */
@@ -1291,6 +1479,7 @@ static void on_key(uint8_t b)
             if (ui.menu.id == M_HOME) ui.last_input_ms -= 3600u * 1000u; /* sleep now */
             else if (ui.menu.id == M_CODE_ACTIONS) go(SCR_CODE);
             else if (ui.menu.id == M_CONTACT_ACTIONS) go(SCR_CONTACT);
+            else if (ui.menu.id == M_UPDATE) open_menu(M_SETTINGS);
             else open_menu(M_HOME);
         }
         break;
@@ -1390,7 +1579,7 @@ static void on_key(uint8_t b)
                 crypto_wipe(ui.pin.first, sizeof(ui.pin.first));
                 crypto_wipe(ui.pin.digits, sizeof(ui.pin.digits));
             }
-            open_menu(M_SETTINGS);
+            open_menu(ui.pin.id == P_UPDATE ? M_UPDATE : M_SETTINGS);
         } else if (ui.pin.len < STORE_PIN_MAX) {
             uint8_t sym = b == BTN_UP ? 1 : b == BTN_RIGHT ? 2 : b == BTN_DOWN ? 3 : 4;
             ui.pin.digits[ui.pin.len++] = sym;
@@ -1432,6 +1621,13 @@ static void on_key(uint8_t b)
 
     case SCR_ABOUT:
         open_menu(M_SETTINGS);
+        break;
+
+    case SCR_UPDATE:
+        if (b == BTN_LEFT) {
+            update_stop();
+            open_menu(M_UPDATE);
+        }
         break;
 
     case SCR_MESSAGE:
@@ -1564,6 +1760,7 @@ static void render(bool tick_only)
     case SCR_ABOUT: draw_about(); break;
     case SCR_SIMPLE: draw_simple(); break;
     case SCR_SIMPLE_INTRO: draw_simple_intro(); break;
+    case SCR_UPDATE: draw_update(); break;
     }
     /* Keys as of what was just drawn (drawing the code screen sets
      * code_period), so a redraw is not followed by a spurious one. */
@@ -1597,6 +1794,7 @@ void app_init(void)
     ui.held_since = ui.last_input_ms;
     ui.force_full = true;
     enter_first_screen();
+    update_show_result();
     ui.view_key = current_view_key();
 }
 
@@ -1628,6 +1826,10 @@ void app_ir_rx(const uint8_t *data, size_t len)
      * device is talking. */
     uint32_t now = hal_millis();
     if (len && (int32_t)(now - ui.pair_tx_end) > 0) ui.pair_rx_ms = now;
+    if (ui.scr == SCR_UPDATE && !ui.upd.receiving) {
+        fwtx_rx(&ui.upd.tx, data, len, now);
+        return;
+    }
     if (ui.scr != SCR_PAIR && ui.scr != SCR_SAS) return;
     if (pairing_rx(&ui.pair, data, len)) {
         if (ui.pair.state == PAIR_REVEALING) ui.pair_found_ms = hal_millis();
@@ -1674,6 +1876,8 @@ uint32_t app_poll(void)
         message_to_menu("No other device found", "Hold them top edge to top edge", M_HOME);
     }
 
+    if (ui.scr == SCR_UPDATE && !ui.upd.receiving) update_poll(now);
+
     if (current_view_key() != ui.view_key) ui.dirty = true;
     if (ui.dirty) {
         ui.dirty = false;
@@ -1687,6 +1891,7 @@ uint32_t app_poll(void)
     bool stuck = ui.held != 0 && now - ui.held_since >= HOLD_LIMIT_MS;
     if ((ui.held == 0 || stuck) && now - ui.last_input_ms >= idle_limit) {
         if (ui.scr == SCR_PAIR || ui.scr == SCR_SAS || ui.scr == SCR_TEXT) stop_pairing();
+        if (ui.scr == SCR_UPDATE) update_stop();
         crypto_wipe(&ui.draft, sizeof(ui.draft));
         crypto_wipe(ui.text.buf, sizeof(ui.text.buf));
         crypto_wipe(&ui.pin, sizeof(ui.pin)); /* a PIN (or family PIN) half entered */
@@ -1700,6 +1905,7 @@ uint32_t app_poll(void)
     }
     if (ui.held && !stuck) return 20;
     if (ui.pair.state >= PAIR_SEARCHING && ui.pair.state <= PAIR_DONE) return 20;
+    if (ui.scr == SCR_UPDATE) return 10;
     return 100;
 }
 

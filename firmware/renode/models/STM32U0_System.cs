@@ -62,6 +62,11 @@ namespace Antmicro.Renode.Peripherals.Miscellaneous
         public const uint RCC_BDCR_LSERDY = 1u << 1;
         public const uint RCC_CSR_LSION = 1u << 0;
         public const uint RCC_CSR_LSIRDY = 1u << 1;
+        public const uint RCC_CSR_RMVF = 1u << 23;
+        public const uint RCC_CSR_OBLRSTF = 1u << 25;
+        public const uint RCC_CSR_PINRSTF = 1u << 26;
+        public const uint RCC_CSR_PWRRSTF = 1u << 27;
+        public const uint RCC_CSR_SFTRSTF = 1u << 28;
         public const uint RCC_CRRCR_HSI48ON = 1u << 0;
         public const uint RCC_CRRCR_HSI48RDY = 1u << 1;
 
@@ -79,6 +84,13 @@ namespace Antmicro.Renode.Peripherals.Miscellaneous
         public const long OFF_FLASH_SR = 0x10;
         public const long OFF_FLASH_CR = 0x14;
         public const long OFF_FLASH_ECCR = 0x18;
+        public const long OFF_FLASH_OPTKEYR = 0x0C;
+        public const long OFF_FLASH_OPTR = 0x20;
+        public const uint FLASH_CR_PG = 1u << 0;
+        public const uint FLASH_CR_OPTSTRT = 1u << 17;
+        public const uint FLASH_CR_OBL_LAUNCH = 1u << 27;
+        public const uint FLASH_CR_OPTLOCK = 1u << 30;
+        public const uint FLASH_OPTR_RDP = 0xFFu;
         public const uint FLASH_SR_EOP = 1u << 0;
         public const uint FLASH_CR_PER = 1u << 1;
         public const int FLASH_CR_PNB_Pos = 3;
@@ -92,6 +104,8 @@ namespace Antmicro.Renode.Peripherals.Miscellaneous
         public const uint FLASH_ECCR_ADDR_ECC = 0x3FFFu;
         public const uint FlashKey1 = 0x45670123; // RM0503 3.3.5, not in the CMSIS header
         public const uint FlashKey2 = 0xCDEF89AB;
+        public const uint OptKey1 = 0x08192A3B; // RM0503 3.4.2
+        public const uint OptKey2 = 0x4C5D6E7F;
 
         // ---- EXTI ----
         public const long OFF_EXTI_RTSR1 = 0x00;
@@ -161,10 +175,29 @@ namespace Antmicro.Renode.Peripherals.Miscellaneous
     }
 
     // RCC: every oscillator is ready as soon as it is enabled; SWS follows SW.
+    // CSR's reset flags (RM0503 5.4.27) live outside the register reset:
+    // a new machine has had a power-on (PWRRSTF | PINRSTF), a machine reset
+    // is a software reset (SFTRSTF), PowerOnReset() is a cell put in, and
+    // writing RMVF clears them.
     public class STM32U0_RCC : U0RegisterFile
     {
-        public STM32U0_RCC() : base(0x400) { Reset(); }
-        protected override void OnReset() { regs[U0Map.OFF_RCC_CR / 4] = 0x00000061; /* MSION, MSIRANGE 4 MHz */ }
+        public STM32U0_RCC() : base(0x400) { Reset(); resetFlags = U0Map.RCC_CSR_PWRRSTF | U0Map.RCC_CSR_PINRSTF; }
+        protected override void OnReset()
+        {
+            regs[U0Map.OFF_RCC_CR / 4] = 0x00000061; /* MSION, MSIRANGE 4 MHz */
+            if(powerOnPending) { resetFlags |= U0Map.RCC_CSR_PWRRSTF | U0Map.RCC_CSR_PINRSTF; powerOnPending = false; }
+            else resetFlags |= U0Map.RCC_CSR_SFTRSTF;
+        }
+        public void PowerOnReset() { powerOnPending = true; }
+        public void OptionByteReset() { resetFlags |= U0Map.RCC_CSR_OBLRSTF; }
+        public uint ResetFlags => resetFlags;
+        protected override uint OnWrite(long offset, uint old, uint value)
+        {
+            if(offset == U0Map.OFF_RCC_CSR && (value & U0Map.RCC_CSR_RMVF) != 0) resetFlags = 0;
+            return offset == U0Map.OFF_RCC_CSR ? value & ~U0Map.RCC_CSR_RMVF : value;
+        }
+        private uint resetFlags;
+        private bool powerOnPending;
         protected override uint OnRead(long offset, uint v)
         {
             switch(offset)
@@ -178,7 +211,7 @@ namespace Antmicro.Renode.Peripherals.Miscellaneous
                 return v;
             case U0Map.OFF_RCC_CFGR: return (v & ~U0Map.RCC_CFGR_SWS) | ((v & U0Map.RCC_CFGR_SW) << 3);
             case U0Map.OFF_RCC_BDCR: return Ready(v, U0Map.RCC_BDCR_LSEON, U0Map.RCC_BDCR_LSERDY);
-            case U0Map.OFF_RCC_CSR: return Ready(v, U0Map.RCC_CSR_LSION, U0Map.RCC_CSR_LSIRDY);
+            case U0Map.OFF_RCC_CSR: return Ready(v, U0Map.RCC_CSR_LSION, U0Map.RCC_CSR_LSIRDY) | resetFlags;
             case U0Map.OFF_RCC_CRRCR: return Ready(v, U0Map.RCC_CRRCR_HSI48ON, U0Map.RCC_CRRCR_HSI48RDY);
             default: return v;
             }
@@ -264,17 +297,78 @@ namespace Antmicro.Renode.Peripherals.Miscellaneous
     // read of it then sets FLASH_ECCR.ECCD and raises an NMI, as on silicon,
     // until the page is erased. The marks survive a machine reset (they are
     // in the flash array).
+    //
+    // Option bytes (RM0503 3.4): FLASH_OPTR reads the loaded value; with
+    // OPTLOCK cleared (OPTKEYR sequence, after the flash unlock) a write
+    // sets the value OPTSTRT programs, and OBL_LAUNCH loads it and resets
+    // the machine (OBLRSTF). A new chip ships unprotected (RDP = 0xAA).
+    // RdpLevel and OptionBytePrograms are for the tests; Rcc names the RCC
+    // model for the reset flag.
+    //
+    // Power cuts: TearLastOperation() leaves what a cell pulled during the
+    // latest flash operation would: the page erased last, if nothing was
+    // programmed into it since, half erased with an ECC fault in the rest;
+    // else the double-word programmed last into it with an ECC fault.
     public class STM32U0_FLASH : U0RegisterFile
     {
-        public STM32U0_FLASH(IMachine machine, MappedMemory flash, NVIC nvic, int pageSize = 2048) : base(0x400)
+        public STM32U0_FLASH(IMachine machine, MappedMemory flash, NVIC nvic, STM32U0_RCC rcc = null, int pageSize = 2048) : base(0x400)
         {
             this.machine = machine;
+            Rcc = rcc;
             this.flash = flash;
             this.nvic = nvic;
             this.pageSize = pageSize;
             Reset();
         }
-        protected override void OnReset() { regs[U0Map.OFF_FLASH_CR / 4] = 0xC0000000; keyStage = 0; needRearm = true; }
+        protected override void OnReset()
+        {
+            regs[U0Map.OFF_FLASH_CR / 4] = 0xC0000000; keyStage = 0; optKeyStage = 0; needRearm = true;
+            regs[U0Map.OFF_FLASH_OPTR / 4] = optrLoaded;
+        }
+        public STM32U0_RCC Rcc { get; }
+        public int RdpLevel => (optrLoaded & U0Map.FLASH_OPTR_RDP) == 0xAA ? 0 : (optrLoaded & U0Map.FLASH_OPTR_RDP) == 0xCC ? 2 : 1;
+        public uint Optr { get => optrLoaded; set { optrLoaded = optrProgrammed = value; regs[U0Map.OFF_FLASH_OPTR / 4] = value; } }
+        public int OptionBytePrograms { get; private set; }
+        public int ProgramOps { get; private set; }
+
+        // SHA-256 (hex) of flash bytes [offset, offset + length): the tests
+        // compare the record store before and after an update.
+        public string RegionHash(long offset, long length)
+        {
+            var bytes = new byte[length];
+            for(long i = 0; i < length; i += 4)
+            {
+                var w = flash.ReadDoubleWord(offset + i);
+                for(int k = 0; k < 4 && i + k < length; k++) bytes[i + k] = (byte)(w >> (8 * k));
+            }
+            using(var sha = System.Security.Cryptography.SHA256.Create())
+                return BitConverter.ToString(sha.ComputeHash(bytes)).Replace("-", "");
+        }
+
+        public string TearLastOperation()
+        {
+            if(lastErasedPage < 0) return "nothing to tear";
+            long baseOff = (long)lastErasedPage * pageSize;
+            ulong pageAddr = U0Map.FLASH_BASE + (ulong)baseOff;
+            if(!programmedSinceErase)
+            {
+                // An erase cut half way: the second half still holds noise.
+                var rnd = new Random(lastErasedPage);
+                for(long i = pageSize / 2; i < pageSize; i++) flash.WriteByte(baseOff + i, (byte)rnd.Next(256));
+                InjectEccError(pageAddr + (ulong)pageSize / 2);
+                return $"erase of page {lastErasedPage} torn";
+            }
+            // The last double-word programmed: the highest non-erased one.
+            for(long off = pageSize - 8; off >= 0; off -= 8)
+            {
+                if(flash.ReadDoubleWord(baseOff + off) != 0xFFFFFFFF || flash.ReadDoubleWord(baseOff + off + 4) != 0xFFFFFFFF)
+                {
+                    InjectEccError(pageAddr + (ulong)off);
+                    return $"program at 0x{pageAddr + (ulong)off:X} torn";
+                }
+            }
+            return "nothing to tear";
+        }
         public int PageErases { get; private set; }
         public int LockViolations { get; private set; }
         public int EccDetections { get; private set; }
@@ -346,19 +440,46 @@ namespace Antmicro.Renode.Peripherals.Miscellaneous
             case U0Map.OFF_FLASH_ECCR: // ECCD, ECCC: write 1 to clear; ECCCIE: read/write
                 return (old & ~(value & (U0Map.FLASH_ECCR_ECCD | U0Map.FLASH_ECCR_ECCC)) & ~U0Map.FLASH_ECCR_ECCCIE)
                        | (value & U0Map.FLASH_ECCR_ECCCIE);
+            case U0Map.OFF_FLASH_OPTKEYR:
+                if((regs[U0Map.OFF_FLASH_CR / 4] & U0Map.FLASH_CR_LOCK) != 0) { LockViolations++; return 0; }
+                if(optKeyStage == 0 && value == U0Map.OptKey1) optKeyStage = 1;
+                else if(optKeyStage == 1 && value == U0Map.OptKey2) { optKeyStage = 2; regs[U0Map.OFF_FLASH_CR / 4] &= ~U0Map.FLASH_CR_OPTLOCK; }
+                else { optKeyStage = 3; LockViolations++; }
+                return 0;
+            case U0Map.OFF_FLASH_OPTR:
+                if((regs[U0Map.OFF_FLASH_CR / 4] & U0Map.FLASH_CR_OPTLOCK) != 0) { LockViolations++; return old; }
+                optrPending = value;
+                return old; // reads keep showing the loaded value until OBL_LAUNCH
             case U0Map.OFF_FLASH_CR:
                 if((old & U0Map.FLASH_CR_LOCK) != 0)
                 {
                     if(value != old) LockViolations++;
                     return old; // locked: ignored
                 }
-                if((value & U0Map.FLASH_CR_LOCK) != 0) { keyStage = 0; return value; }
+                if((value & U0Map.FLASH_CR_LOCK) != 0) { keyStage = 0; optKeyStage = 0; return value | U0Map.FLASH_CR_OPTLOCK; }
+                if((value & U0Map.FLASH_CR_PG) != 0 && (old & U0Map.FLASH_CR_PG) == 0) { programmedSinceErase = true; ProgramOps++; }
+                if((value & U0Map.FLASH_CR_OPTSTRT) != 0 && (old & U0Map.FLASH_CR_OPTLOCK) == 0)
+                {
+                    optrProgrammed = optrPending;
+                    OptionBytePrograms++;
+                    regs[U0Map.OFF_FLASH_SR / 4] |= U0Map.FLASH_SR_EOP;
+                    value &= ~U0Map.FLASH_CR_OPTSTRT;
+                }
+                if((value & U0Map.FLASH_CR_OBL_LAUNCH) != 0)
+                {
+                    optrLoaded = optrProgrammed;
+                    Rcc?.OptionByteReset();
+                    machine.RequestReset();
+                    return value & ~U0Map.FLASH_CR_OBL_LAUNCH;
+                }
                 if((value & U0Map.FLASH_CR_STRT) != 0 && (value & U0Map.FLASH_CR_PER) != 0)
                 {
                     var page = (int)((value & U0Map.FLASH_CR_PNB) >> U0Map.FLASH_CR_PNB_Pos);
                     flash.SetRange((long)page * pageSize, pageSize, 0xFF);
                     ClearEccFaults(U0Map.FLASH_BASE + (ulong)page * (ulong)pageSize, (ulong)pageSize);
                     PageErases++;
+                    lastErasedPage = page;
+                    programmedSinceErase = false;
                     regs[U0Map.OFF_FLASH_SR / 4] |= U0Map.FLASH_SR_EOP;
                     value &= ~U0Map.FLASH_CR_STRT;
                 }
@@ -373,8 +494,11 @@ namespace Antmicro.Renode.Peripherals.Miscellaneous
         private readonly NVIC nvic;
         private readonly int pageSize;
         private readonly HashSet<ulong> eccFaults = new HashSet<ulong>();
-        private int keyStage;
+        private int keyStage, optKeyStage;
         private bool needRearm;
+        private uint optrLoaded = 0xFFFFFEAA, optrProgrammed = 0xFFFFFEAA, optrPending = 0xFFFFFEAA;
+        private int lastErasedPage = -1;
+        private bool programmedSinceErase;
     }
 
     // EXTI with the U0 register map (RM0503): RTSR1, FTSR1, SWIER1, RPR1, FPR1,

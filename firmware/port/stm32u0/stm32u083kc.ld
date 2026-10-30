@@ -1,26 +1,28 @@
-/* Linker script for the STM32U083KC (256 KB flash, 40 KB SRAM).
+/* Linker script for the IRL2FA application on the STM32U083KC (256 KB
+ * flash, 40 KB SRAM), started by the bootloader (boot/boot.ld).
  *
- * The top 80 KB of flash (40 x 2 KB pages, 0x0802C000-0x0803FFFF) belong to
- * the record store (core/store.c via hal_flash_*); code and constant data
- * must stay below it, so FLASH is only 176 KB long here and the link fails
- * if the image would not fit.
+ * The application lives in the application slot (flash_layout.ld): the
+ * slot's first 256 bytes hold the signed image header (added after the
+ * link by tools/sign_image.py), the vector table follows at 0x08006900.
+ * The link fails if the binary would not fit the slot. The record store,
+ * the staging slot and the bootloader's journal are only reached through
+ * the flash driver.
  * SPDX-License-Identifier: AGPL-3.0-or-later */
+
+INCLUDE flash_layout.ld
 
 ENTRY(Reset_Handler)
 
 MEMORY
 {
-    FLASH (rx)  : ORIGIN = 0x08000000, LENGTH = 176K
-    STORE (r)   : ORIGIN = 0x0802C000, LENGTH = 80K
-    RAM   (rwx) : ORIGIN = 0x20000000, LENGTH = 40K
+    FLASH (rx)  : ORIGIN = 0x08006900, LENGTH = 96K - 0x100
+    RAM   (rwx) : ORIGIN = 0x20000000, LENGTH = 40K - 48
 }
 
 /* Minimum stack the image must leave free (checked below). Argon2 and
  * X25519 are the deepest users, roughly 2 KB each. */
 __min_stack_size = 6K;
 
-__store_start = ORIGIN(STORE);
-__store_size = LENGTH(STORE);
 __stack_top = ORIGIN(RAM) + LENGTH(RAM);
 
 SECTIONS
@@ -91,6 +93,9 @@ SECTIONS
     }
 }
 
-ASSERT(__flash_image_end <= ORIGIN(STORE), "firmware image overlaps the record store")
+ASSERT(ORIGIN(FLASH) == __app_slot_start + __app_offset, "vector table at the application slot + 0x100")
+ASSERT(ORIGIN(FLASH) % 256 == 0, "VTOR needs the vector table 256-byte aligned (48 entries)")
+ASSERT(__flash_image_end <= __app_slot_start + __app_slot_size, "application overlaps the staging slot")
+ASSERT(__stack_top == __boot_debug, "the stack ends below the bootloader debug block and mailbox")
 ASSERT(__store_start % 2048 == 0, "store must start on a flash page boundary")
 ASSERT(__store_size == 40 * 2048, "store must be 40 pages (core/store.h)")
