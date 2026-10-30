@@ -13,7 +13,7 @@ pins:
   - {pin: 1,  name: VDD,   net: VBAT}
   - {pin: 2,  name: PC14,  net: null,        notes: "spare (LSE pins unused; RTC is external)"}
   - {pin: 3,  name: PC15,  net: null,        notes: spare}
-  - {pin: 4,  name: PF2,   net: NRST,        notes: "NRST, 100 nF to GND, Tag-Connect"}
+  - {pin: 4,  name: PF2,   net: NRST,        notes: "NRST, 100 nF to GND, Tag-Connect J3, test pad TP5"}
   - {pin: 5,  name: VDDA,  net: VBAT,        notes: "battery voltage measured via VREFINT"}
   - {pin: 6,  name: PA0,   net: JOY_CENTER,  mode: input_pullup, exti: true, symbol: JOY_CENTER, notes: "joystick push (WKUP1)"}
   - {pin: 7,  name: PA1,   net: JOY_A,       mode: input_pullup, exti: true, symbol: JOY_A, notes: "joystick direction A"}
@@ -32,8 +32,8 @@ pins:
   - {pin: 20, name: PA10,  net: IR_RX,       mode: af, af: 7, symbol: IR_RX, notes: "USART1_RX, inverted"}
   - {pin: 21, name: PA11,  net: IR_RX_PWR,   mode: output, symbol: IR_RX_PWR, notes: "powers the phototransistor"}
   - {pin: 22, name: PA12,  net: null,        notes: spare}
-  - {pin: 23, name: PA13,  net: SWDIO,       mode: af, af: 0, notes: "SWD, Tag-Connect"}
-  - {pin: 24, name: PA14,  net: SWCLK,       mode: af, af: 0, notes: "SWD, Tag-Connect"}
+  - {pin: 23, name: PA13,  net: SWDIO,       mode: af, af: 0, notes: "SWD, Tag-Connect J3, test pad TP3"}
+  - {pin: 24, name: PA14,  net: SWCLK,       mode: af, af: 0, notes: "SWD, Tag-Connect J3, test pad TP4"}
   - {pin: 25, name: PA15,  net: JOY_D,       mode: input_pullup, exti: true, symbol: JOY_D, notes: "joystick direction D"}
   - {pin: 26, name: PB3,   net: null,        notes: spare}
   - {pin: 27, name: PB4,   net: RTC_INT,     mode: input_pullup, exti: true, symbol: RTC_INT, notes: "RV-3032 INT, open drain"}

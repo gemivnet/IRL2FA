@@ -1,9 +1,12 @@
-* IR emitter drive: VBAT -> R8 100 ohm -> D4 -> Q4 (AO3400A) switched by
-* USART1_TX. LED current must stay between 10 and 25 mA from a nearly flat
-* cell (2.5 V) to a fresh one (3.2 V).
+* IR emitter drive: VBAT -> R8 68 ohm -> D4 -> Q4 (AO3400A) switched by
+* USART1_TX. LED current from a nearly flat cell (2.5 V) to a fresh one (3.2 V):
+* about 18 and 28 mA (docs/electrical-review.md IR-2: 68 ohm instead of 100 for
+* about 20 % more range). Limits: at least the 17 mA ir_rx.cir assumes from a flat
+* cell, at most 35 mA (VSMB2948SL IF 100 mA abs. max, doc 83498 p.2; R8, a 62.5 mW
+* 0402, dissipates 53 mW at 3.2 V and 59 mW at 3.3 V, and only while transmitting).
 .include models.lib
 Vbat vbat 0 3.2
-R8 vbat a 100
+R8 vbat a 68
 D4 a k IRLED
 XQ4 k g 0 NFET_LED
 Vtx g 0 0
@@ -15,6 +18,8 @@ alter Vbat dc=3.2
 op
 let ihi = -i(Vbat)
 echo "RESULT iled_fresh $&ihi"
+let pr8 = ihi * ihi * 68
+echo "RESULT pr8_fresh $&pr8"
 alter Vbat dc=2.5
 alter Vtx dc=2.5
 op

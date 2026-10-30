@@ -17,8 +17,8 @@ symbol_pins:
   Transistor_FET:AO3400A:
     source: "AOS AO3400A rev 3, p.1 'SOT23 Top View': 1 G, 2 S, 3 D (https://www.aosmd.com/res/datasheets/AO3400A.pdf)"
     pins: {"1": G, "2": S, "3": D}
-  Transistor_FET:Si1308EDL:
-    source: "Vishay Si1308EDL doc 63399 rev C, p.1 'SOT-323 Top View': 1 G, 2 S, 3 D (https://www.vishay.com/docs/63399/si1308edl.pdf)"
+  Transistor_FET:Q_NMOS_GSD:
+    source: "Nexperia NX3008NBK data sheet (5 Nov 2022) p.2 Table 2 'Pinning information' (SOT23): 1 G, 2 S, 3 D (https://assets.nexperia.com/documents/data-sheet/NX3008NBK.pdf)"
     pins: {"1": G, "2": S, "3": D}
   Device:LED:
     source: "VSMB2948SL doc 83498 rev 1.1, p.5 package drawing (Cathode / Anode) and tape table (Lead I = Cathode); footprint pad 1 = Lead I"
@@ -27,7 +27,7 @@ symbol_pins:
     source: "MBR0530 (JSCJ) SOD-123: band = cathode; KiCad D_SOD-123 pad 1 = cathode"
     pins: {"1": K, "2": A}
   Device:Q_Photo_NPN:
-    source: "VEMT2523SLX01 doc 84167 rev 1.0, p.4 package drawing (Collector / Emitter) and p.5 tape table (Lead I = Collector)"
+    source: "VEMT2023SLX01 doc 84166 rev 1.0, p.4 package drawing (Collector / Emitter) and p.5 tape table (Lead I = Collector)"
     pins: {"1": C, "2": E}
   Device:Battery_Cell:
     source: "MYOUNG MY-CP-0106: both clip legs are + (pad 1); the board pad under the cell is - (pad 2)"
@@ -202,7 +202,7 @@ booster:
   L1: {value: 47u}
   R7: {value: "2.2"}      # RESE sense, reference R2
   R6: {value: 1M}         # GDR pull-down, reference R1
-  Q3: {mpn: Si1308EDL}
+  Q3: {mpn: NX3008NBK}    # reference Si1308EDL; NX3008NBK is SSD1680 Table 13-1's suggestion (Vgs(th) <= 1.3 V)
   D1: {mpn: MBR0530}
   D2: {mpn: MBR0530}
   D3: {mpn: MBR0530}
@@ -221,6 +221,7 @@ ir_detector:
   # VEMT2523SLX01 doc 84167 p.1: 'clear epoxy dome lens ... sensitive to visible and near
   # infrared radiation', bandwidth 470-1090 nm: no daylight filter.
   # VEMT2023SLX01 (doc 84166, https://www.vishay.com/docs/84166/vemt2023slx01.pdf): same
-  # side-view package and lead assignment (doc 84167 p.5 tape table lists both), with a
-  # daylight-blocking filter matched to 830-950 nm emitters.
+  # side-view package and lead assignment (doc 84166 p.4 drawing 'VEMT2x23SLX01', p.5 tape
+  # table), with a daylight-blocking filter matched to 830-950 nm emitters (p.1; 790-970 nm,
+  # Fig. 5).
   daylight_filter_mpns: [VEMT2023SLX01]

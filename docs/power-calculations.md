@@ -48,9 +48,9 @@ The script: wake with a press, open the contact and read the SAY/HEAR words for 
 | e-paper refreshing | 3.5 / 5.0 mA | 56.49 / 80.70 | 41.58 / 59.40 |
 | e-paper powered, not refreshing | 0.3 / 1.0 mA | 0.89 / 2.97 | 0.71 / 2.37 |
 | RTC I2C | 0.32 / 0.64 mA | 0.06 / 0.12 | 0.05 / 0.10 |
-| IR LED | 18 / 25 mA | 0.00 / 0.00 | 46.35 / 64.38 |
+| IR LED | 25 / 35 mA | 0.00 / 0.00 | 64.38 / 90.12 |
 | IR receiver | 0.1 / 0.3 mA | 0.00 / 0.00 | 2.21 / 6.62 |
-| **Total** | | **86.1 / 132.8** | **115.4 / 174.6** |
+| **Total** | | **86.1 / 132.8** | **133.4 / 200.4** |
 
 ### Current sources
 
@@ -60,8 +60,8 @@ The script: wake with a press, open the contact and read the SAY/HEAR words for 
 - **e-paper powered, not refreshing:** SSD1680 powered with the analog block off (reset, register and RAM writes): assumption, no datasheet figure for this state
 - **Refresh times:** GDEY0213B74: full refresh 3 s, partial 0.42 s @ 25 C. The emulated SSD1680 holds BUSY this long, so these also set the measured BUSY time.
 - **RTC I2C:** two 4.7 kohm pull-ups at 3 V (0.64 mA each when pulled low), low about a quarter of the bit time on average; worst: half
-- **IR LED:** VSMB2948SL through 100 ohm and AO3400A: 18 mA at 3 V; hardware/spice/ir_led.cir limits it to 25 mA on a fresh cell
-- **IR receiver:** VEMT2523SLX01 emitter follower into 10 kohm: photocurrent only, at most 3 V / 10 kohm = 0.3 mA when lit; dark current is nA
+- **IR LED:** VSMB2948SL through 68 ohm and AO3400A: 25 mA at 3 V; hardware/spice/ir_led.cir limits it to 35 mA on a fresh cell
+- **IR receiver:** VEMT2023SLX01 emitter follower into 10 kohm: photocurrent only, at most 3 V / 10 kohm = 0.3 mA when lit; dark current is nA
 
 ## Battery life
 

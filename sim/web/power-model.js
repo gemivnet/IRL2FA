@@ -72,18 +72,18 @@ export default Object.freeze({
       "awake_mA": 0.387,
       "full_refresh_mAs": 10.54,
       "partial_refresh_mAs": 1.515,
-      "ir_mA": 2.202,
+      "ir_mA": 3.019,
       "use_mAs": 86.13,
-      "pairing_mAs": 115.4
+      "pairing_mAs": 133.4
     },
     "worst": {
       "sleep_uA": 6.11,
       "awake_mA": 0.6613,
       "full_refresh_mAs": 15.15,
       "partial_refresh_mAs": 2.249,
-      "ir_mA": 3.219,
+      "ir_mA": 4.387,
       "use_mAs": 132.8,
-      "pairing_mAs": 174.6
+      "pairing_mAs": 200.4
     }
   },
   "profiles": {

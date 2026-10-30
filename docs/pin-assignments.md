@@ -11,7 +11,7 @@ configured as analog inputs for the lowest leakage.
 | 1 | VDD | VBAT | power |  |
 | 2 | PC14 | - | unused (analog) | spare (LSE pins unused; RTC is external) |
 | 3 | PC15 | - | unused (analog) | spare |
-| 4 | PF2 | NRST | reset | NRST, 100 nF to GND, Tag-Connect |
+| 4 | PF2 | NRST | reset | NRST, 100 nF to GND, Tag-Connect J3, test pad TP5 |
 | 5 | VDDA | VBAT | power | battery voltage measured via VREFINT |
 | 6 | PA0 | JOY_CENTER | GPIO input, pull-up, EXTI wake | joystick push (WKUP1) |
 | 7 | PA1 | JOY_A | GPIO input, pull-up, EXTI wake | joystick direction A |
@@ -30,8 +30,8 @@ configured as analog inputs for the lowest leakage.
 | 20 | PA10 | IR_RX | AF7 | USART1_RX, inverted |
 | 21 | PA11 | IR_RX_PWR | GPIO output | powers the phototransistor |
 | 22 | PA12 | - | unused (analog) | spare |
-| 23 | PA13 | SWDIO | SWD (AF0) | SWD, Tag-Connect |
-| 24 | PA14 | SWCLK | SWD (AF0) | SWD, Tag-Connect |
+| 23 | PA13 | SWDIO | SWD (AF0) | SWD, Tag-Connect J3, test pad TP3 |
+| 24 | PA14 | SWCLK | SWD (AF0) | SWD, Tag-Connect J3, test pad TP4 |
 | 25 | PA15 | JOY_D | GPIO input, pull-up, EXTI wake | joystick direction D |
 | 26 | PB3 | - | unused (analog) | spare |
 | 27 | PB4 | RTC_INT | GPIO input, pull-up, EXTI wake | RV-3032 INT, open drain |
