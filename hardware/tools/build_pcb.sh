@@ -32,6 +32,7 @@ kicad python3 hardware/tools/gen_pcb.py --step dsn
 route
 kicad python3 hardware/tools/gen_pcb.py --step ses
 kicad python3 hardware/tools/gen_pcb.py --step finish
+kicad python3 hardware/tools/gen_pcb.py --step silk
 kicad python3 hardware/tools/set_models.py
 kicad kicad-cli sch erc --severity-error --exit-code-violations -o hardware/build/erc.rpt hardware/irl2fa.kicad_sch || { cat hardware/build/erc.rpt; exit 1; }
 kicad kicad-cli pcb drc --schematic-parity --severity-error --exit-code-violations -o hardware/build/drc.rpt hardware/irl2fa.kicad_pcb || { cat hardware/build/drc.rpt; exit 1; }

@@ -122,7 +122,7 @@ Built one? Please [file a build report](https://github.com/gemivnet/IRL2FA/issue
 
 The hardware is open to modification, and people order straight from this repository. So every push runs:
 
-- ERC and DRC (with schematic parity)
+- ERC and DRC (with schematic parity and silkscreen checks as errors), and the IR parts facing out through the top edge
 - every footprint checked against its manufacturer's land-pattern drawing, and its pins against the schematic
 - netlist checks against the pin map shared with the firmware
 - SPICE simulations of the coin cell, e-paper booster, power switch, reverse-battery protection and IR driver

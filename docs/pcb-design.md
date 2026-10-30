@@ -46,7 +46,12 @@ The first version of the schematic and PCB was generated from
 2. `gen_pcb.py` places the footprints from the netlist, draws the outline and edge keepouts, exports Specctra DSN, and imports the routes.
 3. [Freerouting](https://github.com/freerouting/freerouting) autoroutes the board in Docker, with extra passes that start from the previous routes until everything is connected.
 4. `gen_pcb.py` adds the ground pours on both layers and fills them.
-5. ERC and DRC with schematic parity must come back clean.
+5. `gen_pcb.py --step silk` places every reference designator and the board markings where they can be read: clear of pads, other silkscreen, part bodies, the coin cell and its insertion path, the FPC slot and the board edge. A label with no such place is hidden; the [interactive BOM](https://irl2fa.com/ibom.html) still identifies the part. It only moves silkscreen text, so it can be re-run on a hand-edited board.
+6. ERC and DRC with schematic parity must come back clean, silkscreen included.
+
+`gen_pcb.py --step refresh` updates the board's copies of our own footprints from `hardware/lib` after a silkscreen or fab-layer change (it refuses if a pad moved), and `hardware/tools/render_pcb.sh` regenerates the images in `docs/images/pcb`.
+
+**Back-side placement mirrors parts top to bottom.** A part placed on the back at rotation 0 has its footprint's top edge at the bottom. That matters for any part with a direction the copper doesn't show. The side-looking IR LED and phototransistor are placed at 180° so their lenses face out through the top edge, and `hardware/tests/test_orientation.py` checks it. (Up to this change they were placed at 0°, facing into the board; the symmetric pads hid it from ERC, DRC and the footprint checks.)
 
 **From now on, the KiCad files are the source.** Open them in KiCad 9 and edit them like any project. Hand-tidy the autorouted tracks if you like: CI checks the result, not how it was made. `build_pcb.sh` overwrites both files, so only re-run it if you want to start again from `design.py`.
 
@@ -57,7 +62,8 @@ Footprints, symbols and 3D models for the parts KiCad doesn't ship were drawn fr
 Every push runs the following. Details are in [hardware-testing.md](hardware-testing.md).
 
 - ERC
-- DRC with schematic parity
+- DRC with schematic parity, with silkscreen overlaps, silkscreen on pads and silkscreen at the board edge as errors
+- the IR parts facing out through the top edge
 - netlist against `pins.yaml`
 - SPICE benches
 - the power budget

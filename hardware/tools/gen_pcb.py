@@ -3,10 +3,12 @@
 
 Steps (each can be run alone with --step):
   place  - footprints from the netlist placed per tools/design.py, outline,
-           mounting holes, silkscreen; writes the board unrouted
+           mounting holes; writes the board unrouted
   dsn    - Specctra DSN export (Freerouting then runs in its own container)
   ses    - Specctra SES import
   finish - ground pours on both layers, zone fill, save
+  silk   - reference designators and board markings placed clear of pads,
+           parts, the coin cell and the edge (touches only silkscreen text)
 
 Run inside the KiCad 9 container (pcbnew Python module):
     hardware/tools/build_pcb.sh
@@ -151,18 +153,6 @@ def add_cell_via_keepout(board, segments=48):
     board.Add(z)
 
 
-def add_text(board, text, x, y, layer, size=1.0, mirror=False):
-    t = pcbnew.PCB_TEXT(board)
-    t.SetText(text)
-    t.SetPosition(pt(x, y))
-    t.SetLayer(layer)
-    t.SetTextSize(pcbnew.VECTOR2I(mm(size), mm(size)))
-    t.SetTextThickness(mm(size * 0.15))
-    if mirror:
-        t.SetMirrored(True)
-    board.Add(t)
-
-
 def flip(fp):
     try:
         fp.Flip(fp.GetPosition(), pcbnew.FLIP_DIRECTION_LEFT_RIGHT)
@@ -249,10 +239,6 @@ def step_place(netlist):
     add_outline(board)
     add_edge_keepout(board)
     add_cell_via_keepout(board)
-    w, h = B["width"], B["height"]
-    add_text(board, "IRL2FA", w / 2, h - 1.9, pcbnew.B_SilkS, 1.4, mirror=True)
-    add_text(board, "v0.1  irl2fa.com", w / 2, h - 0.75, pcbnew.B_SilkS, 0.7, mirror=True)
-    add_text(board, "CERN-OHL-S-2.0", 11.0, h - 1.1, pcbnew.B_SilkS, 0.7, mirror=True)
     board.Save(str(PCB))
     print("placed", len(board.GetFootprints()), "footprints")
 
@@ -316,13 +302,220 @@ def step_finish():
     print("zones filled")
 
 
+SILK_REF = 0.8          # reference designator height, mm (JLCPCB's legible minimum)
+SILK_REF_SMALL = 0.65   # fallback where 0.8 mm has no free place (DRC minimum is 0.6)
+SILK_GAP = 0.15         # clearance from silk text to pads, other silk and bodies
+
+
+class Obstacles:
+    """Axis-aligned keep-out boxes (mm, board coordinates) per side, plus the
+    coin cell and its insertion path, which nothing printed should sit under."""
+
+    def __init__(self, board):
+        self.boxes = {pcbnew.F_SilkS: [], pcbnew.B_SilkS: []}
+        bt, slot = design.BOARD["battery"], design.BOARD["fpc_slot"]
+        self.cell = (bt["x"], bt["y"], bt["cell_diameter"] / 2 + 0.3)
+        r = self.cell[2]
+        # the cell slides in under the clip from the bottom edge
+        self.add_both((bt["x"] - r, bt["y"], bt["x"] + r, B["height"]), back_only=True)
+        self.add_both((slot["x"] - 0.3, slot["y"] - 0.3, slot["x"] + slot["w"] + 0.3, slot["y"] + slot["h"] + 0.3))
+        for fp in board.GetFootprints():
+            side = pcbnew.B_SilkS if fp.IsFlipped() else pcbnew.F_SilkS
+            for pad in fp.Pads():
+                box = self.mm_box(pad.GetBoundingBox())
+                if pad.GetAttribute() in (pcbnew.PAD_ATTRIB_PTH, pcbnew.PAD_ATTRIB_NPTH):
+                    self.add_both(box)
+                else:
+                    self.boxes[side].append(box)
+            for item in fp.GraphicalItems():
+                if item.GetLayer() in self.boxes and item.GetClass() != "PCB_TEXT":
+                    self.boxes[item.GetLayer()].append(self.mm_box(item.GetBoundingBox()))
+
+    @staticmethod
+    def mm_box(b):
+        return (pcbnew.ToMM(b.GetLeft()) - ORIGIN[0], pcbnew.ToMM(b.GetTop()) - ORIGIN[1],
+                pcbnew.ToMM(b.GetRight()) - ORIGIN[0], pcbnew.ToMM(b.GetBottom()) - ORIGIN[1])
+
+    def add_both(self, box, back_only=False):
+        for layer in self.boxes:
+            if not back_only or layer == pcbnew.B_SilkS:
+                self.boxes[layer].append(box)
+
+    def free(self, box, layer, ignore=()):
+        x0, y0, x1, y1 = box
+        m = 0.3  # board edge margin
+        if x0 < m or y0 < m or x1 > B["width"] - m or y1 > B["height"] - m:
+            return False
+        if layer == pcbnew.B_SilkS:  # nothing readable under the cell
+            cx, cy, r = self.cell
+            nx, ny = min(max(cx, x0), x1), min(max(cy, y0), y1)
+            if (nx - cx) ** 2 + (ny - cy) ** 2 < r * r:
+                return False
+        g = SILK_GAP
+        for i, (a0, b0, a1, b1) in enumerate(self.boxes[layer]):
+            if i in ignore:
+                continue
+            if x0 < a1 + g and x1 > a0 - g and y0 < b1 + g and y1 > b0 - g:
+                return False
+        return True
+
+
+def text_box(t):
+    return Obstacles.mm_box(t.GetBoundingBox())
+
+
+def place_text(t, obs, candidates):
+    """Move text t to the first candidate (x, y, angle) where it is clear of
+    everything; returns False when none is."""
+    layer = t.GetLayer()
+    for x, y, angle in candidates:
+        t.SetTextAngleDegrees(angle)
+        t.SetPosition(pt(x, y))
+        box = text_box(t)
+        if obs.free(box, layer):
+            obs.boxes[layer].append(box)
+            return True
+    return False
+
+
+def ring(cx, cy, x0, y0, x1, y1, w, h):
+    """Candidate centres around a part's pad/body box, nearest first."""
+    out = []
+    for step in (0.0, 0.5, 1.0, 1.6, 2.4):
+        d = SILK_GAP + 0.1 + step
+        for dx in (0.0, -w / 3, w / 3):
+            out.append((cx + dx, y0 - d - h / 2, 0, step))
+            out.append((cx + dx, y1 + d + h / 2, 0, step))
+        for dy in (0.0, -h, h):
+            out.append((x0 - d - w / 2, cy + dy, 0, step))
+            out.append((x1 + d + w / 2, cy + dy, 0, step))
+        out.append((x0 - d - h / 2, cy, 90, step))
+        out.append((x1 + d + h / 2, cy, 90, step))
+        for sx in (-1, 1):
+            for sy in (-1, 1):
+                out.append((cx + sx * ((x1 - x0) / 2 + d + w / 2), cy + sy * ((y1 - y0) / 2 + d + h / 2), 0, step))
+    return [(x, y, a) for x, y, a, _ in sorted(out, key=lambda c: c[3])]
+
+
+def step_refresh():
+    """Replace the board's copies of our own (irl2fa:) footprints with the
+    current library versions, keeping position, side, rotation, fields and pad
+    nets. For silkscreen/fab changes to a footprint without re-routing: the
+    pads must be unchanged, which DRC (0 unconnected) confirms afterwards."""
+    board = pcbnew.LoadBoard(str(PCB))
+    old_fps = [fp for fp in board.GetFootprints() if fp.GetFPID().GetLibNickname() == "irl2fa"]
+    for old in old_fps:
+        new = load_fp(f"irl2fa:{old.GetFPID().GetLibItemName()}")
+        new.SetFPID(old.GetFPID())
+        new.SetReference(old.GetReference())
+        new.SetValue(old.GetValue())
+        new.SetPath(old.GetPath())
+        new.SetAttributes(old.GetAttributes())
+        new.SetBoardOnly(old.IsBoardOnly())
+        new.SetExcludedFromBOM(old.IsExcludedFromBOM())
+        new.SetExcludedFromPosFiles(old.IsExcludedFromPosFiles())
+        for f in old.GetFields():
+            if not f.IsMandatory() and not new.HasField(f.GetName()):
+                new.SetField(f.GetName(), f.GetText())
+        board.Add(new)
+        new.SetPosition(old.GetPosition())
+        if old.IsFlipped():
+            flip(new)
+        new.SetOrientation(old.GetOrientation())
+        nets = {p.GetNumber(): p.GetNetCode() for p in old.Pads()}
+        for pad in new.Pads():
+            pad.SetNetCode(nets.get(pad.GetNumber(), 0))
+        old_pads = sorted((p.GetNumber(), p.GetPosition().x, p.GetPosition().y) for p in old.Pads())
+        new_pads = sorted((p.GetNumber(), p.GetPosition().x, p.GetPosition().y) for p in new.Pads())
+        if old_pads != new_pads:
+            raise SystemExit(f"{old.GetReference()}: pads moved in the library; re-place and re-route instead")
+        board.Remove(old)
+    board.Save(str(PCB))
+    print("refreshed", len(old_fps), "footprints from the library")
+
+
+def step_silk():
+    """Place every reference designator and the board markings where they are
+    legible: clear of pads, other silk, part bodies, the coin cell and its
+    insertion path, the FPC slot and the board edge. A reference with no such
+    place is hidden (the interactive BOM still identifies the part). Runs on
+    the routed board and touches only silkscreen text."""
+    board = pcbnew.LoadBoard(str(PCB))
+    # existing markings are reused, not removed: Remove() from Python leaves
+    # pcbnew 9's footprint list wrappers dangling
+    existing = {d.GetText(): d for d in board.GetDrawings()
+                if d.GetClass() == "PCB_TEXT" and d.GetLayer() in (pcbnew.F_SilkS, pcbnew.B_SilkS)}
+    obs = Obstacles(board)
+    # other parts' bodies: courtyards, so a label never ends up under a part
+    body = {}
+    for fp in board.GetFootprints():
+        layer = pcbnew.B_SilkS if fp.IsFlipped() else pcbnew.F_SilkS
+        cy_layer = pcbnew.B_CrtYd if fp.IsFlipped() else pcbnew.F_CrtYd
+        crt = fp.GetCourtyard(cy_layer)
+        box = Obstacles.mm_box(crt.BBox()) if crt.OutlineCount() else Obstacles.mm_box(fp.GetBoundingBox(False, False))
+        body[fp.GetReference()] = (layer, box)
+        if fp.GetReference() != "BT1":  # the cell check covers the clip
+            obs.boxes[layer].append(box)
+
+    w, h = B["width"], B["height"]
+    marks = [("IRL2FA", 1.2, w / 2, h - 1.6), ("v0.1  irl2fa.com", 0.7, w / 2, h - 0.6),
+             ("CERN-OHL-S-2.0", 0.7, 11.0, h - 1.0)]
+    for text, size, px, py in marks:
+        t = existing.get(text)
+        if t is None:
+            t = pcbnew.PCB_TEXT(board)
+            t.SetText(text)
+            board.Add(t)
+        t.SetLayer(pcbnew.B_SilkS)
+        t.SetMirrored(True)
+        t.SetTextSize(pcbnew.VECTOR2I(mm(size), mm(size)))
+        t.SetTextThickness(mm(size * 0.15))
+        grid = [(px + dx * 0.5, py + dy * 0.5, 0) for dx in range(-150, 151) for dy in range(-60, 61)]
+        grid.sort(key=lambda c: (c[0] - px) ** 2 + (c[1] - py) ** 2)
+        if not place_text(t, obs, grid):
+            raise SystemExit(f"no free place on the back for the marking {text!r}")
+
+    hidden = []
+    fps = sorted(board.GetFootprints(), key=lambda f: -len(list(f.Pads())))
+    for fp in fps:
+        ref = fp.Reference()
+        if fp.GetReference().startswith("H"):  # mounting holes: unlabelled
+            ref.SetVisible(False)
+            continue
+        ref.SetVisible(True)  # re-runs start over, including labels hidden last time
+        ref.SetKeepUpright(True)
+        layer, (x0, y0, x1, y1) = body[fp.GetReference()]
+        ref.SetLayer(layer)
+        # a part's own body box was added as an obstacle; its label may touch it
+        own = obs.boxes[layer].index((x0, y0, x1, y1)) if (x0, y0, x1, y1) in obs.boxes[layer] else None
+        if own is not None:
+            saved = obs.boxes[layer].pop(own)
+        ok = False
+        for size in (SILK_REF, SILK_REF_SMALL):  # the smaller size only where the full one can't fit
+            ref.SetTextSize(pcbnew.VECTOR2I(mm(size), mm(size)))
+            ref.SetTextThickness(mm(0.12 if size < SILK_REF else 0.15))
+            ref.SetTextAngleDegrees(0)
+            tb = text_box(ref)
+            tw, th = tb[2] - tb[0], tb[3] - tb[1]
+            ok = place_text(ref, obs, ring((x0 + x1) / 2, (y0 + y1) / 2, x0, y0, x1, y1, tw, th))
+            if ok:
+                break
+        if own is not None:
+            obs.boxes[layer].append(saved)
+        if not ok:
+            ref.SetVisible(False)
+            hidden.append(fp.GetReference())
+    board.Save(str(PCB))
+    print("silkscreen placed; hidden references:", ", ".join(sorted(hidden)) or "none")
+
+
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--step", choices=["place", "dsn", "ses", "finish"], required=True)
+    ap.add_argument("--step", choices=["place", "dsn", "ses", "finish", "refresh", "silk"], required=True)
     ap.add_argument("--netlist", default=str(HW / "build" / "irl2fa.net"))
     a = ap.parse_args()
     {"place": lambda: step_place(a.netlist), "dsn": step_dsn, "ses": step_ses,
-     "finish": step_finish}[a.step]()
+     "finish": step_finish, "refresh": step_refresh, "silk": step_silk}[a.step]()
 
 
 if __name__ == "__main__":

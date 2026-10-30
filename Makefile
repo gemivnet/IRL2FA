@@ -6,7 +6,7 @@ PY ?= $(if $(wildcard .venv/bin/python),.venv/bin/python,python3)
 HW_IMAGE ?= irl2fa-hw
 HW = docker run --rm -u $$(id -u):$$(id -g) -e HOME=/tmp -v "$(CURDIR)":/w -w /w $(HW_IMAGE)
 
-.PHONY: check firmware verify verify-image formal stm32 renode sim case hardware hw-image fab pins screens power
+.PHONY: check firmware verify verify-image formal stm32 renode sim case hardware hw-image fab pins screens power renders
 
 check: firmware verify formal stm32 renode sim case hardware
 
@@ -54,6 +54,9 @@ fab: hw-image
 
 pins:
 	$(PY) hardware/tools/gen_pins.py --docs
+
+renders: hw-image
+	hardware/tools/render_pcb.sh
 
 screens:
 	$(PY) firmware/tools/screens.py

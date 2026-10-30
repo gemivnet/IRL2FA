@@ -419,7 +419,8 @@ def my2450():
     y_ch = g["y_top"] + m["chamfer_dy"]
     fp.poly_line("F.SilkS", [(-hw, sy0), (-hw, y_ch), (-tw, g["y_top"] - o), (tw, g["y_top"] - o),
                              (hw, y_ch), (hw, sy0)])
-    fp.text("F.SilkS", "+", px, py - m["pad_h"] / 2 - 1.2, 1.5)
+    # "+" over the contact on the side away from the display caps (C11 sits by the other one)
+    fp.text("F.SilkS", "+", -px, py - m["pad_h"] / 2 - 1.2, 1.5)
 
     # courtyard: union of plate, cell and pads, grown by CRT_CLEAR
     plate = _offset_poly(pts, CRT_CLEAR)
@@ -487,7 +488,8 @@ def sidelooker(name, part, kind, p1, p2, ds, lcsc):
     # silk: only the back edge (the lens side is the board edge) + pin-1 bar
     pad_y = m["pad_h"] / 2
     fp.line("F.SilkS", -bw, m["back"] + 0.11, bw, m["back"] + 0.11)
-    fp.line("F.SilkS", m["pad_x"] + m["pad_w"] / 2 + 0.25, -pad_y, m["pad_x"] + m["pad_w"] / 2 + 0.25, pad_y)
+    # the pads run almost to the lens side (the board edge): the bar stops 0.5 mm short
+    fp.line("F.SilkS", m["pad_x"] + m["pad_w"] / 2 + 0.25, -pad_y + 0.5, m["pad_x"] + m["pad_w"] / 2 + 0.25, pad_y)
 
     xc = m["pad_x"] + m["pad_w"] / 2 + CRT_CLEAR
     fp.courtyard_rect(-xc, m["lens_tip"] - CRT_CLEAR, xc, max(m["back"], pad_y) + CRT_CLEAR)

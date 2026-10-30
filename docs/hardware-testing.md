@@ -10,6 +10,8 @@ someone's order.
 |-|-|-|
 | **ERC** | unconnected pins, power pins with no driver, conflicting outputs | `kicad-cli sch erc` |
 | **DRC + schematic parity** | clearance/width violations against JLCPCB's standard process, unrouted nets, PCB out of sync with the schematic | `kicad-cli pcb drc --schematic-parity`, rules in `hardware/irl2fa.kicad_pro` |
+| **Silkscreen** | labels or markings overlapping each other, printed on pads or clipped by the board edge (DRC errors, not warnings) | `silk_overlap`, `silk_over_copper`, `silk_edge_clearance` in `hardware/irl2fa.kicad_pro`; labels placed by `gen_pcb.py --step silk` |
+| **Part orientation** | a direction-sensitive part turned the wrong way while its symmetric pads still pass DRC: the side-looking IR LED and phototransistor must face out through the top edge | `hardware/tests/test_orientation.py` |
 | **Footprints vs datasheets** | a pad, pitch, exposed pad, hole or pin 1 that disagrees with the manufacturer's land pattern; symbol pins and pads that do not match; a new footprint with no datasheet entry (the test fails until one is added) | `hardware/tests/footprints.yaml` (dimensions, datasheet URL and page per part), `hardware/tests/test_footprints.py` |
 | **Netlist vs pinout** | an MCU pin moved in the schematic but not in `hardware/pins.yaml`, and so not in the firmware; missing decoupling, pull-ups or LCSC numbers; single-pin nets | `hardware/tests/test_netlist.py` |
 | **SPICE benches** | the e-paper booster no longer reaching ±20 V or exceeding part ratings; a coin-cell sag that would brown out a refresh; load-switch inrush; reverse-battery leakage; IR LED current out of range | `hardware/spice/*.cir`, limits in `hardware/spice/checks.yaml`, run by `hardware/tests/test_spice.py` |

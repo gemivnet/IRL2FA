@@ -246,8 +246,8 @@ PLACEMENT = {
     "U2": ("B", 69.6, 7.8, 0),
     "C9": ("B", 72.2, 7.8, 90),
     "R2": ("B", 69.6, 4.9, 0),
-    "R3": ("B", 67.6, 10.2, 0),
-    "R4": ("B", 67.6, 11.6, 0),
+    "R3": ("B", 67.6, 10.5, 0),   # clear of U2's pin-1 mark
+    "R4": ("B", 67.6, 11.9, 0),
     "SW1": ("F", BOARD["joystick"]["x"], BOARD["joystick"]["y"], 45),
     # The 14.3 mm tail ends 7.73 mm right of the glass edge on a 0.8 mm board (gen_models.py
     # prints it): 0.53 mm past J1's origin, as on the first (1.0 mm) board, ~0.8 mm insertion margin
@@ -263,11 +263,11 @@ PLACEMENT = {
     "D3": ("B", 33.4, 2.0, 0),
     "C10": ("B", 16.4, 3.6, 0),
     "C11": ("B", 23.4, 10.2, 0),
-    "D4": ("B", BOARD["ir"]["emitter"]["x"], BOARD["ir"]["emitter"]["y"], 0),
+    "D4": ("B", BOARD["ir"]["emitter"]["x"], BOARD["ir"]["emitter"]["y"], 180),  # lens out through the top edge (back-side placement mirrors y)
     "R8": ("B", 53.4, 2.6, 90),
     "Q4": ("B", 54.4, 5.8, 0),
     "R9": ("B", 51.6, 6.4, 90),
-    "Q5": ("B", BOARD["ir"]["detector"]["x"], BOARD["ir"]["detector"]["y"], 0),
+    "Q5": ("B", BOARD["ir"]["detector"]["x"], BOARD["ir"]["detector"]["y"], 180),  # lens out through the top edge (back-side placement mirrors y)
     "R10": ("B", 24.2, 2.6, 0),
     "DS1": ("F", _G["x"] + _G["w"] / 2, _G["y"] + _G["h"] / 2, 0),
 }

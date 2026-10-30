@@ -175,7 +175,7 @@
 		(layer "F.SilkS")
 	)
 	(fp_line
-		(start 2.35 -0.6)
+		(start 2.35 -0.1)
 		(end 2.35 0.6)
 		(stroke
 			(width 0.12)

@@ -175,7 +175,7 @@
 		(layer "F.SilkS")
 	)
 	(fp_text user "+"
-		(at 15.325 -4.5 0)
+		(at -15.325 -4.5 0)
 		(layer "F.SilkS")
 		(effects
 			(font
