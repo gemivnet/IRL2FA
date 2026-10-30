@@ -16,6 +16,7 @@ ${ELF}            ${CURDIR}/../build/stm32u0/irl2fa.elf
 ${OUT}            ${CURDIR}/../build/renode
 ${UNIX}           1800000000    # 2027-01-15 08:00:00 UTC
 @{DEVICES}
+&{DEBUG_ADDR}
 
 *** Keywords ***
 Load Models
@@ -35,9 +36,12 @@ Create Device
     Execute Command    include @${CURDIR}/board_init.resc
     IF    not ${time_valid}
         # A fresh RTC: power-on flag set, no "time valid" marker.
-        Execute Command    sysbus.i2c1.rtc Reset
+        Execute Command    sysbus.i2c1.rtc PowerOnReset
     END
     Execute Command    sysbus LoadELF @${ELF}
+    # Looked up once: a reset makes Renode forget the symbols.
+    ${addr}=    Execute Command    sysbus GetSymbolAddress "irl2fa_debug"
+    Set To Dictionary    ${DEBUG_ADDR}    ${name}=${addr.strip()}
     Append To List    ${DEVICES}    ${name}
 
 Run For
@@ -47,8 +51,7 @@ Run For
 Debug Block
     [Arguments]    ${name}
     Execute Command    mach set "${name}"
-    ${addr}=    Execute Command    sysbus GetSymbolAddress "irl2fa_debug"
-    ${raw}=    Execute Command    sysbus ReadBytes ${addr} 40
+    ${raw}=    Execute Command    sysbus ReadBytes ${DEBUG_ADDR}[${name}] 40
     ${dbg}=    Decode Debug Block    ${raw}
     RETURN    ${dbg}
 
@@ -96,6 +99,31 @@ Epd Int
     ${v}=    Monitor Int    ${out}
     RETURN    ${v}
 
+Model Int
+    [Arguments]    ${name}    ${what}
+    Execute Command    mach set "${name}"
+    ${out}=    Execute Command    ${what}
+    ${v}=    Monitor Int    ${out}
+    RETURN    ${v}
+
+Model Text
+    [Arguments]    ${name}    ${what}
+    Execute Command    mach set "${name}"
+    ${out}=    Execute Command    ${what}
+    ${v}=    Monitor Text    ${out}
+    RETURN    ${v}
+
+Reset Mcu
+    [Documentation]    A reset of the MCU alone (NRST, a watchdog, a fault):
+    ...    flash, the RTC and the panel keep their state.
+    [Arguments]    ${name}
+    Execute Command    mach set "${name}"
+    ${before}=    Debug Block    ${name}
+    Execute Command    machine RequestReset
+    Run For    0.001
+    ${after}=    Debug Block    ${name}
+    Should Be True    ${after}[polls] < ${before}[polls]    ${name}: the MCU did not reset
+
 Epd Text
     [Arguments]    ${name}    ${what}
     Execute Command    mach set "${name}"
@@ -112,16 +140,23 @@ Dump Screen
 Device Healthy
     [Arguments]    ${name}
     ${dbg}=    Debug Block    ${name}
-    Should Be Equal As Integers    ${dbg}[magic]    0x47424449
-    Should Be Equal As Integers    ${dbg}[flash_errors]    0
-    Should Be Equal As Integers    ${dbg}[i2c_errors]    0
-    Should Be Equal As Integers    ${dbg}[epd_timeouts]    0
+    Run Keyword And Continue On Failure    Should Be Equal As Integers    ${dbg}[magic]    0x47424449
+    Run Keyword And Continue On Failure    Should Be Equal As Integers    ${dbg}[flash_errors]    0
+    Run Keyword And Continue On Failure    Should Be Equal As Integers    ${dbg}[i2c_errors]    0
+    Run Keyword And Continue On Failure    Should Be Equal As Integers    ${dbg}[epd_timeouts]    0
     ${v}=    Epd Int    ${name}    BackPowerViolations
-    Should Be Equal As Integers    ${v}    0    ${name}: a panel line was high while the panel was unpowered
+    Run Keyword And Continue On Failure    Should Be Equal As Integers    ${v}    0    ${name}: a panel line was high while the panel was unpowered
     ${v}=    Epd Int    ${name}    PartialOldImageMismatches
-    Should Be Equal As Integers    ${v}    0    ${name}: a partial update had the wrong old image in RAM 0x26
+    Run Keyword And Continue On Failure    Should Be Equal As Integers    ${v}    0    ${name}: a partial update had the wrong old image in RAM 0x26
     ${v}=    Epd Int    ${name}    CommandsWhileBusy
-    Should Be Equal As Integers    ${v}    0    ${name}: command sent while BUSY was high
+    Run Keyword And Continue On Failure    Should Be Equal As Integers    ${v}    0    ${name}: command sent while BUSY was high
+    ${v}=    Epd Int    ${name}    PowerUpTimingViolations
+    Run Keyword And Continue On Failure    Should Be Equal As Integers    ${v}    0    ${name}: panel powered up faster than SSD1680 section 9 allows
+    ${v}=    Model Int    ${name}    sysbus.pwr Stop2Violations
+    ${why}=    Model Text    ${name}    sysbus.pwr LastStop2Violation
+    Run Keyword And Continue On Failure    Should Be Equal As Integers    ${v}    0    ${name}: Stop 2 entered with ${why}
+    ${v}=    Model Int    ${name}    sysbus.rng UncharacterisedWords
+    Run Keyword And Continue On Failure    Should Be Equal As Integers    ${v}    0    ${name}: random words drawn outside the AN4230 NIST configuration
 
 Save Screens And Test Teardown
     ${test}=    Evaluate    re.sub(r'[^A-Za-z0-9]+', '-', $TEST_NAME).strip('-').lower()    modules=re
@@ -201,6 +236,8 @@ Sleeps In Stop 2 And Wakes On The Joystick
     Run For    5
     ${dbg}=    Debug Block    dev
     Should Be Equal As Integers    ${dbg}[sleeps]    1    device did not go to sleep
+    ${entries}=    Model Int    dev    sysbus.pwr Stop2Entries
+    Should Be True    ${entries} >= 1    the Stop 2 entry audit never ran
     ${polls}=    Set Variable    ${dbg}[polls]
     Dump Screen    dev    asleep
     Run For    5
@@ -250,3 +287,71 @@ Two Devices Pair Over IR
     Dump Screen    alice    name-contact
     Device Healthy    alice
     Device Healthy    bob
+
+Drives The Panel SPI Within Its Limits
+    # docs/firmware-hardware-review.md: SPI1 ran at fPCLK/2 = 8 MHz through
+    # low-speed (OSPEED = 00) outputs. While the first refresh is running
+    # the bus is configured: at most fPCLK/4, SCK and MOSI at medium speed.
+    Create Device    dev    1
+    FOR    ${i}    IN RANGE    100
+        ${busy}=    Model Text    dev    sysbus.spi1.epd IsBusy
+        IF    'True' in '''${busy}'''    BREAK
+        Run For    0.05
+    END
+    Should Contain    ${busy}    True    the first refresh never started
+    ${cr1}=    Model Int    dev    sysbus ReadDoubleWord 0x40013000
+    ${br}=    Evaluate    (${cr1} >> 3) & 7
+    Should Be True    ${br} >= 1    SPI1 at fPCLK/2 = 8 MHz (BR = ${br})
+    ${ospeedr}=    Model Int    dev    sysbus ReadDoubleWord 0x50000008
+    ${sck}=    Evaluate    (${ospeedr} >> 10) & 3
+    ${mosi}=    Evaluate    (${ospeedr} >> 14) & 3
+    Should Be True    ${sck} >= 1 and ${mosi} >= 1    PA5/PA7 left at low speed (OSPEEDR 0x${ospeedr})
+    Wait For Screen    dev    menu    timeout_s=8
+    Device Healthy    dev
+
+Survives A Torn Flash Double-Word At Boot
+    # docs/firmware-hardware-review.md: a program cut by a power loss leaves
+    # a double-word whose ECC no longer matches (RM0503 3.3.5). Reading it
+    # raises an NMI. The NMI used to reset the device, and the store is read
+    # at every boot: an endless reset loop. Here the first PIN-log entry
+    # (store page 3, 0x0802D800) is torn and the MCU reset.
+    Create Device    dev    1
+    Wait For Screen    dev    menu    timeout_s=8
+    Wait Until Display Idle    dev
+    Execute Command    sysbus.flash_ctrl InjectEccError 0x0802D800
+    Reset Mcu    dev
+    Wait For Screen    dev    menu    timeout_s=10
+    Wait Until Display Idle    dev
+    ${ecc}=    Model Int    dev    sysbus.flash_ctrl EccDetections
+    Should Be True    ${ecc} >= 1    the torn double-word was never read
+    ${dbg}=    Debug Block    dev
+    Should Be True    ${dbg}[flash_errors] >= 1    the ECC error was not counted
+    # And the device still works: the menu moves.
+    ${before}=    Epd Text    dev    RegionHash 0 17 250 90
+    Press    dev    joyDown
+    ${after}=    Epd Text    dev    RegionHash 0 17 250 90
+    Should Not Be Equal    ${before}    ${after}    no response after the ECC error
+
+Writes The RTC Configuration EEPROM Only Once
+    # docs/firmware-hardware-review.md: after a power-on the RV-3032 needs
+    # tPREFR = 66 ms to load its configuration EEPROM into C0h-CAh. The
+    # firmware read PMU before that, saw 00h (CLKOUT on) and rewrote the
+    # EEPROM at every cell change. Second power-on: no EEPROM write.
+    Create Device    dev    1    time_valid=False
+    Wait For Screen    dev    time    timeout_s=8
+    Wait Until Display Idle    dev
+    ${ee}=    Model Int    dev    sysbus.i2c1.rtc EepromUpdates
+    Should Be Equal As Integers    ${ee}    1    first power-on: CLKOUT off, stored once
+    # The cell is swapped: RTC and MCU power up together.
+    Execute Command    mach set "dev"
+    Execute Command    sysbus.i2c1.rtc PowerOnReset
+    Reset Mcu    dev
+    Wait For Screen    dev    time    timeout_s=8
+    Wait Until Display Idle    dev
+    ${ee}=    Model Int    dev    sysbus.i2c1.rtc EepromUpdates
+    Should Be Equal As Integers    ${ee}    1    the RTC EEPROM was rewritten at the second power-on
+    ${early}=    Model Int    dev    sysbus.i2c1.rtc ConfigReadsBeforeRefresh
+    Should Be Equal As Integers    ${early}    0    configuration read before the RTC had loaded it
+    ${clk}=    Model Text    dev    sysbus.i2c1.rtc ClkoutEnabled
+    Should Contain    ${clk}    False
+    Device Healthy    dev

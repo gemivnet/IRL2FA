@@ -215,3 +215,38 @@ TEST(test_pair_timeout)
     /* ...and asleep after the idle timeout. */
     CHECK(run_until_sleep(35000));
 }
+
+/* ---- a key jammed down (in a pocket) ---- */
+
+/* docs/firmware-hardware-review.md: a held UP/DOWN used to auto-repeat
+ * every 90 ms for as long as it stayed down, each repeat a panel refresh,
+ * and a held key of any kind kept the device out of sleep: a joystick
+ * pressed in a pocket flattened the cell in days. Now a key held past
+ * HOLD_LIMIT_MS stops repeating and stops counting as activity. */
+TEST(test_app_stuck_key_sleeps)
+{
+    vhal_reset(12);
+    vhal_set_unix(1800000000);
+    app_init();
+    run(200);
+    CHECK(strcmp(app_screen_name(), "menu") == 0);
+    uint32_t before = vhal_refreshes(0) + vhal_refreshes(1);
+    vhal_set_buttons(BTN_DOWN); /* and it stays down */
+    /* 20 s of repeats, then the 30 s idle timeout: asleep within a minute,
+     * with the DOWN contact still closed. */
+    CHECK(run_until_sleep(60000));
+    uint32_t during = vhal_refreshes(0) + vhal_refreshes(1) - before;
+    /* At most one refresh per repeat for 20 s, plus the sleep screen:
+     * bounded, not one every 90 ms for ever. */
+    CHECK(during <= 20000 / 90 + 2);
+    vhal_set_buttons(0);
+    vhal_wake();
+    app_wake();
+    run(200);
+    CHECK(strcmp(app_screen_name(), "menu") == 0);
+
+    /* CENTER held (no auto-repeat) used to keep the device awake too. */
+    vhal_set_buttons(BTN_CENTER);
+    CHECK(run_until_sleep(60000));
+    vhal_set_buttons(0);
+}

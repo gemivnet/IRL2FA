@@ -118,6 +118,13 @@ void rv3032_init(void)
 {
     valid = false;
     cache_ok = false;
+    /* After a power-on the RV-3032 copies its configuration EEPROM into the
+     * RAM mirror C0h-CAh, which takes tPREFR ~66 ms with EEbusy set
+     * (application manual 4.6.1, 4.6.7). The MCU gets here a few ms after
+     * the cell goes in, so reading PMU before that returns the power-on
+     * value 00h (NCLKE = 0) whatever the EEPROM holds, and the check below
+     * would rewrite the EEPROM on every battery change from a stale value. */
+    ee_idle();
     uint8_t st, mark[4];
     if (!rd(R_STATUS, &st, 1) || !rd(R_USER_RAM, mark, sizeof(mark))) return;
     if (st & (ST_PORF | ST_VLF)) {

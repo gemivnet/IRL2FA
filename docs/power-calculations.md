@@ -28,13 +28,13 @@ The script: wake with a press, open the contact and read the SAY/HEAR words for 
 
 | | Use | Pairing |
 |-|-|-|
-| Awake (wake press to Stop 2) | 74.7 s | 60.1 s |
-| Core executing (instructions / 16 MHz) | 3.067 s (49,072,989 instr.) | 3.870 s (61,922,243 instr.) |
-| Core in WFI (Sleep mode) | 71.6 s | 56.2 s |
-| Full / partial refreshes | 3 / 18 | 2 / 14 |
-| E-paper BUSY (full + partial) | 16.56 s | 11.88 s |
-| E-paper powered, not refreshing | 3.02 s | 2.28 s |
-| SPI to the panel | 168,819 B (169 ms at 8 MHz) | 128,624 B (129 ms) |
+| Awake (wake press to Stop 2) | 74.3 s | 60.1 s |
+| Core executing (instructions / 16 MHz) | 2.933 s (46,923,296 instr.) | 3.878 s (62,047,833 instr.) |
+| Core in WFI (Sleep mode) | 71.4 s | 56.3 s |
+| Full / partial refreshes | 3 / 17 | 2 / 14 |
+| E-paper BUSY (full + partial) | 16.14 s | 11.88 s |
+| E-paper powered, not refreshing | 2.97 s | 2.37 s |
+| SPI to the panel | 160,780 B (161 ms at 8 MHz) | 128,624 B (129 ms) |
 | RTC I2C transactions | 388 (2134 B) | 330 (1815 B) |
 | IR receiver on / LED lit | 0.0 s / 0.00 s | 22.1 s / 2.58 s (2398 B sent) |
 | Stop 2 entries | 1 | 1 |
@@ -43,14 +43,14 @@ The script: wake with a press, open the contact and read the SAY/HEAR words for 
 
 | Contributor | Current typ / worst | Use: typ / worst (mA·s) | Pairing: typ / worst (mA·s) |
 |-|-|-|-|
-| MCU running | 1.2 / 2.0 mA | 3.88 / 6.47 | 4.80 / 8.00 |
-| MCU in WFI | 0.35 / 0.6 mA | 25.08 / 42.99 | 19.68 / 33.73 |
-| e-paper refreshing | 3.5 / 5.0 mA | 57.96 / 82.80 | 41.58 / 59.40 |
-| e-paper powered, not refreshing | 0.3 / 1.0 mA | 0.90 / 3.02 | 0.69 / 2.28 |
+| MCU running | 1.2 / 2.0 mA | 3.71 / 6.19 | 4.81 / 8.01 |
+| MCU in WFI | 0.35 / 0.6 mA | 24.97 / 42.81 | 19.69 / 33.75 |
+| e-paper refreshing | 3.5 / 5.0 mA | 56.49 / 80.70 | 41.58 / 59.40 |
+| e-paper powered, not refreshing | 0.3 / 1.0 mA | 0.89 / 2.97 | 0.71 / 2.37 |
 | RTC I2C | 0.32 / 0.64 mA | 0.06 / 0.12 | 0.05 / 0.10 |
 | IR LED | 18 / 25 mA | 0.00 / 0.00 | 46.35 / 64.38 |
 | IR receiver | 0.1 / 0.3 mA | 0.00 / 0.00 | 2.21 / 6.62 |
-| **Total** | | **87.9 / 135.4** | **115.3 / 174.5** |
+| **Total** | | **86.1 / 132.8** | **115.4 / 174.6** |
 
 ### Current sources
 
@@ -67,17 +67,17 @@ The script: wake with a press, open the contact and read the SAY/HEAR words for 
 
 | Profile | Uses/day | Pairings/year | Typical: mAh/year | Typical: years | Worst: mAh/year | Worst: years |
 |-|-|-|-|-|-|-|
-| light | 5 | 2 | 55 | 9.0 | 122 | 4.2 |
-| normal | 20 | 6 | 189 | 2.8 | 328 | 1.6 |
-| heavy | 60 | 12 | 545 | 1.0 | 878 | 0.6 |
+| light | 5 | 2 | 54 | 9.1 | 121 | 4.3 |
+| normal | 20 | 6 | 185 | 2.8 | 323 | 1.6 |
+| heavy | 60 | 12 | 535 | 1.0 | 862 | 0.6 |
 
-At 20 uses a day (typical currents) the year's 189 mAh splits into 10 mAh of sleep current, 178 mAh of uses and 0.2 mAh of pairings.
+At 20 uses a day (typical currents) the year's 185 mAh splits into 10 mAh of sleep current, 175 mAh of uses and 0.2 mAh of pairings.
 
 ## How the measurement changed the firmware
 
 - **v0.1 budget, before any measurement:** a use assumed to be 40 s awake with 2 full and 3 partial refreshes (63 mA·s typical): 3.7 years typical, 2.1 worst case at 20 uses a day.
 - **First emulator measurement:** 77 s awake with 5 full and 20 partial refreshes (113 mA·s): 2.2 / 1.3 years, and heavy use (60 a day) under a year (0.8). The contact, code and code-list screens redrew every 5 s for their countdown bars, and every sixth redraw was a 3 s full refresh, for as long as the screen stayed up.
-- **Now** (`firmware/core/app.c`): a screen is redrawn when its content changes (words every 15 s, codes every 30 or 60 s); the countdown bar moves in thirds of the period with partial refreshes that never trigger a full one; a full refresh comes on the first content change after 5 partial ones; waking is a partial refresh because the sleep screen's full refresh left the panel clean; the sleep screen stays a full refresh so nothing sensitive is left on the glass. The same use is now 75 s awake with 3 full and 18 partial refreshes (88 mA·s): 2.8 years typical and 1.6 worst case at 20 uses a day, and 0.98 years typical at 60 a day, so heavy use is still just short of a year. The next lever is the MCU waiting in Sleep mode at 16 MHz while awake (29 % of a use, with a current that is still an estimate): idling in Stop 2 between polls, with a low-power timer as the time base, is a port change of its own.
+- **Now** (`firmware/core/app.c`): a screen is redrawn when its content changes (words every 15 s, codes every 30 or 60 s); the countdown bar moves in thirds of the period with partial refreshes that never trigger a full one; a full refresh comes on the first content change after 5 partial ones; waking is a partial refresh because the sleep screen's full refresh left the panel clean; the sleep screen stays a full refresh so nothing sensitive is left on the glass. The same use is now 74 s awake with 3 full and 17 partial refreshes (86 mA·s): 2.8 years typical and 1.6 worst case at 20 uses a day, and 1.00 years typical at 60 a day, so heavy use is still just short of a year. The next lever is the MCU waiting in Sleep mode at 16 MHz while awake (29 % of a use, with a current that is still an estimate): idling in Stop 2 between polls, with a low-power timer as the time base, is a port change of its own.
 - **The clock** (`firmware/port/stm32u0/rv3032.c`): the RTC driver returned the second it last read for up to 250 ms, so just after a boundary a screen could show the previous code or word and redraw a moment later, an extra refresh. It now counts on from the RV-3032's hundredths with the millisecond tick. Found by replaying the measured use in the simulator, whose clock is exact.
 - **Pairing** listens before it talks, so frames rarely collide, and gives up after 60 s; the LED is lit for about 12 % of the IR-on time.
 

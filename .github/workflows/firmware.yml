@@ -23,6 +23,8 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Unit tests (ASan + UBSan)
         run: make -C firmware test
+      - name: Hand-written STM32U083 addresses, offsets, bits and IRQs against ST's CMSIS header
+        run: python3 firmware/tools/check_hw_constants.py
 
   lint:
     # cppcheck + clang-tidy, zero findings

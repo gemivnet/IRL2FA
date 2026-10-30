@@ -90,7 +90,7 @@ It behaves like the hardware, not just like the firmware:
 </p>
 
 - Design files: [schematic (PDF)](hardware/fab/irl2fa-schematic.pdf) · [KiCad 9 project](hardware/) · [interactive BOM](https://irl2fa.com/ibom.html) · [3D model (STEP)](hardware/fab/irl2fa.step)
-- Design notes: [PCB design](docs/pcb-design.md) · [pin assignments](docs/pin-assignments.md) · [why these parts](docs/hardware-options.md) · [design review](docs/design-review.md)
+- Design notes: [PCB design](docs/pcb-design.md) · [pin assignments](docs/pin-assignments.md) · [why these parts](docs/hardware-options.md) · [design review](docs/design-review.md) · [firmware against the silicon](docs/firmware-hardware-review.md)
 
 ## Build one
 

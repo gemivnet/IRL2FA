@@ -37,6 +37,7 @@ namespace Antmicro.Renode.Peripherals.Miscellaneous
 
         public SSD1680(IMachine machine, int fullRefreshMs = 3000, int partialRefreshMs = 420)
         {
+            this.machine = machine;
             BUSY = new GPIO();
             FullRefreshMs = fullRefreshMs;
             PartialRefreshMs = partialRefreshMs;
@@ -53,6 +54,11 @@ namespace Antmicro.Renode.Peripherals.Miscellaneous
         public int PartialOldImageMismatches { get; private set; }
         public int BackPowerViolations { get; private set; }
         public int CommandsWhileBusy { get; private set; }
+        // Timing of the power-up sequence (SSD1680 section 9 and Good
+        // Display's GDEY0213B74 reference flow): VCI must have been on for
+        // 10 ms before the first command, and a hardware reset holds RES#
+        // low for 10 ms. Each shortfall is counted; the tests require zero.
+        public int PowerUpTimingViolations { get; private set; }
         public int PowerCycles { get; private set; }
         public int BytesIgnored { get; private set; }
         public bool Powered => powered;
@@ -83,7 +89,7 @@ namespace Antmicro.Renode.Peripherals.Miscellaneous
             if(number == 3)
             {
                 bool on = !value;
-                if(on && !powered) { powered = true; PowerCycles++; PowerOnReset(); Activity?.Invoke("on"); }
+                if(on && !powered) { powered = true; PowerCycles++; PowerOnReset(); poweredAtMs = NowMs(); commandSincePower = false; Activity?.Invoke("on"); }
                 else if(!on && powered)
                 {
                     if(busy) Activity?.Invoke("idle");
@@ -98,8 +104,17 @@ namespace Antmicro.Renode.Peripherals.Miscellaneous
             }
             if(number == 2 && powered)
             {
-                if(!value) { inReset = true; }
-                else if(!old) { inReset = false; RegisterReset(); StartBusy(1, "reset"); }
+                if(!value) { inReset = true; resetAtMs = NowMs(); }
+                else if(!old)
+                {
+                    inReset = false;
+                    if(NowMs() - resetAtMs < 10.0 - 1e-6)
+                    {
+                        PowerUpTimingViolations++;
+                        this.Log(LogLevel.Warning, "RES# held low for only {0:0.###} ms (10 ms required)", NowMs() - resetAtMs);
+                    }
+                    RegisterReset(); StartBusy(1, "reset");
+                }
             }
             if(number == 1 && value) { haveCommand = false; } // CS# rising ends the transfer
         }
@@ -109,6 +124,15 @@ namespace Antmicro.Renode.Peripherals.Miscellaneous
             if(!pins[1]) SpiBytes++;
             if(!powered || inReset || pins[1]) { BytesIgnored++; return 0; }
             if(deepSleep) { BytesIgnored++; return 0; }
+            if(!pins[0] && !commandSincePower)
+            {
+                commandSincePower = true;
+                if(NowMs() - poweredAtMs < 10.0 - 1e-6)
+                {
+                    PowerUpTimingViolations++;
+                    this.Log(LogLevel.Warning, "first command {0:0.###} ms after VCI on (10 ms required)", NowMs() - poweredAtMs);
+                }
+            }
             if(!pins[0]) Command(data);
             else Data(data);
             return 0;
@@ -349,5 +373,10 @@ namespace Antmicro.Renode.Peripherals.Miscellaneous
         private bool[] pins;
         private bool powered, inReset, deepSleep, busy, haveCommand;
         private int cmd, param, entryMode, xStart, xEnd, yStart, yEnd, xCount, yCount, updateOption, pendingDisplay;
+    
+        private double NowMs() { return machine.LocalTimeSource.ElapsedVirtualTime.TotalMilliseconds; }
+        private readonly IMachine machine;
+        private double poweredAtMs, resetAtMs;
+        private bool commandSincePower;
     }
 }

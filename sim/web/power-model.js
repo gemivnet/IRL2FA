@@ -11,79 +11,79 @@ export default Object.freeze({
   "epd": {
     "full_refresh_s": 3.0,
     "partial_refresh_s": 0.42,
-    "overhead_s": 0.181
+    "overhead_s": 0.185
   },
   "ir": {
     "baud": 4800
   },
   "measured": {
     "use": {
-      "awake_s": 74.711,
-      "instructions": 49072989,
-      "mcu_run_s": 3.0671,
-      "mcu_sleep_s": 71.6439,
+      "awake_s": 74.2861,
+      "instructions": 46923296,
+      "mcu_run_s": 2.9327,
+      "mcu_sleep_s": 71.3534,
       "stop2_entries": 1,
-      "spi_bytes": 168819,
-      "spi_s": 0.1688,
+      "spi_bytes": 160780,
+      "spi_s": 0.1608,
       "full_refreshes": 3,
-      "partial_refreshes": 18,
+      "partial_refreshes": 17,
       "epd_busy_full_s": 9.0,
-      "epd_busy_partial_s": 7.56,
-      "epd_powered_s": 19.5758,
-      "epd_logic_s": 3.0157,
+      "epd_busy_partial_s": 7.14,
+      "epd_powered_s": 19.1111,
+      "epd_logic_s": 2.9711,
       "i2c_transactions": 388,
       "i2c_bytes": 2134,
       "i2c_s": 0.1921,
       "ir_on_s": 0.0,
       "ir_tx_bytes": 0,
       "ir_led_s": 0.0,
-      "refresh_seq": "pppppppFpppppFppppppF",
-      "start_unix_ms": 1800000184820,
-      "draw_s": 0.0378
+      "refresh_seq": "ppppppFpppppFppppppF",
+      "start_unix_ms": 1800000185070,
+      "draw_s": 0.0366
     },
     "pairing": {
-      "awake_s": 60.086,
-      "instructions": 61922243,
-      "mcu_run_s": 3.8701,
-      "mcu_sleep_s": 56.2159,
+      "awake_s": 60.133,
+      "instructions": 62047833,
+      "mcu_run_s": 3.878,
+      "mcu_sleep_s": 56.255,
       "stop2_entries": 1,
       "spi_bytes": 128624,
       "spi_s": 0.1286,
       "full_refreshes": 2,
       "partial_refreshes": 14,
       "epd_busy_full_s": 6.0,
-      "epd_busy_partial_s": 5.88,
-      "epd_powered_s": 14.1636,
-      "epd_logic_s": 2.2836,
+      "epd_busy_partial_s": 5.8801,
+      "epd_powered_s": 14.2454,
+      "epd_logic_s": 2.3653,
       "i2c_transactions": 330,
       "i2c_bytes": 1815,
       "i2c_s": 0.1633,
-      "ir_on_s": 22.05,
+      "ir_on_s": 22.0533,
       "ir_tx_bytes": 2398,
       "ir_led_s": 2.575,
       "refresh_seq": "pppppFpppppppppF",
-      "start_unix_ms": 1800000012760,
-      "draw_s": 0.036
+      "start_unix_ms": 1800000012960,
+      "draw_s": 0.0361
     }
   },
   "cases": {
     "typ": {
       "sleep_uA": 1.17,
-      "awake_mA": 0.3884,
+      "awake_mA": 0.387,
       "full_refresh_mAs": 10.54,
-      "partial_refresh_mAs": 1.513,
+      "partial_refresh_mAs": 1.515,
       "ir_mA": 2.202,
-      "use_mAs": 87.88,
-      "pairing_mAs": 115.3
+      "use_mAs": 86.13,
+      "pairing_mAs": 115.4
     },
     "worst": {
       "sleep_uA": 6.11,
-      "awake_mA": 0.6636,
-      "full_refresh_mAs": 15.14,
-      "partial_refresh_mAs": 2.244,
-      "ir_mA": 3.22,
-      "use_mAs": 135.4,
-      "pairing_mAs": 174.5
+      "awake_mA": 0.6613,
+      "full_refresh_mAs": 15.15,
+      "partial_refresh_mAs": 2.249,
+      "ir_mA": 3.219,
+      "use_mAs": 132.8,
+      "pairing_mAs": 174.6
     }
   },
   "profiles": {
@@ -91,24 +91,24 @@ export default Object.freeze({
       "uses_per_day": 5,
       "pairings_per_year": 2,
       "life_years": {
-        "typ": 8.96,
-        "worst": 4.23
+        "typ": 9.09,
+        "worst": 4.27
       }
     },
     "normal": {
       "uses_per_day": 20,
       "pairings_per_year": 6,
       "life_years": {
-        "typ": 2.78,
-        "worst": 1.62
+        "typ": 2.83,
+        "worst": 1.64
       }
     },
     "heavy": {
       "uses_per_day": 60,
       "pairings_per_year": 12,
       "life_years": {
-        "typ": 0.98,
-        "worst": 0.61
+        "typ": 1.0,
+        "worst": 0.62
       }
     }
   },

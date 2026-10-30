@@ -65,13 +65,18 @@ the `joystick:` section through the generated `JOY_UP`/`JOY_DOWN`/... macros.
 - **Sleep:** Stop 2 (`PWR_CR1.LPMS = 010`, `SLEEPDEEP`, WFI), with ULP sampling of
   the BOR enabled. Wake sources are falling edges on the five joystick lines and on
   RTC_INT (EXTI). A press that lands while the firmware is deciding to sleep is
-  noticed and is reported as the press that woke the device.
+  noticed and is reported as the press that woke the device. I2C1 is disabled
+  (`PE = 0`) for the duration: RM0503 33.5 allows only I2C3 to stay enabled in Stop 2.
+  A joystick contact that has been closed for more than 15 s without a new press
+  edge (a key jammed in a pocket) does not keep the device awake; the core stops
+  auto-repeating such a key after 20 s (`HOLD_LIMIT_MS`).
 - **E-paper:** powered only during an update, through the P-FET switch on
   `EPD_PWR_N` (low = on). The order is: supply on, wait 10 ms, raise CS/RST, hardware
   reset, SW reset `0x12`, configure, write both RAMs, update `0x22`/`0x20`, wait for
   BUSY (high = busy) to fall, deep sleep `0x10`, then drive SCK/MOSI/CS/DC/RST low
   and switch the supply off, so no line back-powers the unpowered panel. BUSY is
   analog while the panel is off.
+  SPI1 runs at fPCLK/4 = 4 MHz with SCK/MOSI at medium output speed.
   `DISPLAY_FULL` uses display mode 1 (`0x22 = F7`). `DISPLAY_FAST` uses display mode
   2 (`0x22 = FF`), the panel's partial waveform. Mode 2 needs the old image in
   the RED RAM (`0x26`), and that RAM is lost with the supply, so the port keeps a
@@ -89,6 +94,10 @@ the `joystick:` section through the generated `JOY_UP`/`JOY_DOWN`/... macros.
   marker. A power loss clears the RAM and sets PORF, so the core then shows the
   clock screen. CLKOUT ships enabled (32.768 kHz); the port clears it in the
   configuration EEPROM once (NCLKE=1, EECMD 11h) and also disables PORIE/VLIE.
+  At power-on the RTC needs ~66 ms (tPREFR, EEbusy set) to load that EEPROM into
+  its registers, so `rv3032_init()` waits for EEbusy to clear before reading them.
+  If SDA is stuck low at boot (an MCU reset in the middle of an RTC read), the port
+  clocks the bus free before enabling I2C1.
   `hal_sleep(wake_at)` arms the periodic countdown timer (1 Hz, or 1/60 Hz beyond
   4095 s) to pull INT low.
 - **IR:** USART1 at 4800 baud, 8N1, plain UART (not IrDA SIR; the phototransistor
@@ -97,13 +106,19 @@ the `joystick:` section through the generated `JOY_UP`/`JOY_DOWN`/... macros.
   TX and RX are interrupt-driven ring buffers. When IR is off, TX is a GPIO
   driven low and RX is analog.
 - **Entropy:** the TRNG, clocked from HSI48. Both are switched on only while
-  generating, with clock-error detection on and seed-error recovery
-  (`CONDRST`). If the TRNG fails, the device resets rather than return weak
-  randomness.
+  generating, in the STM32U0 NIST configuration of AN4230 (`RNG_CR = 0x00F00D00`,
+  `RNG_HTCR = 0xAAC7`; the reset value is not that configuration), with clock-error
+  detection on and seed-error recovery (`CONDRST`, RM0503 21.3.7). If the TRNG
+  fails, the device resets rather than return weak randomness.
 - **Flash store:** page erase and double-word programming with unlock/lock,
   BSY1/CFGBSY polling, error-flag checks, and read-back verification. Failures
   increment a counter shown in the debug block. Double-words that are all `0xFF`
   are skipped, so they stay erased.
+- **Flash ECC:** a program or erase cut by a power loss can leave a double-word
+  with inconsistent ECC bits; reading it raises an NMI (RM0503 3.3.2, 3.3.5). Store
+  reads are armed for this: the NMI handler clears `FLASH_ECCR.ECCD` and returns, and
+  the store sees zeros for that double-word (a torn record, which it already
+  handles). Any other NMI resets the device.
 - **Battery:** VDDA, which is the cell, is measured through VREFINT on ADC channel
   12 as `3000 mV x VREFINT_CAL / reading`, averaged over 4 samples and cached for
   10 s.
@@ -141,6 +156,16 @@ The firmware spends most of its time in Stop 2. Connect under reset (`mode=UR`,
 `--connect-under-reset`, or OpenOCD's `reset_config srst_only` with NRST wired)
 so the probe gets in before the core sleeps.
 
+**The very first time a blank chip is programmed, pull the cell (or otherwise
+power-cycle the board) afterwards.** A virgin STM32U0 has the `FLASH_ACR.EMPTY`
+flag set, and that flag is only re-evaluated when the option bytes load: at a
+power-on reset or `OBL_LAUNCH`, not at a system reset or NRST (RM0503 2.5.4). Until
+then every reset, including the `-rst` / `reset` at the end of the commands
+above, boots the ST bootloader in system memory instead of the firmware: the board
+looks dead, and the bootloader reconfigures some GPIOs. Alternatively clear the
+flag from the debugger before the reset (OpenOCD: `mmw 0x40022000 0 0x10000`,
+which clears bit 16 of `FLASH_ACR`).
+
 ## Readout protection (RDP level 1)
 
 The store's master key sits in flash. Without a PIN it is not wrapped by
@@ -155,7 +180,17 @@ openocd -f interface/stlink.cfg -f target/stm32u0x.cfg -c "init; reset halt; stm
 ```
 
 The new option bytes load on the next power-on reset. Pull the battery, or use
-`-ob ... -rst` / `OBL_LAUNCH`. Consequences of level 1:
+`-ob ... -rst` / `OBL_LAUNCH`.
+
+**Program option bytes only from a solid supply.** RM0503 3.4.2 (the caution
+under the option byte programming sequence): if the supply drops or a reset
+happens while the option bytes are being rewritten, the mismatching values that
+load afterwards "force a secure configuration that might permanently lock the
+device". A CR2450 near the end of its life, or one sagging under the debugger's
+load, is not a safe supply: fit a fresh cell, or power the board from a bench
+supply on the battery contacts, before changing RDP.
+
+Consequences of level 1:
 
 - The debugger can still connect (to the running core, or under reset), but
   reading or writing the main flash through SWD, from code loaded into RAM by
@@ -213,18 +248,32 @@ Renode's generic models (Cortex-M0+ with NVIC/SysTick, `STM32_GPIOPort`,
 - EXTI: the U0 register map, with per-line port selection through EXTICR,
   rising and falling pending flags, IMR, and the three NVIC lines.
 - RNG: CONDRST, DRDY, and DR from a seeded PRNG. Each emulated device gets its
-  own seed.
+  own seed. Configuration fields and `RNG_HTCR` only take writes with CONDRST set;
+  words drawn outside the AN4230 configuration are counted, and the tests require
+  none.
+- PWR: a Stop 2 entry audit. Every WFI with SLEEPDEEP and LPMS = Stop 2 checks
+  for pending EXTI bits, LPR, peripherals that may not stay enabled in Stop 2
+  (I2C1, SPI1, USART1, ADC, RNG) and floating digital inputs; the tests require
+  no violation.
+- Every register offset and bit the models use is in `U0Map`
+  (`models/STM32U0_System.cs`), and `firmware/tools/check_hw_constants.py`
+  (part of `make firmware` and CI) checks those, the platform's base addresses
+  and IRQ numbers, the vector table and the linker memory map against
+  `vendor/cmsis_device_u0/stm32u083xx.h`.
 - ADC: regulator, calibration, ADEN/ADRDY, CHSELR/CCRDY, single conversions;
   VREFINT reads as 1.212 V at VDDA = 3.0 V.
 - SSD1680: SPI commands with D/C# and CS#, both RAMs, data entry modes, windows
   and address counters, SW and HW reset, deep sleep, BUSY timing (3 s full,
   0.42 s partial). It also checks that the old image is in RAM 0x26 for partial
-  updates, that no command is sent while BUSY is high, and that no line is high
-  while the panel is unpowered. It reconstructs the shown frame, which can be
+  updates, that no command is sent while BUSY is high, that no line is high
+  while the panel is unpowered, that the supply was on for 10 ms before the
+  first command and that RES# was held low for 10 ms. It reconstructs the shown frame, which can be
   dumped as PBM or PNG.
 - RV-3032: register pointer, BCD time on virtual time, status flags (PORF at
-  power-on), user RAM, configuration RAM and EEPROM update, the countdown timer
-  and the INT pulse.
+  power-on), user RAM, configuration RAM and EEPROM update, the 66 ms power-on
+  EEPROM refresh (EEbusy, configuration registers reading 00h until it is done),
+  the countdown timer and the INT pulse. An MCU reset (`machine RequestReset`)
+  leaves it running; `PowerOnReset` is a cell change.
 - Joystick: buttons with pull-up semantics. IR: two machines' USART1 joined by
   `emulation CreateUARTHub`.
 
@@ -247,9 +296,12 @@ Renode's generic models (Cortex-M0+ with NVIC/SysTick, `STM32_GPIOPort`,
   orientation; it shares the firmware's mapping. The tests therefore prove the
   driver is self-consistent and that the controller protocol is right, not
   which corner is up on a real panel.
-- **Flash:** ECC, programming errors (writing a non-erased double-word,
-  alignment) and timing; a CPU write lands even without PG set. The firmware's
-  own read-back verification is what the tests check.
+- **Flash:** programming errors (writing a non-erased double-word, alignment)
+  and timing; a CPU write lands even without PG set. The firmware's own read-back
+  verification is what the tests check. ECC *is* modelled for injected faults
+  (`sysbus.flash_ctrl InjectEccError <address>`: ECCD and an NMI on every read of
+  that double-word until its page is erased), which is how a torn write is
+  tested.
 - **RTC wake-up timer:** it is modelled, but the core never asks for a timed
   wake-up (`app_wake_at()` returns 0), so no test exercises it.
 - **TRNG statistics, AES, option bytes / RDP, watchdogs, the LSE/LSI, DBGMCU.**

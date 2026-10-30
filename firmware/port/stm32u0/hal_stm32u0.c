@@ -94,10 +94,13 @@ void board_delay_us(uint32_t us)
     }
 }
 
+/* At least `ms` milliseconds: the call can start just before a tick, so
+ * wait for ms + 1 tick edges (counting only `ms` returned up to 1 ms early,
+ * and the e-paper's 10 ms supply settling and reset pulse were 9.x ms). */
 void board_delay_ms(uint32_t ms)
 {
     uint32_t start = ms_ticks;
-    while (ms_ticks - start < ms) __WFI();
+    while (ms_ticks - start <= ms) __WFI();
 }
 
 void board_idle_until(uint32_t deadline)
@@ -139,6 +142,39 @@ static btn_filter_t btn_filter_state;
 static volatile uint8_t btn_latched;
 static volatile uint32_t btn_edge_ms[BTN_COUNT]; /* time of each button's latest press edge */
 
+/* A reset in the middle of an RV-3032 read (a fault, a brown-out during a
+ * refresh) can leave the RTC driving SDA low, waiting for clocks the new
+ * firmware never sends. The RV-3032 only gives up after its 950 ms bus
+ * timeout (application manual 4.5), long after rv3032_init() has read
+ * nothing and marked the time invalid. So, with SCL/SDA as open-drain
+ * GPIOs: if SDA is low, clock SCL up to nine times until the slave lets go,
+ * then send a STOP (NXP UM10204 3.1.16, bus clear). ~100 kHz. */
+static void i2c_bus_clear(void)
+{
+    GPIO_TypeDef *scl = PIN_PORT(PIN_I2C_SCL), *sda = PIN_PORT(PIN_I2C_SDA);
+    const uint32_t c = PIN_MASK(PIN_I2C_SCL), d = PIN_MASK(PIN_I2C_SDA);
+    pin_write(scl, c, true);
+    pin_write(sda, d, true);
+    pin_config(scl, c, LL_GPIO_MODE_OUTPUT, LL_GPIO_PULL_NO, 0);
+    pin_config(sda, d, LL_GPIO_MODE_OUTPUT, LL_GPIO_PULL_NO, 0);
+    board_delay_us(5);
+    if (pin_read(sda, d)) return;
+    for (int i = 0; i < 9 && !pin_read(sda, d); i++) {
+        pin_write(scl, c, false);
+        board_delay_us(5);
+        pin_write(scl, c, true);
+        board_delay_us(5);
+    }
+    pin_write(scl, c, false); /* STOP: SDA low -> high while SCL is high */
+    board_delay_us(5);
+    pin_write(sda, d, false);
+    board_delay_us(5);
+    pin_write(scl, c, true);
+    board_delay_us(5);
+    pin_write(sda, d, true);
+    board_delay_us(5);
+}
+
 static void gpio_init(void)
 {
     RCC->IOPENR |= RCC_IOPENR_GPIOAEN | RCC_IOPENR_GPIOBEN | RCC_IOPENR_GPIOCEN | RCC_IOPENR_GPIOFEN;
@@ -175,6 +211,7 @@ static void gpio_init(void)
     /* I2C: open drain, external 4.7k pull-ups. */
     LL_GPIO_SetPinOutputType(PIN_PORT(PIN_I2C_SCL), PIN_MASK(PIN_I2C_SCL), LL_GPIO_OUTPUT_OPENDRAIN);
     LL_GPIO_SetPinOutputType(PIN_PORT(PIN_I2C_SDA), PIN_MASK(PIN_I2C_SDA), LL_GPIO_OUTPUT_OPENDRAIN);
+    i2c_bus_clear();
     PIN_CFG(PIN_I2C_SCL, LL_GPIO_MODE_ALTERNATE, LL_GPIO_PULL_NO, PIN_I2C_SCL_AF);
     PIN_CFG(PIN_I2C_SDA, LL_GPIO_MODE_ALTERNATE, LL_GPIO_PULL_NO, PIN_I2C_SDA_AF);
 
@@ -229,6 +266,20 @@ static void exti_irq(void)
 void EXTI0_1_IRQHandler(void) { exti_irq(); }
 void EXTI2_3_IRQHandler(void) { exti_irq(); }
 void EXTI4_15_IRQHandler(void) { exti_irq(); }
+
+/* A contact closed for longer than this without a new press edge is taken
+ * as jammed (in a pocket, under a strap): hal_sleep() does not let it keep
+ * the device awake. Shorter than core/app.c HOLD_LIMIT_MS, after which the
+ * core stops treating a held key as activity, so that by the time the core
+ * decides to sleep the port agrees. */
+#define BTN_STUCK_MS 15000u
+
+static bool btn_stuck(uint8_t b, uint32_t now)
+{
+    for (unsigned i = 0; i < BTN_COUNT; i++)
+        if (b == (1u << i)) return now - btn_edge_ms[i] >= BTN_STUCK_MS;
+    return false;
+}
 
 /* Press edges are latched by EXTI, so a press is never missed; the
  * filter (core/buttons.c) also keeps a second press made during a display
@@ -344,10 +395,18 @@ void spi_open(void)
     (void)RCC->APBENR2;
     SPI1->CR1 = 0;
     SPI1->CR2 = (7u << SPI_CR2_DS_Pos) | SPI_CR2_FRXTH; /* 8-bit frames */
-    /* fPCLK/2 = 8 MHz; the SSD1680 accepts up to 20 MHz on writes. */
-    SPI1->CR1 = SPI_CR1_MSTR | SPI_CR1_SSM | SPI_CR1_SSI | SPI_CR1_SPE;
+    /* fPCLK/4 = 4 MHz (SSD1680 Table 12-1 allows 20 MHz on writes), and
+     * SCK/MOSI at medium speed. The previous fPCLK/2 = 8 MHz through
+     * low-speed (OSPEED = 00) outputs relied on edges that slow drivers do
+     * not promise into a panel FPC at a sagging coin cell (the SSD1680
+     * needs 0.8 VDDIO within each 62 ns half period); 4 MHz costs about
+     * 8 ms per refresh against a 420 ms partial update. */
+    SPI1->CR1 = SPI_CR1_MSTR | SPI_CR1_SSM | SPI_CR1_SSI | SPI_CR1_BR_0;
+    SPI1->CR1 |= SPI_CR1_SPE;
     PIN_CFG(PIN_EPD_SCK, LL_GPIO_MODE_ALTERNATE, LL_GPIO_PULL_NO, PIN_EPD_SCK_AF);
     PIN_CFG(PIN_EPD_SDI, LL_GPIO_MODE_ALTERNATE, LL_GPIO_PULL_NO, PIN_EPD_SDI_AF);
+    LL_GPIO_SetPinSpeed(PIN_PORT(PIN_EPD_SCK), PIN_MASK(PIN_EPD_SCK), LL_GPIO_SPEED_FREQ_MEDIUM);
+    LL_GPIO_SetPinSpeed(PIN_PORT(PIN_EPD_SDI), PIN_MASK(PIN_EPD_SDI), LL_GPIO_SPEED_FREQ_MEDIUM);
 }
 
 void spi_write(const uint8_t *data, size_t len)
@@ -484,6 +543,10 @@ size_t board_ir_take(uint8_t *buf, size_t cap)
 /* ------------------------------------------------------------------ */
 /* entropy: TRNG clocked from HSI48, both on only while in use        */
 
+#define RNG_CR_NIST_U0 ((0x0Fu << RNG_CR_RNG_CONFIG1_Pos) | (0x0Du << RNG_CR_RNG_CONFIG3_Pos))
+#define RNG_HTCR_NIST_U0 0x0000AAC7u
+_Static_assert(RNG_CR_NIST_U0 == 0x00F00D00u, "AN4230 STM32U0 RNG_CR value");
+
 static bool rng_word(uint32_t *out)
 {
     for (int tries = 0; tries < 8; tries++) {
@@ -491,17 +554,21 @@ static bool rng_word(uint32_t *out)
         for (;;) {
             uint32_t sr = RNG->SR;
             if (sr & (RNG_SR_SECS | RNG_SR_SEIS | RNG_SR_CEIS)) {
-                /* Seed or clock error: clear and restart the conditioning
-                 * stage (RM0503 RNG error management). */
-                RNG->SR = 0;
+                /* Seed or clock error, RM0503 21.3.7: reset the
+                 * conditioning logic, wait for CONDRST to clear, only then
+                 * clear the flags (SEIS/CEIS are rc_w0). */
                 RNG->CR |= RNG_CR_CONDRST;
                 RNG->CR &= ~RNG_CR_CONDRST;
                 wait_bits(&RNG->CR, RNG_CR_CONDRST, 0, 2);
+                RNG->SR = 0;
                 break;
             }
             if (sr & RNG_SR_DRDY) {
                 uint32_t v = RNG->DR;
-                if (v != 0) { /* 0 is what DR reads after a seed error */
+                /* RM0503 21.3.5: DR reads 0 if a seed error came between
+                 * the SR poll and the read; check SEIS again as ST's HAL
+                 * does, a word read across a seed error is not used. */
+                if (v != 0 && !(RNG->SR & (RNG_SR_SEIS | RNG_SR_SECS))) {
                     *out = v;
                     return true;
                 }
@@ -519,10 +586,18 @@ void hal_random(uint8_t *buf, size_t len)
     RCC->CCIPR = (RCC->CCIPR & ~RCC_CCIPR_CLK48SEL) | RCC_CCIPR_CLK48SEL; /* HSI48 */
     RCC->AHBENR |= RCC_AHBENR_RNGEN;
     (void)RCC->AHBENR;
-    /* Same bring-up as ST's HAL_RNG_Init: clock error detection on, reset
-     * the conditioning stage, keep the reset (NIST) configuration. */
-    RNG->CR = (RNG->CR & ~(RNG_CR_CED | RNG_CR_IE)) | RNG_CR_CONDRST;
-    RNG->CR &= ~RNG_CR_CONDRST;
+    /* RM0503 21.3.5 polling bring-up: write the configuration together with
+     * CONDRST = 1 (RNG_HTCR only takes writes while CONDRST = 1), then
+     * CONDRST = 0. The reset value of RNG_CR (0x00800D00, RNG_CONFIG1 = 0x08)
+     * is not one of the configurations ST characterised (RM0503 21.6.2
+     * Table 115 defers configuration A to AN4230). AN4230 Table 3 gives the
+     * STM32U0 NIST configuration as RNG_CR = 0x00F00D00 (RNG_CONFIG1 0x0F,
+     * RNG_CONFIG3 0xD, CLKDIV 0 for the 48 MHz HSI48, CED = 0 = clock error
+     * detection on) with RNG_HTCR = 0xAAC7, the values Zephyr's stm32u0.dtsi
+     * carries; RNG_NSCR stays at reset. */
+    RNG->CR = RNG_CR_NIST_U0 | RNG_CR_CONDRST;
+    RNG->HTCR = RNG_HTCR_NIST_U0;
+    RNG->CR = RNG_CR_NIST_U0;
     ok = ok && wait_bits(&RNG->CR, RNG_CR_CONDRST, 0, 5);
     RNG->CR |= RNG_CR_RNGEN;
     size_t i = 0;
@@ -560,6 +635,65 @@ uint32_t hal_flash_pages(void)
     return STORE_PAGES;
 }
 
+/* Flash ECC (RM0503 3.3.2 and the caution in 3.3.5): every 64-bit
+ * double-word carries 8 ECC bits. A program or erase cut short by a power
+ * loss can leave a double-word whose ECC no longer matches, and reading it
+ * later sets FLASH_ECCR.ECCD and raises an NMI. The store is built to
+ * survive exactly those torn writes (core/store.c, tests/test_powercut.c),
+ * so a double ECC error inside the store is data, not a fault: store reads
+ * are "armed", the NMI handler then clears the flag and returns, and the
+ * read hands the store zeros for that double-word (never 0xFF, which would
+ * pass for erased, and neither a valid record nor a PIN-log entry). Any
+ * other NMI still resets the device. Before this, the NMI fell through to
+ * Default_Handler, which resets: the store is mounted at every boot, so one
+ * torn double-word was an endless reset loop and a bricked device. */
+static volatile bool ecc_armed;
+static volatile bool ecc_hit;
+
+void NMI_Handler(void)
+{
+    uint32_t eccr = FLASH->ECCR;
+    if (ecc_armed && !(eccr & FLASH_ECCR_SYSF_ECC)) {
+        /* Clear ECCD (and a stale ECCC, which would stop ECCR recording the
+         * next error); both are write-1-to-clear, ECCCIE is kept. */
+        FLASH->ECCR = (eccr & FLASH_ECCR_ECCCIE) | FLASH_ECCR_ECCD | FLASH_ECCR_ECCC;
+        ecc_hit = true;
+        return;
+    }
+    NVIC_SystemReset();
+}
+
+/* RM0503 3.3.2: after an ECC error a re-read of the same address may be
+ * served from the flash interface buffer without raising the error again;
+ * resetting the cache makes the next read go to the array. */
+static void flash_cache_reset(void)
+{
+    uint32_t acr = FLASH->ACR;
+    FLASH->ACR = acr & ~(FLASH_ACR_ICEN | FLASH_ACR_ICRST);
+    FLASH->ACR = (acr & ~FLASH_ACR_ICEN) | FLASH_ACR_ICRST;
+    FLASH->ACR = acr & ~FLASH_ACR_ICRST;
+}
+
+/* Reads the double-word at store offset `off` (8-aligned). False, and
+ * zeros in w[], if it has a double ECC error. */
+static bool store_dword(uint32_t off, uint32_t w[2])
+{
+    const volatile uint32_t *p = (const volatile uint32_t *)(__store_start + off);
+    if (FLASH->ECCR & FLASH_ECCR_ECCC) FLASH->ECCR = (FLASH->ECCR & FLASH_ECCR_ECCCIE) | FLASH_ECCR_ECCC;
+    ecc_hit = false;
+    ecc_armed = true;
+    w[0] = p[0];
+    w[1] = p[1];
+    __DSB(); /* the NMI is taken before the flag is looked at */
+    __ISB();
+    ecc_armed = false;
+    if (!ecc_hit) return true;
+    flash_cache_reset();
+    board_flash_errors++;
+    w[0] = w[1] = 0;
+    return false;
+}
+
 void hal_flash_read(uint32_t off, void *buf, size_t len)
 {
     if (off > STORE_BYTES || len > STORE_BYTES - off) {
@@ -567,7 +701,18 @@ void hal_flash_read(uint32_t off, void *buf, size_t len)
         board_flash_errors++;
         return;
     }
-    memcpy(buf, __store_start + off, len);
+    uint8_t *dst = buf;
+    while (len) {
+        uint32_t w[2];
+        uint32_t at = off & 7u;
+        size_t n = 8u - at;
+        if (n > len) n = len;
+        store_dword(off - at, w);
+        memcpy(dst, (const uint8_t *)w + at, n);
+        dst += n;
+        off += (uint32_t)n;
+        len -= n;
+    }
 }
 
 static bool flash_unlock(void)
@@ -618,8 +763,10 @@ void hal_flash_erase(uint32_t page)
     }
     flash_lock();
     /* Verify: the store relies on erased bytes reading 0xFF. */
-    const uint32_t *w = (const uint32_t *)(__store_start + page * HAL_FLASH_PAGE);
-    for (uint32_t i = 0; ok && i < HAL_FLASH_PAGE / 4; i++) ok = w[i] == 0xFFFFFFFFu;
+    for (uint32_t i = 0; ok && i < HAL_FLASH_PAGE; i += 8) {
+        uint32_t w[2];
+        ok = store_dword(page * HAL_FLASH_PAGE + i, w) && w[0] == 0xFFFFFFFFu && w[1] == 0xFFFFFFFFu;
+    }
     if (!ok) board_flash_errors++;
 }
 
@@ -641,7 +788,8 @@ void hal_flash_write(uint32_t off, const void *buf, size_t len)
         dst[1] = w[1];
         ok = flash_wait();
         FLASH->CR &= ~FLASH_CR_PG;
-        ok = ok && dst[0] == w[0] && dst[1] == w[1];
+        uint32_t r[2];
+        ok = ok && store_dword(off + (uint32_t)i, r) && r[0] == w[0] && r[1] == w[1];
     }
     flash_lock();
     if (!ok) board_flash_errors++;
@@ -714,19 +862,30 @@ void hal_sleep(int64_t wake_at)
     __disable_irq();
     /* A press between the core deciding to sleep and here must not be lost:
      * if one is latched, pending or still held, don't sleep at all. It is
-     * then reported by hal_buttons() as the press that woke us. */
-    uint8_t held = btn_latched;
-#define X(p, b) if (!pin_read(PIN_PORT(p), PIN_MASK(p))) held |= (b);
+     * then reported by hal_buttons() as the press that woke us. A contact
+     * that has been closed since long before (BTN_STUCK_MS: a key jammed in
+     * a pocket, see core/app.c HOLD_LIMIT_MS) does not count, or the device
+     * would never sleep; its line has no new edge to wake us until it is
+     * released and pressed again. */
+    uint32_t now = ms_ticks;
+    uint8_t held = btn_latched | btn_filter_state.pending;
+#define X(p, b) if (!pin_read(PIN_PORT(p), PIN_MASK(p)) && !btn_stuck(b, now)) held |= (b);
     JOY_FOR_EACH(X)
 #undef X
     if (EXTI->FPR1 & PINS_EXTI_MASK & ~PIN_RTC_INT_MASK) held |= 1;
     if (!held) {
+        /* RM0503 33.5 (I2C in low-power modes): only I2C3 works in Stop 2;
+         * every other I2C must be disabled (PE = 0) before entering it
+         * (4.3.8: peripherals that cannot run in Stop 2 are disabled or
+         * held in reset). */
+        I2C1->CR1 &= ~I2C_CR1_PE;
         PWR->CR1 = (PWR->CR1 & ~(PWR_CR1_LPMS | PWR_CR1_LPR)) | PWR_CR1_LPMS_1; /* Stop 2 */
         PWR->CR3 |= PWR_CR3_ENULP; /* sample BOR/PVD in Stop 2: lower current */
         SCB->SCR |= SCB_SCR_SLEEPDEEP_Msk;
         __DSB();
         __WFI(); /* PRIMASK set: wakes, then the pending EXTI ISR runs below */
         SCB->SCR &= ~SCB_SCR_SLEEPDEEP_Msk;
+        I2C1->CR1 |= I2C_CR1_PE; /* TIMINGR is kept while PE = 0 */
     }
     board_clock_init();
     systick_start();
