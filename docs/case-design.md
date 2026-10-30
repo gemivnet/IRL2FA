@@ -29,6 +29,7 @@ Files:
 | `case/3mf/irl2fa-all.3mf` | all four parts on one 220 x 220 plate, one named object each |
 | `case/build.sh` | regenerates dimensions, STLs, 3MF and the renders |
 | `case/tests/test_case.py` | geometry tests (fit, clearances, walls, printability) |
+| `case/tests/test_mechanical.py` | board, part models and case against the manufacturers' drawings |
 | `case/tools/` | `gen_dims.py`, `make_3mf.py`, `compare_stl.py`, `postprocess_png.py` |
 
 ## Design rationale
@@ -75,20 +76,31 @@ sit 0.4 mm below the face.
 **Screen window.** The opening is the active area from `board.yaml` grown by
 0.3 mm, with 0.3 mm corner radii and a 0.6 mm 45 deg bezel chamfer. A 1 mm rib
 around the glass (0.4 mm clearance) locates its edges and keeps the skin off the
-glass. The rib is open on the FPC side.
+glass. The rib is open over the display's flex, which is wider (14.3 mm, from
+6.77 mm below the top glass edge) for its first 4 mm than the 12.5 mm tail, plus
+0.5 mm for its position and width tolerances.
 
-**Joystick and cap.** The Alps SKRHABE010 STEP model shows a 3.0 mm *square* stem
-(0.3 mm corner radii) on top of two round collars (Ø5.2 mm to 2.15 mm, Ø4.0 mm to
-2.95 mm) above the 1.8 mm body. The cap clears the collars by 0.4 mm and grips the
-top 1.65 mm of the stem in a square socket with four crush ribs (0.1 mm interference
-each). Crush ribs are much more forgiving of printer tolerances than a plain
-interference bore. The skin is relieved to 0.6 mm over the switch body, and the
-hole leaves a 0.4 mm radial gap so the cap can tilt in all four directions. The
-stem top is 5.0 mm above the PCB, which is 2.2 mm above the case face. With a
-0.6 mm roof and a 0.3 mm finger dish, the cap rim therefore sits **3.15 mm** above
-the face, not the 1.5 mm we aimed for. The model raises `cap_protrusion`
-automatically and prints a note. A lower-stem SKRH variant would allow a flatter
-cap.
+**Joystick and cap.** The Alps drawing (SKRH catalog, Drawing No.2) gives the
+SKRHABE010 keytop stem as a **1.95 mm square with R0.5 corners, its flats at 45 deg
+to the switch body**, from about 3.1 mm to 5.0 mm above the PCB, and allows a cap
+to reach at most 1.7 mm down it. Below it are a Ø3 shoulder (to ~3.1 mm) and a
+cone on the body (Ø~3.9 to 2.14 mm). The body is turned 45 deg on this board, so
+the stem's flats are parallel to the board edges. The cap grips the top 1.7 mm of
+the stem in a square socket at that angle, with a crush rib on each face (0.1 mm
+interference). Crush ribs are much more forgiving of printer tolerances than a
+plain interference bore. Below the socket a flat-roofed bore clears the shoulder
+and cone. (Until the mechanical review the socket was sized for a 3.0 mm stem
+turned the other way, from a third-party model: it would not have gripped at all;
+see [mechanical-review.md](mechanical-review.md), MECH-02.) The skin is relieved
+to 0.6 mm over the switch body, and the hole leaves a 0.4 mm radial gap so the
+cap can tilt in all four directions: the switch tilts 0.25 mm at 4.3 mm height
+(about 3.8 deg about a pivot 0.49 mm above the board), which moves the cap only
+about 0.15 mm at the hole. The stem top is 5.0 mm above the PCB, which is 2.2 mm
+above the case face. With a 0.6 mm roof and a 0.3 mm finger dish, the cap rim
+therefore sits **3.15 mm** above the face, not the 1.5 mm we aimed for. The model
+raises `cap_protrusion` automatically and prints a note. A lower-stem SKRH
+variant would allow a flatter cap. The cap is held by the press fit alone; if a
+print comes out loose, raise `stem_rib_interference` or add a drop of glue.
 
 **IR edge.** The emitter and detector are side-lookers on the back, aimed through
 the top edge, with their lens tips on the board edge. The top edge is a flat face
@@ -165,8 +177,11 @@ Print the front shell in the colour you want people to see. A contrasting cap
 1. **Inserts (only with `fastener = "insert"`):** press the four heat-set inserts
    into the back-shell bosses with a soldering iron at about 220 deg C, flush with
    the boss tops.
-2. **Board into the back shell:** fold the display FPC through its slot as on the
-   bare board, then drop the PCB, back side down, into the back shell. It rests
+2. **Board into the back shell:** the display must already be on the board, its
+   flex threaded through the slot and locked in J1 (README, "Build one"), with
+   the spare length as a loose loop under the board. Flash the firmware now: J3
+   is on the back and cannot be reached once the board is in the case. Then drop
+   the PCB, back side down, into the back shell. It rests
    on the four corner bosses. The IR emitter and detector must face the edge with
    the two small windows.
 3. **Front shell:** lay it over the board so the glass sits inside the locating
@@ -174,7 +189,7 @@ Print the front shell in the colour you want people to see. A contrasting cap
 4. **Screws:** drive the four M2 x 6 screws through the front corners. Stop when
    the head seats: thread-forming screws strip PLA easily, so snug is enough.
 5. **Cap:** push the joystick cap onto the stem with the socket's flat sides
-   matching the stem (the socket sits at 45 deg, like the switch). Press straight
+   matching the stem (the stem's flats are parallel to the case edges). Press straight
    down while supporting the board from behind, until the cap stops on the stem
    top.
 6. **Battery:** slide the door off towards the bottom edge (grip grooves, thumb
@@ -185,6 +200,10 @@ Print the front shell in the colour you want people to see. A contrasting cap
 
 To change the cell, slide the door off. Put a fingernail in the notch at the
 clip's open end and slide the cell out through the bottom opening.
+
+To reflash, take out the four screws and lift the board out of the back shell
+(the display stays on it): the Tag-Connect pads (J3) are on the back, under the
+back shell, and the battery door does not reach them.
 
 ## Changing parameters
 
@@ -274,6 +293,24 @@ Changing a value from the table above does not need a test update: the tests rea
 - no overhang is steeper than 45 deg and no bridge is longer than 10 mm;
 - `board_dims.scad` matches `board.yaml`.
 
+`case/tests/test_mechanical.py` checks the board and our models against the
+manufacturers' drawings (sources and pages in the file and in
+[mechanical-review.md](mechanical-review.md)):
+
+- our part models, as placed on the board (`hardware/fab/irl2fa.glb`, exported by
+  `make fab`), have the drawing dimensions: glass, flex flare and stiffener,
+  joystick stem and body, FPC connector, battery clip, IR parts;
+- no part model reaches into a printed part in the assembled position (only the
+  cap's crush ribs on the stem);
+- the display flex fits its slot, folds clear of its glued root, reaches J1 and
+  lines up pin 1 to pin 1;
+- the cap socket matches the stem's size, angle and fitting length, and the 45 deg
+  turn gives the joystick directions in `hardware/pins.yaml`;
+- the coin cell lands on its pad and nothing lies in its insertion path.
+
+Requirements the current board does not meet yet are `xfail` with their finding
+ID.
+
 `.github/workflows/case.yml` runs on pushes and PRs that touch `case/`,
 `hardware/board.yaml` or the workflow. It:
 
@@ -289,8 +326,12 @@ Changing a value from the table above does not need a test update: the tests rea
 These come from datasheets or STEP models in `hardware/lib/` and are parameters in
 the `.scad`:
 
-- SKRH stem is square (3.0 mm, r0.3), with collars Ø5.2 mm to 2.15 mm and Ø4.0 mm
-  to 2.95 mm (`joystick_collars`).
+- SKRH keytop stem: 1.95 mm square, R0.5, flats at 45 deg to the body
+  (`stem_square`, `stem_corner_r`, `stem_angle`), at most 1.7 mm into the cap
+  (`stem_fit_max`); collars Ø3.9 mm to 2.14 mm and Ø3.0 mm to 3.12 mm
+  (`joystick_collars`). From the Alps drawing; `board.yaml` only has the 3.0 mm shoulder.
+- GDEY0213B74 flex flare: 14.30 mm wide from 6.77 mm below the top glass edge
+  (`fpc_flare_w`, `fpc_flare_y`, Good Display drawings).
 - The back side is clear within Ø5.3 mm of each mounting hole and in the corner
   quadrant outside it, because the case bosses sit there.
 - The front side carries nothing except the display, its FPC and the joystick.

@@ -110,8 +110,8 @@ You need a PCB, a display, a coin cell, a printed case and four screws. Everythi
    - Get `irl2fa-stm32u083-<version>.bin` from the [latest release](https://github.com/gemivnet/IRL2FA/releases), or build it with `firmware/port/stm32u0/build.sh`.
    - Flash it through a Tag-Connect TC2030-NL cable and any ST-Link: [firmware/port/stm32u0/README.md](firmware/port/stm32u0/README.md).
 5. **Assemble.**
-   - Stick the display to the front of the board.
-   - Fold its flex cable through the slot into the connector on the back, slide the CR2450 under its clip from the bottom edge, and screw the case together.
+   - Thread the display's flex cable through the slot from the front and lock it into the connector on the back (J1), then stick the display down on the front. Done the other way round, the flex has to be bent back over the glass at its glued root to reach the slot.
+   - Slide the CR2450 under its clip from the bottom edge and screw the case together. Flash first (step 4): the Tag-Connect pads are on the back, inside the case.
    - Set the time: the device asks on first start.
 
 Built one? Please [file a build report](https://github.com/gemivnet/IRL2FA/issues/new?template=build_report.yml).
