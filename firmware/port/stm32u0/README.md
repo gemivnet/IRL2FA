@@ -192,12 +192,12 @@ which clears bit 16 of `FLASH_ACR`).
 The store's master key sits in flash. Without a PIN it is not wrapped by
 anything, so RDP is what keeps someone with a debugger from reading the secrets.
 
-**The bootloader sets level 1 itself**, once: when the owner first wakes the
-device with the joystick, with a signed application and a cell of at least
-2.9 V (never on a programming fixture)
-([docs/firmware-updates.md](../../../docs/firmware-updates.md#readout-protection-on-the-first-wake)).
-Nothing needs doing after flashing a release's factory image; a development
-(unsigned) image never locks the chip. To set it by hand anyway:
+**Nothing sets it automatically.** The owner sets it on the device:
+Settings → Lock debug port; the bootloader then sets level 1 for a signed
+application on a cell of at least 2.9 V
+([docs/firmware-updates.md](../../../docs/firmware-updates.md#locking-the-debug-port)).
+A development (unsigned) image never locks the chip. To set it over SWD
+instead:
 
 ```sh
 # STM32CubeProgrammer: 0xAA = level 0, 0xCC = level 2, any other value = level 1

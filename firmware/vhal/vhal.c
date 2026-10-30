@@ -250,6 +250,27 @@ bool hal_update_read(uint32_t off, uint8_t *buf, size_t len)
     return true;
 }
 
+/* Readout protection: the tests set the state and the bootloader's answer;
+ * the simulator (state -1) has none, and hal_debug_lock() returns. */
+static struct {
+    int state, requests, result;
+} lock = {-1, 0, -1};
+
+void vhal_set_debug_lock(int state, int result)
+{
+    lock.state = state;
+    lock.result = result;
+}
+int vhal_debug_lock_requests(void) { return lock.requests; }
+int hal_debug_lock_state(void) { return lock.state; }
+void hal_debug_lock(void) { lock.requests++; }
+int hal_debug_lock_result(void)
+{
+    int r = lock.result;
+    lock.result = -1;
+    return r;
+}
+
 int hal_update_result(uint32_t *version)
 {
     int r = upd.result;

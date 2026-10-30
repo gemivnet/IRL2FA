@@ -42,7 +42,7 @@ struct irl2fa_boot_debug {
     uint32_t phase; /* 1 checking, 2 receiving, 3 installing, 4 starting the app, 5 locking */
     uint32_t app_err, install_err;
     uint32_t rx_state, rx_next;
-    uint32_t rdp; /* 0 not asked, 1 locked now, 2 cell too low, 3 already, 4 unsigned app */
+    uint32_t rdp; /* 0 not asked, 1 locked now, 2 cell too low, 3 already, 4 unsigned app (BOOT_CMD_LOCK_RESULT) */
     uint32_t battery_mv;
 };
 #define BOOT_DEBUG ((volatile struct irl2fa_boot_debug *)FL_BOOT_DEBUG_ADDR)
@@ -119,20 +119,25 @@ static void lock_chip(void)
     for (;;) NVIC_SystemReset();
 }
 
-/* When the application asks (its owner woke it with the joystick for the
- * first time: never on a programming fixture, which only powers the board),
- * with a signed application, on a healthy cell. */
-static void maybe_lock(const fw_header_t *app, bool requested)
+/* Only when the application asks (its owner chose Settings -> Lock debug
+ * port, never on its own), with a signed application, on a healthy cell.
+ * The outcome goes back to the application through the mailbox. */
+static void lock_declined(uint32_t why)
+{
+    DBG(rdp, why);
+    boot_mailbox_put(BOOT_CMD_LOCK_RESULT, why);
+}
+
+static void maybe_lock(const fw_header_t *app)
 {
     if (!rdp_level0()) {
-        DBG(rdp, 3);
+        lock_declined(3);
         return;
     }
     if (app->flags & FW_FLAG_UNSIGNED) {
-        DBG(rdp, 4);
+        lock_declined(4);
         return;
     }
-    if (!requested) return;
     bool cal;
     uint16_t a = board_battery_mv(&cal);
     board_delay_ms(20);
@@ -140,11 +145,12 @@ static void maybe_lock(const fw_header_t *app, bool requested)
     uint16_t mv = a < b ? a : b;
     DBG(battery_mv, mv);
     if (mv < (cal ? RDP_MIN_MV : RDP_MIN_MV_UNCAL)) {
-        DBG(rdp, 2);
+        lock_declined(2);
         return;
     }
     DBG(rdp, 1);
     DBG(phase, 5);
+    boot_mailbox_put(BOOT_CMD_LOCK_RESULT, 1);
     lock_chip();
 }
 
@@ -232,7 +238,8 @@ int main(void)
 {
     uint32_t arg;
     uint32_t cmd = boot_mailbox_take(&arg);
-    if (cmd == BOOT_CMD_RESULT) boot_mailbox_put(cmd, arg); /* for the application */
+    if (cmd == BOOT_CMD_RESULT || cmd == BOOT_CMD_LOCK_RESULT)
+        boot_mailbox_put(cmd, arg); /* for the application */
 #if IRL2FA_DEBUG_HOOK
     memset((void *)BOOT_DEBUG, 0, sizeof(*BOOT_DEBUG));
     /* The application's block too: what the tests read is this start's. */
@@ -256,7 +263,7 @@ int main(void)
     if (rep.installed && rep.install == FW_OK && rep.app == FW_OK)
         boot_mailbox_put(BOOT_CMD_RESULT, (uint32_t)FW_OK | (rep.app_hdr.version << 8));
     if (act == FWBOOT_RUN_APP) {
-        maybe_lock(&rep.app_hdr, cmd == BOOT_CMD_LOCK);
+        if (cmd == BOOT_CMD_LOCK) maybe_lock(&rep.app_hdr);
         start_app();
     }
     receive(rep.app == FW_OK);

@@ -9,7 +9,7 @@ hardware.
 - [Updating a device](#updating-a-device)
 - [The USB infrared adapter](#the-usb-infrared-adapter)
 - [Security model and limits](#security-model-and-limits)
-- [How it works](#how-it-works): [flash layout](#flash-layout), [image format](#image-format), [transfer protocol](#transfer-protocol), [power cuts](#power-cuts), [readout protection](#readout-protection-on-the-first-wake)
+- [How it works](#how-it-works): [flash layout](#flash-layout), [image format](#image-format), [transfer protocol](#transfer-protocol), [power cuts](#power-cuts), [the flash budget](#the-flash-budget), [locking the debug port](#locking-the-debug-port)
 - [Releases and signing keys](#releases-and-signing-keys), [forks](#forks-your-own-key)
 - [What is tested, and where](#what-is-tested-and-where)
 
@@ -103,13 +103,13 @@ an *older* signed one (anti-rollback), so a fixed bug cannot be brought back.
 Updating keeps the encrypted record store as it is; the new firmware reads
 it with the same keys, which never leave the chip.
 
-**Readout protection.** The first time its owner wakes the device with the
-joystick, on a healthy cell (≥ 2.9 V) and with a signed application, the
-bootloader sets RDP level 1 itself, once
-([below](#readout-protection-on-the-first-wake)). From then on a debugger
-cannot read or write the flash; the only way back is the RDP regression, which
-erases the whole flash, codes and contacts included. So the update path above
-is the only way to change the firmware of a device in use, by design.
+**Readout protection is never automatic.** The owner turns it on with
+Settings → **Lock debug port** ([below](#locking-the-debug-port)). From then
+on a debugger cannot read or write the flash; the only way back is the RDP
+regression, which erases the whole flash, codes and contacts included, and
+the IR update above is the only way to change the firmware. Until then
+anyone holding the device with a debug cable can read its secrets (without a
+PIN, in plain text).
 
 **The PIN gate.** "Receive an update" asks for the device PIN again (a wrong
 one counts towards the ten that erase everything, and locks the device). In
@@ -154,12 +154,27 @@ scripts, `sign_image.py` and `check_hw_constants.py` agree with it):
 | Record store | `0x0802C000` | 80 KB (pages 88-127) | unchanged: codes, contacts, settings. Never erased or written by the bootloader |
 | SRAM mailbox | `0x20009FF0` | 16 bytes | application ↔ bootloader messages (and 32 bytes below it, the bootloader's test block) |
 
-At v0.1.0 (the build's `size-report.txt`, which fails the build if any
-region overflows): application 96,424 of 98,048 bytes, update image 48,679 of
-51,200, bootloader 24,976 of 26,624. **The flash is nearly full**: each has
-1.6-2.5 KB left. The application is the constraint (its
-compressed image has to fit the staging slot too); the record store's 80 KB
-is the only other large region.
+### The flash budget
+
+**This layout is fixed.** The record store keeps its 80 KB (512 accounts), so
+the application, its compressed image and the bootloader have to fit the
+regions above for good. At v0.1.0, with "Lock debug port" (the build's
+`size-report.txt`):
+
+| | Used | Region | Left |
+|-|-|-|-|
+| Application | 97,388 bytes | 98,048 (96 KB slot less the 256-byte header) | **660 bytes** |
+| Update image (Thumb filter + LZMA) | 49,233 bytes | 51,200 (staging slot) | 1,967 bytes |
+| Bootloader | 24,976 bytes | 26,624 | 1,648 bytes |
+
+So the application can grow by **less than 1 KB** more, ever, unless
+something else shrinks; its compressed image grows about half as fast and
+has a little more room. The build fails, loudly, when any of them stops
+fitting: the linker for the application or the bootloader, `size_report.py`
+(`ERROR: the application is N bytes, M more than its 98048 ...`) for all
+three, and `sign_image.py` for an update image that would not fit staging.
+Before adding a feature, measure it (`firmware/port/stm32u0/build.sh`
+prints the table) and find the bytes.
 
 The target was a 16 KB bootloader. It came out at 24.5 KB: Monocypher's
 field arithmetic is written for speed (unrolled 10-limb multiplies), about
@@ -280,18 +295,22 @@ The record store is never written by the bootloader (its flash callbacks
 refuse anything outside the slots and the journal), so codes and contacts
 survive any of the above.
 
-### Readout protection on the first wake
+### Locking the debug port
 
-The device protects itself; JLCPCB, or whoever flashes the factory image over
-SWD, only ever handles an unprotected chip. A programming fixture powers the
-board (JLCPCB's at 3.0 V), may power-cycle it and lets it run, but never
-presses the joystick. So the trigger is the owner: the first time the
-application wakes from sleep by the joystick after a start, if the chip is
-unprotected and the application signed, it puts `LOCK` in the mailbox and
-restarts ([`fw_app.c`](../firmware/port/stm32u0/fw_app.c)). The bootloader
-then sets RDP level 1 if, and only if:
+Readout protection (RDP level 1) is **never set automatically**: not at the
+first start, not on a programming fixture, not when the device wakes.
+JLCPCB, or whoever flashes the factory image over SWD, only ever handles an
+unprotected chip, and so does a developer.
 
-- it was asked (`LOCK`),
+The owner sets it: Settings → **Lock debug port**. It asks for the device
+PIN again if one is set, and in simple mode it is behind the family PIN like
+every setting. A screen says, in plain words, what it does: it stops someone
+who has the device and a debug cable from reading its codes; it is
+permanent, undoing it erases everything; updates over IR still work. Then a
+confirm. The application puts `LOCK` in the RAM mailbox and restarts
+([`fw_app.c`](../firmware/port/stm32u0/fw_app.c)); the bootloader sets RDP
+level 1 if, and only if:
+
 - the chip is still at level 0,
 - the application is **signed** (a development image never locks the chip),
 - the cell measures at least **2.9 V** twice, 20 ms apart (2.96 V on parts
@@ -299,10 +318,12 @@ then sets RDP level 1 if, and only if:
 
 That last rule is [firmware-hardware-review.md](firmware-hardware-review.md)
 F7: an option-byte write cut by a power loss can lock the part for good
-(RM0503 3.4.2), so it is only attempted on a cell that will not sag. On a
-weak cell the bootloader declines and the device carries on unprotected; the
-next start asks again. The write ends with `OBL_LAUNCH`, which restarts the
-chip once: that first wake takes about 5 s instead of half a second.
+(RM0503 3.4.2), so it is only attempted on a cell that will not sag. The
+write ends with `OBL_LAUNCH`, which restarts the chip once. The bootloader
+tells the application the outcome through the mailbox, and the device says
+*Debug port locked*, *Not locked: battery low*, or *Not locked: development
+firmware*. Settings then shows "Debug port: locked", and About shows
+"Debug port locked" or "Debug port open".
 
 ## Releases and signing keys
 
@@ -359,7 +380,8 @@ firmware.
 | Power cut at **every** flash operation of a transfer and of an install (dropped, half done, noise with ECC errors), and again during the recovery; the record store byte for byte | `test_fw_powercut_receive`, `test_fw_powercut_install`, `test_fw_log` | 3 cuts while receiving, 4 or more while installing, store hashed before and after |
 | Device to device through the screens; PIN and simple-mode gates; the report after the restart | `test_app_update_*` | *Updates Over IR And Reports It* |
 | Host tool against the bootloader's receiver code, resume | `tools/test_update_tools.py` | |
-| RDP only at the owner's first wake, with a healthy cell and a signed image; never on a fixture | | *Sets Readout Protection When Its Owner First Wakes It On A Healthy Cell*, *Never Protects A Development Image* |
+| Locking the debug port: only from Settings, behind the PIN and the simple-mode gate, explained and confirmed, the outcome shown, the state in About | `test_app_lock_*` | |
+| RDP never set on its own (power-ons, wakes); set once from Settings on a healthy cell with a signed image; declined on a weak cell and for a development image | | *Never Locks The Debug Port On Its Own*, *Locks The Debug Port Once From Settings*, *Declines To Lock On A Weak Cell*, *Never Locks A Development Image* |
 | Parser and decoder robustness | `fuzz/fuzz_fwupdate.c` (libFuzzer, 60 s in CI) | |
 
 Only in emulation, so far: the option-byte write and `OBL_LAUNCH`, flash
@@ -367,6 +389,6 @@ timing, and what a real torn write leaves (the
 Renode model tears the last operation and injects an ECC error, as the
 silicon is documented to). On a real board, check: an update between two
 devices and from the adapter at 1-3 cm, a cell pulled during the copy, and
-that RDP reads 1 after the first joystick wake on a fresh cell (and 0 straight
-after programming) (`STM32_Programmer_CLI -c
+that RDP reads 0 after programming and after use, and 1 after Settings → Lock
+debug port on a fresh cell (`STM32_Programmer_CLI -c
 port=SWD -ob displ`). See [hardware-testing.md](hardware-testing.md).

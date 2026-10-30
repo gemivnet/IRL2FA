@@ -140,6 +140,18 @@ int main(int argc, char **argv)
     dump("update_send");
     step(BTN_LEFT);
     vhal_set_update_image(NULL, 0);
+    /* About (the debug port's state) and Lock debug port. */
+    vhal_set_debug_lock(0, -1);
+    step(BTN_LEFT);
+    steps(BTN_DOWN, 3);
+    step(BTN_CENTER);
+    dump("about");
+    step(BTN_CENTER);
+    steps(BTN_DOWN, 6);
+    step(BTN_CENTER);
+    dump("lock");
+    step(BTN_LEFT);
+    vhal_set_debug_lock(-1, -1);
     /* Sleep screen */
     for (int i = 0; i < 1000; i++) {
         if (app_poll() == APP_SLEEP) break;

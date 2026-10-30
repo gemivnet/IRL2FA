@@ -55,7 +55,9 @@ typedef struct {
 enum {
     BOOT_CMD_UPDATE = 1, /* application -> bootloader: run the IR update receiver */
     BOOT_CMD_RESULT = 2, /* bootloader -> application: arg = fw_err_t | version << 8 */
-    BOOT_CMD_LOCK = 3,   /* application -> bootloader: its owner woke it; set RDP level 1 */
+    BOOT_CMD_LOCK = 3,   /* application -> bootloader: its owner chose "Lock debug port" */
+    BOOT_CMD_LOCK_RESULT = 4, /* bootloader -> application: arg = 1 locked, 2 cell too low,
+                               * 3 already locked, 4 development image */
 };
 
 #define BOOT_MAILBOX ((volatile boot_mailbox_t *)FL_MAILBOX_ADDR)

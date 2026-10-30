@@ -11,7 +11,7 @@ CORE = core/hash.c core/base32.c core/totp.c core/words.c core/wordlist.c \
        core/fwboot.c core/third_party/monocypher/monocypher.c
 TESTS = tests/test_main.c tests/test_crypto.c tests/test_device.c tests/test_powercut.c \
         tests/test_app.c tests/test_behaviour.c tests/test_simple.c tests/test_fwupdate.c \
-        tests/test_app_update.c tests/vflash.c vhal/vhal.c
+        tests/test_app_update.c tests/test_app_lock.c tests/vflash.c vhal/vhal.c
 
 BUILD = build/host
 

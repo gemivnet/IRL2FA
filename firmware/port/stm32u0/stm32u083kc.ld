@@ -101,7 +101,7 @@ SECTIONS
 
 ASSERT(ORIGIN(FLASH) == __app_slot_start + __app_offset, "vector table at the application slot + 0x100")
 ASSERT(ORIGIN(FLASH) % 256 == 0, "VTOR needs the vector table 256-byte aligned (48 entries)")
-ASSERT(__flash_image_end <= __app_slot_start + __app_slot_size, "application overlaps the staging slot")
+ASSERT(__flash_image_end <= __app_slot_start + __app_slot_size, "ERROR: the application does not fit its 96 KB slot. The flash layout is fixed: make it smaller (docs/firmware-updates.md#the-flash-budget)")
 ASSERT(__stack_top == __app_debug, "the stack ends below the debug blocks and the mailbox")
 ASSERT(ORIGIN(DEBUG) == __app_debug && ORIGIN(DEBUG) + LENGTH(DEBUG) == __boot_debug, "debug block below the bootloader's")
 ASSERT(__store_start % 2048 == 0, "store must start on a flash page boundary")

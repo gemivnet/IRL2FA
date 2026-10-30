@@ -62,6 +62,7 @@ flowchart LR
     settings --> simple[Simple mode] --> intro[What it does] --> fpin[Family PIN x3] --> simplescr
     settings --> fw[Firmware update] --> fwrx[Receive: PIN again, then the bootloader listens]
     fw --> fwtx[Send it to another]
+    settings --> lock[Lock debug port: PIN again, what it means, confirm]
     settings --> wipe[Erase everything]
     pin -- "simple mode on" --> simplescr[Simple: name + word]
 ```
@@ -75,7 +76,8 @@ flowchart LR
 | ![Pair](images/screens/pair.png) **Pairing.** Hold the top edges together. | ![SAS](images/screens/sas.png) **Compare.** Both screens must show the same six symbols. |
 | ![Text](images/screens/text.png) **Text entry.** ↑↓ picks a character from the wheel, → adds it, ← deletes, ● finishes. | ![PIN](images/screens/pin.png) **PIN.** A sequence of 4 to 12 joystick directions. |
 | ![Time](images/screens/time.png) **Date & time.** ←→ selects a field, ↑↓ changes it. | ![Sleep](images/screens/sleep.png) **Asleep.** Shows nothing sensitive. |
-| ![Settings](images/screens/settings.png) **Settings.** Clock, PIN, simple mode, firmware update, erase. | ![Simple](images/screens/simple.png) **Simple mode.** Who is calling and the word they will say. |
+| ![Settings](images/screens/settings.png) **Settings.** Clock, PIN, simple mode, firmware update, debug port lock, erase. | ![Simple](images/screens/simple.png) **Simple mode.** Who is calling and the word they will say. |
+| ![Lock debug port](images/screens/lock.png) **Lock debug port.** What it means before the confirm; never automatic ([firmware-updates.md](firmware-updates.md#locking-the-debug-port)). | ![About](images/screens/about.png) **About.** Version, battery, whether the debug port is locked. |
 | ![Firmware update](images/screens/update_menu.png) **Firmware update.** Receive one over IR, or send this version to another device ([firmware-updates.md](firmware-updates.md)). | ![Sending](images/screens/update_send.png) **Sending.** Progress in tenths; ← cancels. |
 
 ## Vulnerable (simple) mode

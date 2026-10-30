@@ -24,7 +24,7 @@ someone's order.
 | **Case fit** | case clearance under 0.3 mm to any part; the joystick hole, screen window or IR windows misaligned | `case/tests/` |
 | **Firmware pins** | `firmware/port/stm32u0/pins.h` not regenerated after a pinout change | `firmware.yml` |
 | **Firmware on emulated hardware** | the real STM32 binary, run in Renode with modelled SSD1680, RV-3032, joystick and IR link: boot, menus, two devices pairing; and what the silicon requires but a plain emulator would not notice: peripherals left on in Stop 2, a torn flash double-word (ECC NMI) at boot, panel power-up timing, SPI rate, RTC EEPROM refresh at power-on, the RNG configuration ([firmware-hardware-review.md](firmware-hardware-review.md)) | `firmware/renode/` |
-| **Firmware updates** | an update that installs unsigned, older or foreign firmware; a power cut during the transfer or the install (at every flash operation on the host, at seven or more points of a real update in Renode) that leaves a device that does not start, or touches the record store; a transfer that does not resume; readout protection set on a weak cell, on a programming fixture (no joystick wake), or with a development image ([firmware-updates.md](firmware-updates.md#what-is-tested-and-where)) | `firmware/tests/test_fwupdate.c`, `test_app_update.c`, `firmware/tools/test_update_tools.py`, `firmware/renode/update.robot` |
+| **Firmware updates** | an update that installs unsigned, older or foreign firmware; a power cut during the transfer or the install (at every flash operation on the host, at seven or more points of a real update in Renode) that leaves a device that does not start, or touches the record store; a transfer that does not resume; readout protection set without the owner choosing it in Settings, on a weak cell, or with a development image ([firmware-updates.md](firmware-updates.md#what-is-tested-and-where)) | `firmware/tests/test_fwupdate.c`, `test_app_update.c`, `firmware/tools/test_update_tools.py`, `firmware/renode/update.robot` |
 | **Hardware constants** | a hand-written register offset, bit, base address or IRQ number (Renode platform and models, vector table, the flash map in `flash_layout.h`/`.ld`, both linker scripts and `sign_image.py`) that disagrees with ST's CMSIS header for the STM32U083, or with each other | `firmware/tools/check_hw_constants.py` (in `firmware.yml`) |
 | **Browser simulator** | the WebAssembly build of the firmware: pairing at 2 cm in under 6 s (listen before talk), at 8 cm with bit errors, retrying at 14 cm and giving up after a minute; the refresh policy; a second press during a refresh not lost; the Renode power script replayed from the same RTC time with the same refresh sequence; the battery panel agreeing with `power.py`; RFC 6238 codes | `sim/test/sim.test.mjs` (in `sim.yml`) |
 | **Pairing protocol, formally** | a change to the commit/reveal or key derivation that lets a man in the middle learn the key, or choose his key after seeing an honest one | `formal/pairing.spthy` (Tamarin), [formal-verification.md](formal-verification.md), `formal.yml` |
@@ -151,7 +151,7 @@ not replace bringing up a real board.
   modelled from RM0503, not measured. On the first boards: an update from
   another device and from the USB adapter at 1-3 cm, a cell pulled during
   the copy (the device must come back on the old or the new firmware), and
-  `STM32_Programmer_CLI -c port=SWD -ob displ` showing RDP level 1 after the
-  first joystick wake on a fresh cell, level 0 straight after programming and
-  after a wake on a cell below 2.9 V
+  `STM32_Programmer_CLI -c port=SWD -ob displ` showing RDP level 0 after
+  programming and use, level 1 after Settings → Lock debug port on a fresh
+  cell, still 0 after trying on a cell below 2.9 V
   ([firmware-updates.md](firmware-updates.md)).

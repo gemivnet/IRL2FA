@@ -51,6 +51,10 @@ void vhal_set_update_image(const uint8_t *img, size_t len);
 void vhal_set_fw_version(uint32_t ver);
 int vhal_update_entered(void);
 void vhal_set_update_result(int r, uint32_t version);
+/* Readout protection (hal.h): the state (-1 none, 0 open, 1 locked) and the
+ * bootloader's answer for the next start (-1 none); how often the app asked. */
+void vhal_set_debug_lock(int state, int result);
+int vhal_debug_lock_requests(void);
 int vhal_fail_tripped(void);              /* 1 once a cut has happened */
 uint32_t vhal_flash_ops(void);            /* erase + write calls so far */
 

@@ -83,5 +83,5 @@ SECTIONS
 }
 
 ASSERT(ORIGIN(FLASH) == __boot_start && LENGTH(FLASH) == __boot_size, "bootloader region")
-ASSERT(__flash_image_end <= __app_slot_start, "bootloader overlaps the application slot")
+ASSERT(__flash_image_end <= __app_slot_start, "ERROR: the bootloader does not fit its 26 KB (docs/firmware-updates.md#the-flash-budget)")
 ASSERT(__stack_top == __app_debug, "the stack ends below the debug blocks and the mailbox")

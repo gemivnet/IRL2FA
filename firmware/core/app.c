@@ -77,6 +77,7 @@ typedef enum {
     SCR_SIMPLE,       /* simple mode: one contact's name and HEAR word */
     SCR_SIMPLE_INTRO, /* what simple mode is, before the family PIN is set */
     SCR_UPDATE,   /* firmware update: sending this device's image (or entering the receiver) */
+    SCR_LOCK,     /* what locking the debug port means, before the confirm */
 } screen_t;
 
 typedef enum {
@@ -100,6 +101,7 @@ typedef enum {
     C_WIPE,
     C_REMOVE_PIN,
     C_SIMPLE_OFF,
+    C_LOCK,
 } confirm_id_t;
 
 typedef enum {
@@ -111,6 +113,7 @@ typedef enum {
     P_FAMILY_AGAIN,
     P_FAMILY_UNLOCK,  /* leaving simple mode */
     P_UPDATE,     /* the PIN again before the update receiver */
+    P_LOCK,       /* the PIN again before locking the debug port */
 } pin_id_t;
 
 static const char CS_LABEL[] =
@@ -118,7 +121,7 @@ static const char CS_LABEL[] =
 static const char CS_BASE32[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
 
 #define TEXT_MAX 104 /* 64-byte secret = 103 base32 characters */
-#define MENU_MAX 8
+#define MENU_MAX 10
 
 static struct {
     screen_t scr;
@@ -207,7 +210,7 @@ static struct {
 static const char *const SCREEN_NAMES[] = {
     "menu", "codes", "code", "contacts", "contact", "pair", "sas", "text",
     "code_opts", "confirm", "time", "tz", "pin", "message", "about",
-    "simple", "simple_intro", "update",
+    "simple", "simple_intro", "update", "lock",
 };
 
 /* ------------------------------------------------------------------ */
@@ -368,6 +371,7 @@ static void open_menu(menu_id_t id)
         menu_add("About");
         menu_add(s->simple ? "Simple mode: on" : "Simple mode");
         menu_add("Firmware update");
+        menu_add(hal_debug_lock_state() == 1 ? "Debug port: locked" : "Lock debug port");
         menu_add("Erase everything");
         break;
     }
@@ -992,7 +996,9 @@ static void draw_about(void)
     snprintf(buf, sizeof(buf), "Device %02X%02X%02X%02X", uid[0], uid[1], uid[2], uid[3]);
     gfx_text(&font_small, 6, TITLE_H + 22, buf);
     int mv = hal_battery_mv();
-    snprintf(buf, sizeof(buf), "Battery %d.%02d V", mv / 1000, (mv % 1000) / 10);
+    int lock = hal_debug_lock_state();
+    snprintf(buf, sizeof(buf), "Battery %d.%02d V   %s", mv / 1000, (mv % 1000) / 10,
+             lock == 1 ? "Debug port locked" : lock == 0 ? "Debug port open" : "");
     gfx_text(&font_small, 6, TITLE_H + 35, buf);
     snprintf(buf, sizeof(buf), "%d codes, %d contacts, %d free", store_count(REC_TOTP),
              store_count(REC_CONTACT), store_count(REC_EMPTY));
@@ -1098,19 +1104,24 @@ static void update_select(int item)
 
 /* The PIN is checked the only way the store can: lock, unlock. A wrong one
  * counts like any other and leaves the device locked. */
-static void update_pin_submit(void)
+static void pin_again_submit(void (*then)(void))
 {
     store_lock();
     store_status_t st = store_unlock(ui.pin.digits, ui.pin.len);
     crypto_wipe(ui.pin.digits, sizeof(ui.pin.digits));
     ui.pin.len = 0;
     if (st == STORE_OK) {
-        update_receive();
+        then();
     } else if (st == STORE_WIPED) {
         message_to_menu("Too many wrong PINs", "Everything was erased", M_HOME);
     } else {
         open_pin(P_UNLOCK, "Wrong PIN");
     }
+}
+
+static void update_pin_submit(void)
+{
+    pin_again_submit(update_receive);
 }
 
 static void update_poll(uint32_t now)
@@ -1180,6 +1191,62 @@ static void update_show_result(void)
     } else {
         message_to_menu("Update not installed", update_error(r), M_HOME);
     }
+}
+
+/* ------------------------------------------------------------------ */
+/* locking the debug port (docs/firmware-updates.md)                  */
+
+static void open_lock(void)
+{
+    go(SCR_LOCK);
+}
+
+/* Never automatic: only this, behind the PIN (and in simple mode behind the
+ * family PIN, like every setting). */
+static void lock_select(void)
+{
+    if (hal_debug_lock_state() == 1)
+        message_to_menu("The debug port is locked", "Updates over IR still work", M_SETTINGS);
+    else if (store_settings()->pin_set)
+        open_pin(P_LOCK, "PIN to lock");
+    else
+        open_lock();
+}
+
+static void lock_pin_submit(void)
+{
+    pin_again_submit(open_lock);
+}
+
+static void draw_lock(void)
+{
+    title_bar("Lock debug port");
+    gfx_text(&font_small, 6, TITLE_H + 4, "Stops someone who has this device and");
+    gfx_text(&font_small, 6, TITLE_H + 17, "a debug cable from reading its codes.");
+    gfx_text(&font_small, 6, TITLE_H + 34, "It is permanent: undoing it erases");
+    gfx_text(&font_small, 6, TITLE_H + 47, "everything on the device.");
+    gfx_text(&font_small, 6, TITLE_H + 64, "Updates over IR still work.");
+    hint(GFX_DOT " lock     " GFX_LEFT " back");
+}
+
+static void lock_now(void)
+{
+    message("Locking...", "The device restarts", NULL, SCR_MENU);
+    ui.force_full = true;
+    render(false);
+    hal_debug_lock();
+    /* Still here: nothing to lock (the simulator). */
+    message_to_menu("Not on this device", "The simulator has no debug port", M_SETTINGS);
+}
+
+static void lock_show_result(void)
+{
+    int r = hal_debug_lock_result();
+    if (r < 0 || !store_unlocked() || !time_valid()) return;
+    if (r == 1) message_to_menu("Debug port locked", "Updates over IR still work", M_HOME);
+    else if (r == 2) message_to_menu("Not locked: battery low", "Fit a fresh cell, try again", M_HOME);
+    else if (r == 3) message_to_menu("The debug port is locked", NULL, M_HOME);
+    else message_to_menu("Not locked", "Development firmware", M_HOME);
 }
 
 /* ------------------------------------------------------------------ */
@@ -1304,6 +1371,7 @@ static void menu_select(void)
             if (st->simple) ask(C_SIMPLE_OFF, "Turn simple mode off?");
             else go(SCR_SIMPLE_INTRO);
         } else if (item == 6) open_menu(M_UPDATE);
+        else if (item == 7) lock_select();
         else ask(C_WIPE, "Erase ALL codes & contacts?");
         break;
     }
@@ -1335,6 +1403,9 @@ static void confirm_yes(void)
     case C_SIMPLE_OFF:
         store_set_simple(NULL, 0);
         message_to_menu("Simple mode is off", NULL, M_SETTINGS);
+        break;
+    case C_LOCK:
+        lock_now();
         break;
     }
 }
@@ -1386,6 +1457,9 @@ static void pin_submit(void)
         break;
     case P_UPDATE:
         update_pin_submit();
+        break;
+    case P_LOCK:
+        lock_pin_submit();
         break;
     case P_CONFIRM:
         /* The length is public (the screen shows a dot per symbol). */
@@ -1630,6 +1704,11 @@ static void on_key(uint8_t b)
         }
         break;
 
+    case SCR_LOCK:
+        if (b == BTN_CENTER) ask(C_LOCK, "Lock it? It can't be undone");
+        else if (b == BTN_LEFT) open_menu(M_SETTINGS);
+        break;
+
     case SCR_MESSAGE:
         if (ui.msg.back_menu) open_menu(ui.msg.back_menu_id);
         else go(ui.msg.back);
@@ -1761,6 +1840,7 @@ static void render(bool tick_only)
     case SCR_SIMPLE: draw_simple(); break;
     case SCR_SIMPLE_INTRO: draw_simple_intro(); break;
     case SCR_UPDATE: draw_update(); break;
+    case SCR_LOCK: draw_lock(); break;
     }
     /* Keys as of what was just drawn (drawing the code screen sets
      * code_period), so a redraw is not followed by a spurious one. */
@@ -1795,6 +1875,7 @@ void app_init(void)
     ui.force_full = true;
     enter_first_screen();
     update_show_result();
+    lock_show_result();
     ui.view_key = current_view_key();
 }
 

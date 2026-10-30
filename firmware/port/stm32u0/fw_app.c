@@ -55,37 +55,44 @@ bool hal_update_read(uint32_t off, uint8_t *buf, size_t len)
     return board_flash_read(FL_STAGING_OFF + FW_HDR_SIZE + off, buf, len);
 }
 
-/* Readout protection is the bootloader's to set (docs/firmware-updates.md):
- * the first time the owner wakes the device with the joystick after a start,
- * if the chip is unprotected and runs a signed image, ask for it. A
- * programming fixture only powers the board and never gets here. The
- * bootloader declines on a weak cell; then the next start asks again. */
-void board_request_lock(void)
+/* The bootloader's message from before this start, read once. */
+static uint32_t mailbox_cmd, mailbox_arg;
+
+static void mailbox_read(void)
 {
-    static bool asked;
-    if (asked) return;
-    asked = true;
-    const fw_header_t *h = own_header();
-    if ((FLASH->OPTR & FLASH_OPTR_RDP) != 0xAAu || !h || (h->flags & FW_FLAG_UNSIGNED)) return;
-    boot_mailbox_put(BOOT_CMD_LOCK, 0);
-    NVIC_SystemReset();
+    static bool taken;
+    if (taken) return;
+    taken = true;
+    mailbox_cmd = boot_mailbox_take(&mailbox_arg);
 }
 
 int hal_update_result(uint32_t *version)
 {
-    static bool taken;
-    static int result = -1;
-    static uint32_t ver;
-    if (!taken) {
-        taken = true;
-        uint32_t arg;
-        if (boot_mailbox_take(&arg) == BOOT_CMD_RESULT) {
-            result = (int)(arg & 0xFFu);
-            ver = arg >> 8;
-        }
-    }
-    *version = ver;
-    int r = result;
-    result = -1;
-    return r;
+    mailbox_read();
+    *version = mailbox_arg >> 8;
+    if (mailbox_cmd != BOOT_CMD_RESULT) return -1;
+    mailbox_cmd = 0;
+    return (int)(mailbox_arg & 0xFFu);
+}
+
+/* Readout protection (docs/firmware-updates.md#locking-the-debug-port):
+ * never automatic. Settings -> Lock debug port asks the bootloader, which
+ * sets RDP level 1 only for a signed image on a healthy cell. */
+int hal_debug_lock_state(void)
+{
+    return (FLASH->OPTR & FLASH_OPTR_RDP) == 0xAAu ? 0 : 1;
+}
+
+void hal_debug_lock(void)
+{
+    boot_mailbox_put(BOOT_CMD_LOCK, 0);
+    NVIC_SystemReset();
+}
+
+int hal_debug_lock_result(void)
+{
+    mailbox_read();
+    if (mailbox_cmd != BOOT_CMD_LOCK_RESULT) return -1;
+    mailbox_cmd = 0;
+    return (int)mailbox_arg;
 }

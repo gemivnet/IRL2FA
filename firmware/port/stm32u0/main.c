@@ -65,7 +65,6 @@ int main(void)
         if (wait == APP_SLEEP) {
             DEBUG_SLEEP();
             hal_sleep(app_wake_at());
-            board_request_lock();
             app_wake();
             continue;
         }

@@ -85,8 +85,4 @@ void board_init_boot(void);
  * calibration (false: the ES0602 2.1.2 fallback, a typical value). */
 uint16_t board_battery_mv(bool *calibrated);
 
-/* fw_app.c: at the first joystick wake, ask the bootloader to turn on
- * readout protection (restarts the device if it does). */
-void board_request_lock(void);
-
 #endif

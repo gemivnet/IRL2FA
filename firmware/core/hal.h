@@ -83,4 +83,14 @@ bool hal_update_read(uint32_t off, uint8_t *buf, size_t len); /* its payload */
  * *version. */
 int hal_update_result(uint32_t *version);
 
+/* ---- readout protection: never automatic, only Settings -> Lock debug port
+ * (docs/firmware-updates.md#locking-the-debug-port) ---- */
+int hal_debug_lock_state(void);  /* 1 locked, 0 open, -1 no such thing (simulator) */
+/* Restarts into the bootloader, which locks the debug port if the image is
+ * signed and the cell healthy. Returns only where there is none. */
+void hal_debug_lock(void);
+/* Once after that restart: -1 nothing, 1 locked, 2 cell too low, 3 was
+ * already, 4 development image. */
+int hal_debug_lock_result(void);
+
 #endif

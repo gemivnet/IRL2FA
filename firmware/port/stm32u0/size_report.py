@@ -26,10 +26,24 @@ def sections(elf):
     return sec, flash, sec.get(".data", 0) + sec.get(".bss", 0)
 
 
+DOC = "docs/firmware-updates.md#the-flash-budget"
+FIXED = ("The flash layout is fixed (the 80 KB record store stays): make the firmware "
+         "smaller. See " + DOC + ".")
+
+
+def overflow(what, have, limit):
+    print(f"\nERROR: {what} is {have} bytes, {have - limit} more than its {limit}. {FIXED}\n",
+          file=sys.stderr)
+
+
 def main(elf, boot=None, image=None):
     sec, flash, static_ram = sections(elf)
     stack = RAM_BUDGET - static_ram
     ok = flash <= APP_BUDGET and static_ram <= RAM_BUDGET - 4096
+    if flash > APP_BUDGET:
+        overflow("the application", flash, APP_BUDGET)
+    if static_ram > RAM_BUDGET - 4096:
+        overflow("the application's static RAM", static_ram, RAM_BUDGET - 4096)
     print(f"flash: {flash:7d} B / {APP_BUDGET} B ({100 * flash / APP_BUDGET:5.1f} %)  "
           f"[text {sec.get('.text', 0)}, data {sec.get('.data', 0)}]  application slot")
     print(f"ram:   {static_ram:7d} B / {RAM_BUDGET} B ({100 * static_ram / RAM_BUDGET:5.1f} %)  "
@@ -41,12 +55,16 @@ def main(elf, boot=None, image=None):
     if boot:
         _, bflash, bram = sections(boot)
         ok = ok and bflash <= BOOT_BUDGET and bram <= RAM_BUDGET - 3072
+        if bflash > BOOT_BUDGET:
+            overflow("the bootloader", bflash, BOOT_BUDGET)
         print(f"boot:  {bflash:7d} B / {BOOT_BUDGET} B ({100 * bflash / BOOT_BUDGET:5.1f} %)  "
               f"bootloader, {bram} B RAM")
     if image:
         with open(image, "rb") as f:
             n = len(f.read())
         ok = ok and n <= STAGING_BUDGET
+        if n > STAGING_BUDGET:
+            overflow("the compressed update image", n, STAGING_BUDGET)
         print(f"image: {n:7d} B / {STAGING_BUDGET} B ({100 * n / STAGING_BUDGET:5.1f} %)  "
               "update image (LZMA) in the staging slot")
     return 0 if ok else 1

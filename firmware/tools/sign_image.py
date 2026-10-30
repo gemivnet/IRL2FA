@@ -349,8 +349,10 @@ def cmd_sign(a):
     seed = None if a.unsigned else read_seed(a.key) if a.key else sys.exit("sign_image: --key or --unsigned")
     image = make_image(binary, version, seed, COMP_STORED if a.stored else COMP_LZMA_THUMB,
                        int(a.hw_id, 0), a.min_boot)
-    if HDR_SIZE + parse_header(image)["payload_size"] > STAGING_SIZE and not a.unsigned:
-        sys.exit(f"sign_image: update image is {len(image)} bytes, the staging slot {STAGING_SIZE}")
+    if HDR_SIZE + parse_header(image)["payload_size"] > STAGING_SIZE:
+        sys.exit(f"sign_image: ERROR: the update image is {len(image)} bytes, {len(image) - STAGING_SIZE} "
+                 f"more than the {STAGING_SIZE}-byte staging slot. The flash layout is fixed: make the "
+                 f"firmware smaller (docs/firmware-updates.md#the-flash-budget)")
     Path(a.out).write_bytes(image)
     kind = "unsigned development image" if a.unsigned else f"signed, key {ed25519_public(seed).hex()[:16]}..."
     print(f"{a.out}: v{format_version(version)}, {len(binary)} -> {len(image) - HDR_SIZE} bytes, {kind}")

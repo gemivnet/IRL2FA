@@ -278,6 +278,28 @@ Sleep And Wake
     Press    ${name}    joyCenter
     Run For    1
 
+Open Lock Item
+    [Documentation]    Home -> Settings -> Lock debug port (no PIN set: row 6).
+    [Arguments]    ${name}
+    Wait For Screen    ${name}    menu    timeout_s=30
+    Wait Until Display Idle    ${name}
+    Presses    ${name}    joyDown    4
+    Press    ${name}    joyCenter
+    Presses    ${name}    joyDown    6
+    Press    ${name}    joyCenter
+
+Lock From Settings
+    [Documentation]    The explanation, the confirm, yes: the device restarts into
+    ...    the bootloader, which locks if it may.
+    [Arguments]    ${name}
+    Open Lock Item    ${name}
+    Wait For Screen    ${name}    lock
+    Dump Screen    ${name}    lock-explained
+    Press    ${name}    joyCenter
+    Wait For Screen    ${name}    confirm
+    Press    ${name}    joyCenter
+    Run For    1
+
 Dump Screen
     [Arguments]    ${name}    ${file}
     Execute Command    mach set "${name}"
@@ -413,43 +435,64 @@ Refuses An Older Image At Once
     Should Be Equal As Integers    ${b}[install_err]    0    an install was attempted
     Running Version Should Be    bob    ${V2}    timeout_s=30
 
-Sets Readout Protection When Its Owner First Wakes It On A Healthy Cell
-    [Documentation]    Never on a programming fixture (power only, 3.0 V, power
-    ...    cycles), never on a weak cell; once its owner wakes it with the
-    ...    joystick on a fresh cell, level 1, once, and it carries on.
+Never Locks The Debug Port On Its Own
+    [Documentation]    Readout protection is never automatic: not at a power-on
+    ...    on a programming fixture (3.0 V, power cycles), not when its owner
+    ...    wakes it.
     Create Device    dev    1    v1
     Running Version Should Be    dev    ${V1}
     Cut Power    dev
     Running Version Should Be    dev    ${V1}
-    ${rdp}=    Model Int    dev    sysbus.flash_ctrl RdpLevel
-    Should Be Equal As Integers    ${rdp}    0    locked on the fixture
-    # The owner wakes it, but the cell is weak: asked, declined.
-    Execute Command    sysbus.adc VddaMillivolts 2700
     Sleep And Wake    dev
-    Running Version Should Be    dev    ${V1}
-    ${b}=    Boot Block    dev
-    Should Be Equal As Integers    ${b}[rdp]    2
-    ${rdp}=    Model Int    dev    sysbus.flash_ctrl RdpLevel
-    Should Be Equal As Integers    ${rdp}    0
-    # A fresh cell: the next start, the first wake.
-    Execute Command    sysbus.adc VddaMillivolts 3000
+    Sleep And Wake    dev
     Cut Power    dev
     Running Version Should Be    dev    ${V1}
     Sleep And Wake    dev
+    ${rdp}=    Model Int    dev    sysbus.flash_ctrl RdpLevel
+    Should Be Equal As Integers    ${rdp}    0
+    ${n}=    Model Int    dev    sysbus.flash_ctrl OptionBytePrograms
+    Should Be Equal As Integers    ${n}    0
+
+Locks The Debug Port Once From Settings
+    Create Device    dev    1    v1
+    Running Version Should Be    dev    ${V1}
+    Lock From Settings    dev
     Running Version Should Be    dev    ${V1}
     ${rdp}=    Model Int    dev    sysbus.flash_ctrl RdpLevel
     Should Be Equal As Integers    ${rdp}    1
     ${n}=    Model Int    dev    sysbus.flash_ctrl OptionBytePrograms
     Should Be Equal As Integers    ${n}    1
-    Wait For Screen    dev    menu    timeout_s=30
-    # Once.
+    # The device says so, then carries on; asking again does nothing.
+    Wait For Screen    dev    message    timeout_s=30
+    Wait Until Display Idle    dev
+    Dump Screen    dev    lock-done
+    Press    dev    joyCenter
+    Wait For Screen    dev    menu
+    Open Lock Item    dev
+    Wait For Screen    dev    message
+    ${n}=    Model Int    dev    sysbus.flash_ctrl OptionBytePrograms
+    Should Be Equal As Integers    ${n}    1
     Cut Power    dev
     Running Version Should Be    dev    ${V1}
-    Sleep And Wake    dev
-    ${n}=    Model Int    dev    sysbus.flash_ctrl OptionBytePrograms
-    Should Be Equal As Integers    ${n}    1    option bytes written again
+    ${rdp}=    Model Int    dev    sysbus.flash_ctrl RdpLevel
+    Should Be Equal As Integers    ${rdp}    1
 
-Never Protects A Development Image
+Declines To Lock On A Weak Cell
+    Create Device    dev    1    v1    vdda=2700
+    Running Version Should Be    dev    ${V1}
+    Lock From Settings    dev
+    Running Version Should Be    dev    ${V1}
+    ${b}=    Boot Block    dev
+    Should Be Equal As Integers    ${b}[rdp]    2
+    ${rdp}=    Model Int    dev    sysbus.flash_ctrl RdpLevel
+    Should Be Equal As Integers    ${rdp}    0
+    ${n}=    Model Int    dev    sysbus.flash_ctrl OptionBytePrograms
+    Should Be Equal As Integers    ${n}    0
+    Wait For Screen    dev    message    timeout_s=30
+    Wait Until Display Idle    dev
+    Dump Screen    dev    lock-weak-cell
+
+Never Locks A Development Image
     [Documentation]    The unsigned factory image (a build without the signing key)
     ...    boots only while the chip is unprotected, so it must never protect it.
     Create Device    dev    1    v1
@@ -458,9 +501,12 @@ Never Protects A Development Image
     Execute Command    sysbus LoadBinary @${CURDIR}/../build/stm32u0/irl2fa-factory.bin 0x08000000
     Cut Power    dev
     Wait For Boot Phase    dev    4
-    Sleep And Wake    dev
-    Wait For Screen    dev    menu    timeout_s=30
+    Lock From Settings    dev
+    Wait For Boot Phase    dev    4
+    ${b}=    Boot Block    dev
+    Should Be Equal As Integers    ${b}[rdp]    4
     ${rdp}=    Model Int    dev    sysbus.flash_ctrl RdpLevel
     Should Be Equal As Integers    ${rdp}    0
     ${n}=    Model Int    dev    sysbus.flash_ctrl OptionBytePrograms
     Should Be Equal As Integers    ${n}    0
+    Wait For Screen    dev    message    timeout_s=30
