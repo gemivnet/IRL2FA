@@ -13,6 +13,7 @@ check: firmware verify formal stm32 renode sim case hardware
 firmware:
 	$(MAKE) -C firmware test
 	$(PY) hardware/tools/gen_pins.py --check
+	$(PY) firmware/tools/check_hw_constants.py
 
 VERIFY_IMAGE ?= irl2fa-verify
 verify-image:

@@ -5,7 +5,9 @@
 // encoded in ST's stm32u083xx.h (firmware/port/stm32u0/vendor).
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-flash: Memory.MappedMemory @ sysbus 0x08000000
+// Main flash, also aliased at 0 when booting from it (RM0503 2.5): the
+// core fetches the reset SP/PC from 0 after every reset.
+flash: Memory.MappedMemory @ { sysbus 0x08000000; sysbus 0x0 }
     size: 0x40000
 
 sram: Memory.MappedMemory @ sysbus 0x20000000
@@ -29,9 +31,11 @@ cpu: CPU.CortexM @ sysbus
 rcc: Miscellaneous.STM32U0_RCC @ sysbus 0x40021000
 
 pwr: Miscellaneous.STM32U0_PWR @ sysbus 0x40007000
+    cpu: cpu
 
 flash_ctrl: Miscellaneous.STM32U0_FLASH @ sysbus 0x40022000
     flash: flash
+    nvic: nvic
 
 exti: Miscellaneous.STM32U0_EXTI @ sysbus 0x40021800
     [0-2] -> nvic@[5-7]

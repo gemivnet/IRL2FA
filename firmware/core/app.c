@@ -20,6 +20,12 @@
 #define IDLE_SLEEP_S_DEFAULT 30
 #define REPEAT_DELAY_MS 450
 #define REPEAT_RATE_MS 90
+/* A key held longer than this is taken as jammed (pressed in a pocket):
+ * it stops auto-repeating and stops counting as activity, so the device
+ * goes to sleep instead of redrawing the panel ten times a second until the
+ * cell is flat. Long enough for any real hold (scrolling a full list, a
+ * clock field through 0..59). port/stm32u0 BTN_STUCK_MS must stay below. */
+#define HOLD_LIMIT_MS 20000u
 #define FULL_REFRESH_EVERY 5   /* GDEY0213B74 datasheet: full refresh after 5 fast/partial ones */
 #define BAR_STEPS 3            /* countdown bars move in thirds of the period (partial refreshes) */
 #define PAIR_TX_MS 220
@@ -1211,7 +1217,7 @@ static void scan_buttons(uint32_t now)
         ui.next_repeat = now + REPEAT_DELAY_MS;
         ui.last_input_ms = now;
         on_key(b);
-    } else if (held && held == ui.held && repeats(held) &&
+    } else if (held && held == ui.held && repeats(held) && now - ui.held_since < HOLD_LIMIT_MS &&
                (int32_t)(now - ui.next_repeat) >= 0) {
         ui.next_repeat = now + REPEAT_RATE_MS;
         ui.last_input_ms = now;
@@ -1303,6 +1309,7 @@ void app_init(void)
     store_mount();
     ui.held = hal_buttons(); /* the press that woke us is not a key */
     ui.last_input_ms = hal_millis();
+    ui.held_since = ui.last_input_ms;
     ui.force_full = true;
     enter_first_screen();
     ui.view_key = current_view_key();
@@ -1312,6 +1319,7 @@ void app_wake(void)
 {
     ui.held = hal_buttons();
     ui.last_input_ms = hal_millis();
+    ui.held_since = ui.last_input_ms;
     /* The sleep screen went up with a full refresh, so the panel is clean:
      * the first screen can be a partial one (0.42 s, not 3 s). The STM32
      * driver still does a full one if it lost track of the panel. */
@@ -1391,7 +1399,8 @@ uint32_t app_poll(void)
 
     uint32_t idle_limit = (store_settings()->sleep_s ? store_settings()->sleep_s
                                                        : IDLE_SLEEP_S_DEFAULT) * 1000u;
-    if (ui.held == 0 && now - ui.last_input_ms >= idle_limit) {
+    bool stuck = ui.held != 0 && now - ui.held_since >= HOLD_LIMIT_MS;
+    if ((ui.held == 0 || stuck) && now - ui.last_input_ms >= idle_limit) {
         if (ui.scr == SCR_PAIR || ui.scr == SCR_SAS || ui.scr == SCR_TEXT) stop_pairing();
         crypto_wipe(&ui.draft, sizeof(ui.draft));
         crypto_wipe(ui.text.buf, sizeof(ui.text.buf));
@@ -1403,7 +1412,7 @@ uint32_t app_poll(void)
         ui.fast_count = 0;
         return APP_SLEEP;
     }
-    if (ui.held) return 20;
+    if (ui.held && !stuck) return 20;
     if (ui.pair.state >= PAIR_SEARCHING && ui.pair.state <= PAIR_DONE) return 20;
     return 100;
 }

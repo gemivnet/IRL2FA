@@ -1,6 +1,13 @@
 // Minimal Renode models of the STM32U0 RCC, PWR, FLASH interface, EXTI, RNG
 // and ADC: enough register behaviour for the IRL2FA firmware (RM0503 register
 // maps), nothing more. See firmware/port/stm32u0/README.md, "Emulation".
+//
+// Every register offset, bit and base address the models use is a constant in
+// U0Map below, named after ST's CMSIS header (stm32u083xx.h): OFF_<P>_<REG> is
+// offsetof(<P>_TypeDef, <REG>), any other name is the header macro of that
+// name. firmware/tools/check_hw_constants.py compiles them against the
+// vendored header and fails on any difference, so a model cannot quietly
+// disagree with the silicon the firmware is written for.
 // SPDX-License-Identifier: AGPL-3.0-or-later
 using System;
 using System.Collections.Generic;
@@ -8,10 +15,137 @@ using System.Collections.ObjectModel;
 using Antmicro.Renode.Core;
 using Antmicro.Renode.Logging;
 using Antmicro.Renode.Peripherals.Bus;
+using Antmicro.Renode.Peripherals.CPU;
+using Antmicro.Renode.Peripherals.IRQControllers;
 using Antmicro.Renode.Peripherals.Memory;
+using Antmicro.Renode.Peripherals.Timers;
+using Antmicro.Renode.Time;
 
 namespace Antmicro.Renode.Peripherals.Miscellaneous
 {
+    // Checked against stm32u083xx.h by firmware/tools/check_hw_constants.py.
+    public static class U0Map
+    {
+        // ---- base addresses ----
+        public const uint FLASH_BASE = 0x08000000;
+        public const uint FLASH_R_BASE = 0x40022000;
+        public const uint RCC_BASE = 0x40021000;
+        public const uint PWR_BASE = 0x40007000;
+        public const uint EXTI_BASE = 0x40021800;
+        public const uint RNG_BASE = 0x40025000;
+        public const uint ADC1_BASE = 0x40012400;
+        public const uint I2C1_BASE = 0x40005400;
+        public const uint SPI1_BASE = 0x40013000;
+        public const uint USART1_BASE = 0x40013800;
+        public const uint GPIOA_BASE = 0x50000000;
+        public const uint GPIOB_BASE = 0x50000400;
+        public const uint GPIOC_BASE = 0x50000800;
+        public const uint GPIOF_BASE = 0x50001400;
+
+        // ---- RCC ----
+        public const long OFF_RCC_CR = 0x00;
+        public const long OFF_RCC_CFGR = 0x08;
+        public const long OFF_RCC_BDCR = 0x90;
+        public const long OFF_RCC_CSR = 0x94;
+        public const long OFF_RCC_CRRCR = 0x98;
+        public const uint RCC_CR_MSION = 1u << 0;
+        public const uint RCC_CR_MSIRDY = 1u << 1;
+        public const uint RCC_CR_HSION = 1u << 8;
+        public const uint RCC_CR_HSIRDY = 1u << 10;
+        public const uint RCC_CR_HSEON = 1u << 16;
+        public const uint RCC_CR_HSERDY = 1u << 17;
+        public const uint RCC_CR_PLLON = 1u << 24;
+        public const uint RCC_CR_PLLRDY = 1u << 25;
+        public const uint RCC_CFGR_SW = 7u << 0;
+        public const uint RCC_CFGR_SWS = 7u << 3;
+        public const uint RCC_BDCR_LSEON = 1u << 0;
+        public const uint RCC_BDCR_LSERDY = 1u << 1;
+        public const uint RCC_CSR_LSION = 1u << 0;
+        public const uint RCC_CSR_LSIRDY = 1u << 1;
+        public const uint RCC_CRRCR_HSI48ON = 1u << 0;
+        public const uint RCC_CRRCR_HSI48RDY = 1u << 1;
+
+        // ---- PWR ----
+        public const long OFF_PWR_CR1 = 0x00;
+        public const long OFF_PWR_SR2 = 0x14;
+        public const uint PWR_CR1_LPMS = 7u << 0;
+        public const uint PWR_CR1_LPMS_1 = 2u << 0;
+        public const uint PWR_CR1_LPR = 1u << 14;
+        public const uint PWR_CR1_VOS_0 = 1u << 9;
+
+        // ---- FLASH ----
+        public const long OFF_FLASH_ACR = 0x00;
+        public const long OFF_FLASH_KEYR = 0x08;
+        public const long OFF_FLASH_SR = 0x10;
+        public const long OFF_FLASH_CR = 0x14;
+        public const long OFF_FLASH_ECCR = 0x18;
+        public const uint FLASH_SR_EOP = 1u << 0;
+        public const uint FLASH_CR_PER = 1u << 1;
+        public const int FLASH_CR_PNB_Pos = 3;
+        public const uint FLASH_CR_PNB = 0x7Fu << 3;
+        public const uint FLASH_CR_STRT = 1u << 16;
+        public const uint FLASH_CR_LOCK = 1u << 31;
+        public const uint FLASH_ECCR_ECCD = 1u << 31;
+        public const uint FLASH_ECCR_ECCC = 1u << 30;
+        public const uint FLASH_ECCR_ECCCIE = 1u << 24;
+        public const uint FLASH_ECCR_SYSF_ECC = 1u << 20;
+        public const uint FLASH_ECCR_ADDR_ECC = 0x3FFFu;
+        public const uint FlashKey1 = 0x45670123; // RM0503 3.3.5, not in the CMSIS header
+        public const uint FlashKey2 = 0xCDEF89AB;
+
+        // ---- EXTI ----
+        public const long OFF_EXTI_RTSR1 = 0x00;
+        public const long OFF_EXTI_FTSR1 = 0x04;
+        public const long OFF_EXTI_SWIER1 = 0x08;
+        public const long OFF_EXTI_RPR1 = 0x0C;
+        public const long OFF_EXTI_FPR1 = 0x10;
+        public const long OFF_EXTI_EXTICR = 0x60;
+        public const long OFF_EXTI_IMR1 = 0x80;
+        public const long OFF_EXTI_EMR1 = 0x84;
+        public const long OFF_EXTI_IMR2 = 0x90;
+
+        // ---- RNG ----
+        public const long OFF_RNG_CR = 0x00;
+        public const long OFF_RNG_SR = 0x04;
+        public const long OFF_RNG_DR = 0x08;
+        public const long OFF_RNG_HTCR = 0x10;
+        public const uint RNG_CR_RNGEN = 1u << 2;
+        public const uint RNG_CR_CONDRST = 1u << 30;
+        public const uint RNG_CR_CONFIGLOCK = 1u << 31;
+        public const uint RNG_SR_DRDY = 1u << 0;
+
+        // ---- ADC ----
+        public const long OFF_ADC_ISR = 0x00;
+        public const long OFF_ADC_CR = 0x08;
+        public const long OFF_ADC_CHSELR = 0x28;
+        public const long OFF_ADC_DR = 0x40;
+        public const uint ADC_ISR_ADRDY = 1u << 0;
+        public const uint ADC_ISR_EOC = 1u << 2;
+        public const uint ADC_ISR_EOS = 1u << 3;
+        public const uint ADC_ISR_CCRDY = 1u << 13;
+        public const uint ADC_CR_ADEN = 1u << 0;
+        public const uint ADC_CR_ADDIS = 1u << 1;
+        public const uint ADC_CR_ADSTART = 1u << 2;
+        public const uint ADC_CR_ADCAL = 1u << 31;
+
+        // ---- peripherals the Stop 2 audit looks at ----
+        public const long OFF_I2C_CR1 = 0x00;
+        public const uint I2C_CR1_PE = 1u << 0;
+        public const long OFF_SPI_CR1 = 0x00;
+        public const uint SPI_CR1_SPE = 1u << 6;
+        public const long OFF_USART_CR1 = 0x00;
+        public const uint USART_CR1_UE = 1u << 0;
+        public const long OFF_GPIO_MODER = 0x00;
+        public const long OFF_GPIO_OSPEEDR = 0x08;
+        public const long OFF_GPIO_PUPDR = 0x0C;
+        public const long OFF_GPIO_IDR = 0x10;
+
+        // Cortex-M0+ System Control Register (Armv6-M ARM B3.2.7), not in the
+        // device header: SLEEPDEEP is bit 2.
+        public const ulong ScbScr = 0xE000ED10;
+        public const uint ScbScrSleepDeep = 1u << 2;
+    }
+
     // A register file whose reads can be post-processed (ready flags etc.).
     public abstract class U0RegisterFile : IDoubleWordPeripheral, IKnownSize
     {
@@ -30,71 +164,203 @@ namespace Antmicro.Renode.Peripherals.Miscellaneous
     public class STM32U0_RCC : U0RegisterFile
     {
         public STM32U0_RCC() : base(0x400) { Reset(); }
-        protected override void OnReset() { regs[0] = 0x00000061; /* MSION, MSIRANGE 4 MHz */ }
+        protected override void OnReset() { regs[U0Map.OFF_RCC_CR / 4] = 0x00000061; /* MSION, MSIRANGE 4 MHz */ }
         protected override uint OnRead(long offset, uint v)
         {
             switch(offset)
             {
-            case 0x00: // CR: MSIRDY, HSIRDY, HSERDY, PLLRDY
-                v &= ~((1u << 1) | (1u << 10) | (1u << 17) | (1u << 25));
-                if((v & 1) != 0) v |= 1u << 1;
-                if((v & (1u << 8)) != 0) v |= 1u << 10;
-                if((v & (1u << 16)) != 0) v |= 1u << 17;
-                if((v & (1u << 24)) != 0) v |= 1u << 25;
+            case U0Map.OFF_RCC_CR:
+                v &= ~(U0Map.RCC_CR_MSIRDY | U0Map.RCC_CR_HSIRDY | U0Map.RCC_CR_HSERDY | U0Map.RCC_CR_PLLRDY);
+                if((v & U0Map.RCC_CR_MSION) != 0) v |= U0Map.RCC_CR_MSIRDY;
+                if((v & U0Map.RCC_CR_HSION) != 0) v |= U0Map.RCC_CR_HSIRDY;
+                if((v & U0Map.RCC_CR_HSEON) != 0) v |= U0Map.RCC_CR_HSERDY;
+                if((v & U0Map.RCC_CR_PLLON) != 0) v |= U0Map.RCC_CR_PLLRDY;
                 return v;
-            case 0x08: return (v & ~0x38u) | ((v & 7u) << 3); // CFGR: SWS = SW
-            case 0x90: return (v & ~2u) | ((v & 1u) << 1);     // BDCR: LSERDY
-            case 0x94: return (v & ~2u) | ((v & 1u) << 1);     // CSR: LSIRDY
-            case 0x98: return (v & ~2u) | ((v & 1u) << 1);     // CRRCR: HSI48RDY
+            case U0Map.OFF_RCC_CFGR: return (v & ~U0Map.RCC_CFGR_SWS) | ((v & U0Map.RCC_CFGR_SW) << 3);
+            case U0Map.OFF_RCC_BDCR: return Ready(v, U0Map.RCC_BDCR_LSEON, U0Map.RCC_BDCR_LSERDY);
+            case U0Map.OFF_RCC_CSR: return Ready(v, U0Map.RCC_CSR_LSION, U0Map.RCC_CSR_LSIRDY);
+            case U0Map.OFF_RCC_CRRCR: return Ready(v, U0Map.RCC_CRRCR_HSI48ON, U0Map.RCC_CRRCR_HSI48RDY);
             default: return v;
             }
         }
+        private static uint Ready(uint v, uint on, uint rdy) { return (v & ~rdy) | ((v & on) != 0 ? rdy : 0); }
     }
 
     // PWR: plain registers; SR2 reports the regulator settled (VOSF = REGLPF = 0).
+    //
+    // Stop 2 entry audit (RM0503 4.3.8, 33.5): each time the core executes
+    // WFI with SLEEPDEEP set and LPMS = Stop 2, check what real silicon
+    // requires but the emulated core would not notice:
+    //  - no EXTI pending bit set (else the Stop 2 entry is ignored);
+    //  - LPR clear (else Stop 1 is entered instead);
+    //  - the peripherals that cannot run in Stop 2 are disabled: I2C1 (only
+    //    I2C3 runs in Stop 2), SPI1, USART1, ADC, RNG;
+    //  - no GPIO left as a floating digital input (input mode, no pull),
+    //    which draws current on real silicon.
+    // Violations are counted (Stop2Violations) and the last one is named
+    // (LastStop2Violation); the tests require zero.
     public class STM32U0_PWR : U0RegisterFile
     {
-        public STM32U0_PWR() : base(0x400) { Reset(); }
-        protected override void OnReset() { regs[0] = 0x00000200; /* VOS range 1 */ }
-        protected override uint OnRead(long offset, uint v) { return offset == 0x14 ? 0u : v; }
-        public uint LowPowerMode => regs[0] & 7u;
+        public STM32U0_PWR(IMachine machine, TranslationCPU cpu) : base(0x400)
+        {
+            this.machine = machine;
+            cpu.AddHookAtWfiStateChange(OnWfi);
+            Reset();
+        }
+        protected override void OnReset() { regs[U0Map.OFF_PWR_CR1 / 4] = 0x00000208; /* RM0503 4.4.1: VOS range 1, FPD_STOP */ }
+        protected override uint OnRead(long offset, uint v) { return offset == U0Map.OFF_PWR_SR2 ? 0u : v; }
+        public uint LowPowerMode => regs[U0Map.OFF_PWR_CR1 / 4] & U0Map.PWR_CR1_LPMS;
+        public int Stop2Entries { get; private set; }
+        public int Stop2Violations { get; private set; }
+        public string LastStop2Violation { get; private set; } = "none";
+
+        private void OnWfi(bool entering)
+        {
+            if(!entering) return;
+            var bus = machine.SystemBus;
+            if((bus.ReadDoubleWord(U0Map.ScbScr) & U0Map.ScbScrSleepDeep) == 0) return;
+            var cr1 = regs[U0Map.OFF_PWR_CR1 / 4];
+            if((cr1 & U0Map.PWR_CR1_LPMS) != U0Map.PWR_CR1_LPMS_1) return;
+            Stop2Entries++;
+            var problems = new List<string>();
+            if((cr1 & U0Map.PWR_CR1_LPR) != 0) problems.Add("PWR_CR1.LPR set");
+            var pending = bus.ReadDoubleWord(U0Map.EXTI_BASE + U0Map.OFF_EXTI_RPR1) | bus.ReadDoubleWord(U0Map.EXTI_BASE + U0Map.OFF_EXTI_FPR1);
+            if(pending != 0) problems.Add(string.Format("EXTI pending 0x{0:X}", pending));
+            Check(problems, "I2C1", U0Map.I2C1_BASE + U0Map.OFF_I2C_CR1, U0Map.I2C_CR1_PE);
+            Check(problems, "SPI1", U0Map.SPI1_BASE + U0Map.OFF_SPI_CR1, U0Map.SPI_CR1_SPE);
+            Check(problems, "USART1", U0Map.USART1_BASE + U0Map.OFF_USART_CR1, U0Map.USART_CR1_UE);
+            Check(problems, "ADC", U0Map.ADC1_BASE + U0Map.OFF_ADC_CR, U0Map.ADC_CR_ADEN);
+            Check(problems, "RNG", U0Map.RNG_BASE + U0Map.OFF_RNG_CR, U0Map.RNG_CR_RNGEN);
+            foreach(var port in new[] { Tuple.Create('A', U0Map.GPIOA_BASE), Tuple.Create('B', U0Map.GPIOB_BASE),
+                                        Tuple.Create('C', U0Map.GPIOC_BASE), Tuple.Create('F', U0Map.GPIOF_BASE) })
+            {
+                var moder = bus.ReadDoubleWord((ulong)port.Item2 + U0Map.OFF_GPIO_MODER);
+                var pupdr = bus.ReadDoubleWord((ulong)port.Item2 + U0Map.OFF_GPIO_PUPDR);
+                for(int pin = 0; pin < 16; pin++)
+                    if(((moder >> (2 * pin)) & 3) == 0 && ((pupdr >> (2 * pin)) & 3) == 0)
+                        problems.Add(string.Format("P{0}{1} floating input", port.Item1, pin));
+            }
+            if(problems.Count == 0) return;
+            Stop2Violations++;
+            LastStop2Violation = string.Join(", ", problems);
+            this.Log(LogLevel.Warning, "Stop 2 entry: {0}", LastStop2Violation);
+        }
+
+        private void Check(List<string> problems, string name, ulong address, uint enable)
+        {
+            if((machine.SystemBus.ReadDoubleWord(address) & enable) != 0) problems.Add(name + " enabled");
+        }
+
+        private readonly IMachine machine;
     }
 
     // FLASH interface: KEYR unlock sequence, LOCK, page erase (fills the page
     // with 0xFF), EOP/BSY. Programming is done by the CPU writing the flash
     // array directly, as on silicon; the model only counts PG sessions.
+    //
+    // ECC (RM0503 3.3.2, 3.3.5 caution): InjectEccError(address) marks the
+    // double-word holding `address` as having inconsistent ECC bits, which is
+    // what a program or erase cut by a power loss leaves behind. Every CPU
+    // read of it then sets FLASH_ECCR.ECCD and raises an NMI, as on silicon,
+    // until the page is erased. The marks survive a machine reset (they are
+    // in the flash array).
     public class STM32U0_FLASH : U0RegisterFile
     {
-        public STM32U0_FLASH(MappedMemory flash, int pageSize = 2048) : base(0x400) { this.flash = flash; this.pageSize = pageSize; Reset(); }
-        protected override void OnReset() { regs[0x14 / 4] = 0xC0000000; keyStage = 0; }
+        public STM32U0_FLASH(IMachine machine, MappedMemory flash, NVIC nvic, int pageSize = 2048) : base(0x400)
+        {
+            this.machine = machine;
+            this.flash = flash;
+            this.nvic = nvic;
+            this.pageSize = pageSize;
+            Reset();
+        }
+        protected override void OnReset() { regs[U0Map.OFF_FLASH_CR / 4] = 0xC0000000; keyStage = 0; needRearm = true; }
         public int PageErases { get; private set; }
         public int LockViolations { get; private set; }
+        public int EccDetections { get; private set; }
+
+        public void InjectEccError(ulong address)
+        {
+            var dw = address & ~7UL;
+            if(!eccFaults.Add(dw)) return;
+            Hook(dw);
+        }
+
+        // A machine reset drops the system bus watchpoints; the faults are in
+        // the flash array and stay. Re-arm them on the first access to the
+        // flash interface after a reset (the firmware sets FLASH_ACR before
+        // it reads anything from the store).
+        public override uint ReadDoubleWord(long offset) { Rearm(); return base.ReadDoubleWord(offset); }
+        public override void WriteDoubleWord(long offset, uint value) { Rearm(); base.WriteDoubleWord(offset, value); }
+
+        private void Rearm()
+        {
+            if(!needRearm) return;
+            needRearm = false;
+            foreach(var dw in eccFaults)
+            {
+                for(ulong a = dw; a < dw + 8; a++) machine.SystemBus.RemoveAllWatchpointHooks(a);
+                Hook(dw);
+            }
+        }
+
+        private void Hook(ulong dw)
+        {
+            for(ulong a = dw; a < dw + 8; a++)
+                machine.SystemBus.AddWatchpointHook(a, SysbusAccessWidth.Byte | SysbusAccessWidth.Word | SysbusAccessWidth.DoubleWord,
+                                                    Access.Read, OnEccRead);
+        }
+
+        private void OnEccRead(ICpuSupportingGdb cpu, ulong address, SysbusAccessWidth width, ulong value)
+        {
+            EccDetections++;
+            var eccr = regs[U0Map.OFF_FLASH_ECCR / 4];
+            if((eccr & (U0Map.FLASH_ECCR_ECCD | U0Map.FLASH_ECCR_ECCC)) == 0)
+                eccr = (eccr & U0Map.FLASH_ECCR_ECCCIE) | (uint)(((address - U0Map.FLASH_BASE) >> 3) & U0Map.FLASH_ECCR_ADDR_ECC);
+            regs[U0Map.OFF_FLASH_ECCR / 4] = eccr | U0Map.FLASH_ECCR_ECCD;
+            nvic.SetPendingIRQ(2); // NMI
+        }
+
+        private void ClearEccFaults(ulong start, ulong length)
+        {
+            var gone = new List<ulong>();
+            foreach(var dw in eccFaults) if(dw >= start && dw < start + length) gone.Add(dw);
+            foreach(var dw in gone)
+            {
+                eccFaults.Remove(dw);
+                for(ulong a = dw; a < dw + 8; a++) machine.SystemBus.RemoveAllWatchpointHooks(a);
+            }
+        }
 
         protected override uint OnWrite(long offset, uint old, uint value)
         {
             switch(offset)
             {
-            case 0x08: // KEYR
-                if(keyStage == 0 && value == 0x45670123) keyStage = 1;
-                else if(keyStage == 1 && value == 0xCDEF89AB) { keyStage = 2; regs[0x14 / 4] &= ~(1u << 31); }
+            case U0Map.OFF_FLASH_KEYR:
+                if(keyStage == 0 && value == U0Map.FlashKey1) keyStage = 1;
+                else if(keyStage == 1 && value == U0Map.FlashKey2) { keyStage = 2; regs[U0Map.OFF_FLASH_CR / 4] &= ~U0Map.FLASH_CR_LOCK; }
                 else { keyStage = 3; LockViolations++; } // wrong sequence locks until reset
                 return 0;
-            case 0x10: // SR: write 1 to clear flags
+            case U0Map.OFF_FLASH_SR: // write 1 to clear flags
                 return old & ~value;
-            case 0x14: // CR
-                if((old & (1u << 31)) != 0)
+            case U0Map.OFF_FLASH_ECCR: // ECCD, ECCC: write 1 to clear; ECCCIE: read/write
+                return (old & ~(value & (U0Map.FLASH_ECCR_ECCD | U0Map.FLASH_ECCR_ECCC)) & ~U0Map.FLASH_ECCR_ECCCIE)
+                       | (value & U0Map.FLASH_ECCR_ECCCIE);
+            case U0Map.OFF_FLASH_CR:
+                if((old & U0Map.FLASH_CR_LOCK) != 0)
                 {
                     if(value != old) LockViolations++;
                     return old; // locked: ignored
                 }
-                if((value & (1u << 31)) != 0) { keyStage = 0; return value; }
-                if((value & (1u << 16)) != 0 && (value & 2u) != 0) // STRT with PER
+                if((value & U0Map.FLASH_CR_LOCK) != 0) { keyStage = 0; return value; }
+                if((value & U0Map.FLASH_CR_STRT) != 0 && (value & U0Map.FLASH_CR_PER) != 0)
                 {
-                    var page = (int)((value >> 3) & 0x7F);
+                    var page = (int)((value & U0Map.FLASH_CR_PNB) >> U0Map.FLASH_CR_PNB_Pos);
                     flash.SetRange((long)page * pageSize, pageSize, 0xFF);
+                    ClearEccFaults(U0Map.FLASH_BASE + (ulong)page * (ulong)pageSize, (ulong)pageSize);
                     PageErases++;
-                    regs[0x10 / 4] |= 1u; // EOP
-                    value &= ~(1u << 16);
+                    regs[U0Map.OFF_FLASH_SR / 4] |= U0Map.FLASH_SR_EOP;
+                    value &= ~U0Map.FLASH_CR_STRT;
                 }
                 return value;
             default:
@@ -102,9 +368,13 @@ namespace Antmicro.Renode.Peripherals.Miscellaneous
             }
         }
 
+        private readonly IMachine machine;
         private readonly MappedMemory flash;
+        private readonly NVIC nvic;
         private readonly int pageSize;
+        private readonly HashSet<ulong> eccFaults = new HashSet<ulong>();
         private int keyStage;
+        private bool needRearm;
     }
 
     // EXTI with the U0 register map (RM0503): RTSR1, FTSR1, SWIER1, RPR1, FPR1,
@@ -142,14 +412,15 @@ namespace Antmicro.Renode.Peripherals.Miscellaneous
         {
             switch(offset)
             {
-            case 0x00: return rtsr;
-            case 0x04: return ftsr;
-            case 0x0C: return rpr;
-            case 0x10: return fpr;
-            case 0x60: case 0x64: case 0x68: case 0x6C: return exticr[(offset - 0x60) / 4];
-            case 0x80: return imr1;
-            case 0x84: return emr1;
-            case 0x90: return imr2;
+            case U0Map.OFF_EXTI_RTSR1: return rtsr;
+            case U0Map.OFF_EXTI_FTSR1: return ftsr;
+            case U0Map.OFF_EXTI_RPR1: return rpr;
+            case U0Map.OFF_EXTI_FPR1: return fpr;
+            case U0Map.OFF_EXTI_EXTICR: case U0Map.OFF_EXTI_EXTICR + 4: case U0Map.OFF_EXTI_EXTICR + 8: case U0Map.OFF_EXTI_EXTICR + 12:
+                return exticr[(offset - U0Map.OFF_EXTI_EXTICR) / 4];
+            case U0Map.OFF_EXTI_IMR1: return imr1;
+            case U0Map.OFF_EXTI_EMR1: return emr1;
+            case U0Map.OFF_EXTI_IMR2: return imr2;
             default: return 0;
             }
         }
@@ -158,15 +429,16 @@ namespace Antmicro.Renode.Peripherals.Miscellaneous
         {
             switch(offset)
             {
-            case 0x00: rtsr = value & 0xFFFF; break;
-            case 0x04: ftsr = value & 0xFFFF; break;
-            case 0x08: rpr |= value & 0xFFFF; break; // SWIER1
-            case 0x0C: rpr &= ~value; break;
-            case 0x10: fpr &= ~value; break;
-            case 0x60: case 0x64: case 0x68: case 0x6C: exticr[(offset - 0x60) / 4] = value; break;
-            case 0x80: imr1 = value; break;
-            case 0x84: emr1 = value; break;
-            case 0x90: imr2 = value; break;
+            case U0Map.OFF_EXTI_RTSR1: rtsr = value & 0xFFFF; break;
+            case U0Map.OFF_EXTI_FTSR1: ftsr = value & 0xFFFF; break;
+            case U0Map.OFF_EXTI_SWIER1: rpr |= value & 0xFFFF; break;
+            case U0Map.OFF_EXTI_RPR1: rpr &= ~value; break;
+            case U0Map.OFF_EXTI_FPR1: fpr &= ~value; break;
+            case U0Map.OFF_EXTI_EXTICR: case U0Map.OFF_EXTI_EXTICR + 4: case U0Map.OFF_EXTI_EXTICR + 8: case U0Map.OFF_EXTI_EXTICR + 12:
+                exticr[(offset - U0Map.OFF_EXTI_EXTICR) / 4] = value; break;
+            case U0Map.OFF_EXTI_IMR1: imr1 = value; break;
+            case U0Map.OFF_EXTI_EMR1: emr1 = value; break;
+            case U0Map.OFF_EXTI_IMR2: imr2 = value; break;
             }
             Update();
         }
@@ -195,26 +467,65 @@ namespace Antmicro.Renode.Peripherals.Miscellaneous
     // RNG: CR (CONDRST self-clears), SR (DRDY while RNGEN), DR from a seeded
     // PRNG: give each emulated device its own Seed, or two devices would
     // generate the same keys.
+    //
+    // Configuration (RM0503 21.7.1, 21.7.5): the RNG_CONFIGx/NISTC/CLKDIV/CED
+    // fields and RNG_HTCR only take writes while CONDRST is 1. Words handed
+    // out while the configuration is not the STM32U0 NIST one from AN4230
+    // (RNG_CR 0x00F00D00, RNG_HTCR 0xAAC7; the reset value 0x00800D00 is not
+    // it) are counted in UncharacterisedWords; the tests require zero.
     public class STM32U0_RNG : U0RegisterFile
     {
+        public const uint NistCr = 0x00F00D00;
+        public const uint NistHtcr = 0x0000AAC7;
+        const uint ConfigMask = 0x03FFFFA0; // CONFIG1, CLKDIV, CONFIG2, NISTC, CONFIG3, ARDIS, CED
+
         public STM32U0_RNG(int seed = 1) : base(0x400) { Seed = seed; Reset(); }
         public int Seed { get => seed; set { seed = value; rng = new Random(value); } }
         public int WordsRead { get; private set; }
-        protected override void OnReset() { regs[0] = 0x00800D00; rng = new Random(seed); }
+        public int UncharacterisedWords { get; private set; }
+        protected override void OnReset()
+        {
+            regs[U0Map.OFF_RNG_CR / 4] = 0x00800D00;
+            regs[U0Map.OFF_RNG_HTCR / 4] = 0x000072AC;
+            rng = new Random(seed);
+        }
         protected override uint OnWrite(long offset, uint old, uint value)
         {
-            if(offset == 0x00) return value & ~(1u << 30); // CONDRST done at once
-            if(offset == 0x04) return 0;
-            return value;
+            switch(offset)
+            {
+            case U0Map.OFF_RNG_CR:
+                // The configuration fields only change while CONDRST is (or
+                // is being set) 1; CONDRST itself completes at once.
+                if((value & U0Map.RNG_CR_CONDRST) == 0 && (old & U0Map.RNG_CR_CONDRST) == 0)
+                    value = (value & ~ConfigMask) | (old & ConfigMask);
+                return value & ~U0Map.RNG_CR_CONDRST;
+            case U0Map.OFF_RNG_SR: return 0;
+            case U0Map.OFF_RNG_HTCR:
+                // Accepted only while CONDRST = 1. The model clears CONDRST at
+                // once, so it remembers the last CR write instead.
+                return condrstWindow ? value : old;
+            default: return value;
+            }
+        }
+        public override void WriteDoubleWord(long offset, uint value)
+        {
+            base.WriteDoubleWord(offset, value);
+            if(offset == U0Map.OFF_RNG_CR) condrstWindow = (value & U0Map.RNG_CR_CONDRST) != 0;
         }
         protected override uint OnRead(long offset, uint v)
         {
-            bool on = (regs[0] & 4u) != 0;
-            if(offset == 0x04) return on ? 1u : 0u;
-            if(offset == 0x08)
+            bool on = (regs[U0Map.OFF_RNG_CR / 4] & U0Map.RNG_CR_RNGEN) != 0;
+            if(offset == U0Map.OFF_RNG_SR) return on ? U0Map.RNG_SR_DRDY : 0u;
+            if(offset == U0Map.OFF_RNG_DR)
             {
                 if(!on) return 0;
                 WordsRead++;
+                if((regs[U0Map.OFF_RNG_CR / 4] & ConfigMask) != (NistCr & ConfigMask) || regs[U0Map.OFF_RNG_HTCR / 4] != NistHtcr)
+                {
+                    if(UncharacterisedWords++ == 0)
+                        this.Log(LogLevel.Warning, "random words drawn with RNG_CR 0x{0:X8}, RNG_HTCR 0x{1:X}: not the AN4230 configuration",
+                                 regs[U0Map.OFF_RNG_CR / 4], regs[U0Map.OFF_RNG_HTCR / 4]);
+                }
                 uint w;
                 do { w = (uint)rng.Next(0x10000) << 16 | (uint)rng.Next(0x10000); } while(w == 0);
                 return w;
@@ -223,6 +534,7 @@ namespace Antmicro.Renode.Peripherals.Miscellaneous
         }
         private int seed;
         private Random rng;
+        private bool condrstWindow;
     }
 
     // ADC: ADVREGEN/ADCAL/ADEN/ADSTART state machine, CHSELR (bit mode) with
@@ -239,19 +551,19 @@ namespace Antmicro.Renode.Peripherals.Miscellaneous
         {
             switch(offset)
             {
-            case 0x00: return old & ~value; // ISR: write 1 to clear
-            case 0x08: // CR
-                value &= ~(1u << 31); // ADCAL completes at once
-                if((value & 2u) != 0) value &= ~3u; // ADDIS
-                else if((value & 1u) != 0 && (old & 1u) == 0) regs[0] |= 1u; // ADRDY
-                if((value & 4u) != 0 && (value & 1u) != 0) // ADSTART
+            case U0Map.OFF_ADC_ISR: return old & ~value; // write 1 to clear
+            case U0Map.OFF_ADC_CR:
+                value &= ~U0Map.ADC_CR_ADCAL; // calibration completes at once
+                if((value & U0Map.ADC_CR_ADDIS) != 0) value &= ~(U0Map.ADC_CR_ADEN | U0Map.ADC_CR_ADDIS);
+                else if((value & U0Map.ADC_CR_ADEN) != 0 && (old & U0Map.ADC_CR_ADEN) == 0) regs[U0Map.OFF_ADC_ISR / 4] |= U0Map.ADC_ISR_ADRDY;
+                if((value & U0Map.ADC_CR_ADSTART) != 0 && (value & U0Map.ADC_CR_ADEN) != 0)
                 {
-                    regs[0x40 / 4] = Convert();
-                    regs[0] |= (1u << 2) | (1u << 3); // EOC, EOS
-                    value &= ~4u;
+                    regs[U0Map.OFF_ADC_DR / 4] = Convert();
+                    regs[U0Map.OFF_ADC_ISR / 4] |= U0Map.ADC_ISR_EOC | U0Map.ADC_ISR_EOS;
+                    value &= ~U0Map.ADC_CR_ADSTART;
                 }
                 return value;
-            case 0x28: regs[0] |= 1u << 13; return value; // CHSELR -> CCRDY
+            case U0Map.OFF_ADC_CHSELR: regs[U0Map.OFF_ADC_ISR / 4] |= U0Map.ADC_ISR_CCRDY; return value;
             default: return value;
             }
         }
@@ -259,7 +571,7 @@ namespace Antmicro.Renode.Peripherals.Miscellaneous
         private uint Convert()
         {
             Conversions++;
-            uint sel = regs[0x28 / 4] & 0x7FFFF;
+            uint sel = regs[U0Map.OFF_ADC_CHSELR / 4] & 0x7FFFF;
             int ch = 0;
             while(ch < 19 && (sel & (1u << ch)) == 0) ch++;
             decimal mv = ch == 12 ? VrefintMillivolts : 0;

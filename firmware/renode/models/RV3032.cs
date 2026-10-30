@@ -5,6 +5,12 @@
 // user RAM 40h-4Fh, the configuration RAM mirror C0h-CAh with the EECMD 11h
 // "update" command into a model EEPROM, and the periodic countdown timer
 // (TD, TE, TIE, TF) pulsing the open-drain INT output low.
+//
+// Power-on (PowerOnReset, also at creation): PORF set, the configuration RAM
+// mirror C0h-CAh at 00h with EEbusy set for tPREFR = 66 ms, then refreshed
+// from the (non-volatile) model EEPROM (application manual 4.6.1). A reset of
+// the MCU (Renode's machine reset, Reset()) does not touch the RTC, which
+// keeps its own supply and time: only the I2C interface state is reset.
 // Not modelled: alarms, periodic time update, temperature, timestamps, EVI,
 // backup switchover, password protection, CLKOUT waveform.
 // SPDX-License-Identifier: AGPL-3.0-or-later
@@ -28,9 +34,13 @@ namespace Antmicro.Renode.Peripherals.Miscellaneous
             countdown.LimitReached += TimerFired;
             pulse = new LimitTimer(machine.ClockSource, 1000, this, "int_pulse", 8, Direction.Ascending, false, WorkMode.OneShot, true);
             pulse.LimitReached += () => { INT.Set(); };
+            refresh = new LimitTimer(machine.ClockSource, 1000, this, "eeprom_refresh", RefreshMs, Direction.Ascending, false, WorkMode.OneShot, true);
+            refresh.LimitReached += RefreshDone;
             this.initialUnixTime = initialUnixTime;
-            Reset();
+            PowerOnReset();
         }
+
+        public const int RefreshMs = 66; // tPREFR
 
         public GPIO INT { get; }
         public int EepromUpdates { get; private set; }
@@ -40,18 +50,42 @@ namespace Antmicro.Renode.Peripherals.Miscellaneous
         // on the bus including the address byte).
         public event Action<string, int> Activity;
 
+        // MCU reset: the RTC is not reset with it; only its I2C interface
+        // sees the bus go idle.
         public void Reset()
         {
+            expectAddress = true;
+        }
+
+        // The RV-3032 itself powering up (a fresh or swapped cell). The
+        // EEPROM keeps its contents; the RAM mirror is reloaded after tPREFR.
+        public void PowerOnReset()
+        {
             Array.Clear(regs, 0, regs.Length);
-            Array.Clear(eeprom, 0, eeprom.Length);
             regs[0x0D] = 0x02; // PORF
+            regs[0x0E] = 0x04; // EEbusy during the power-on refresh
             regs[0x3D] = 0xC0;
             pointer = 0;
             expectAddress = true;
             countdown.Enabled = false;
             pulse.Enabled = false;
+            refresh.Enabled = false;
+            refresh.Value = 0;
+            refresh.Enabled = true;
             SetUnixTime(initialUnixTime);
             INT.Set(); // open drain, pulled up
+        }
+
+        public bool RefreshPending => (regs[0x0E] & 0x04) != 0;
+        // Reads of the configuration RAM C0h-CAh while the power-on refresh
+        // had not yet loaded it (they return the POR value 00h, not the
+        // configuration): a driver that acts on them acts on a wrong value.
+        public int ConfigReadsBeforeRefresh { get; private set; }
+
+        private void RefreshDone()
+        {
+            Array.Copy(eeprom, 0, regs, 0xC0, 11);
+            regs[0x0E] &= unchecked((byte)~0x04);
         }
 
         // ---- test controls ----
@@ -102,6 +136,7 @@ namespace Antmicro.Renode.Peripherals.Miscellaneous
                 case 7: return Bcd(c.Year - 2000);
                 }
             }
+            if(a >= 0xC0 && a <= 0xCA && RefreshPending) ConfigReadsBeforeRefresh++;
             if(a == 0x39 || a == 0x3A || a == 0x3B || a == 0x3C || a == 0x3F) return 0; // write only
             if((a >= 0x2E && a <= 0x38) || (a >= 0x50 && a <= 0xBF) || a >= 0xCB) return 0;
             return regs[a];
@@ -187,7 +222,7 @@ namespace Antmicro.Renode.Peripherals.Miscellaneous
         private static int FromBcd(int v) { return (v >> 4) * 10 + (v & 0xF); }
 
         private readonly IMachine machine;
-        private readonly LimitTimer countdown, pulse;
+        private readonly LimitTimer countdown, pulse, refresh;
         private readonly byte[] regs = new byte[256];
         private readonly byte[] eeprom = new byte[11];
         private readonly long initialUnixTime;
