@@ -42,6 +42,13 @@ window_margin  = 0.3;     // window is the ACTIVE area grown by this (rounded co
 bezel_chamfer  = 0.6;     // 45 deg chamfer on the window edge at the front face
 glass_frame_w  = 1.0;     // width of the rib that locates the glass edges
 glass_frame_depth = 0.5;  // how far the rib reaches down the glass edge (from the glass top)
+// GDEY0213B74 FPC next to the glass (Good Display drawing; the sibling GDEM0213B74WT
+// drawing dimensions it): for its first ~4 mm the flex is 14.30 wide, starting 6.77
+// below the top glass edge, before it narrows to the 12.5 mm tail in board.yaml.
+// The rib stays open over all of it, with fpc_tol for its position and width.
+fpc_flare_y     = 6.77;
+fpc_flare_w     = 14.30;
+fpc_tol         = 0.5;    // 8.15 +-0.3 position + 14.30 +-0.2 width
 
 /* [Joystick cap] */
 cap_d           = 7.0;    // cap diameter
@@ -50,14 +57,24 @@ cap_protrusion  = 1.5;    // target height of the cap rim above the front face (
 cap_roof        = 0.6;    // minimum material above the stem top, at the bottom of the finger dish
 cap_dish        = 0.3;    // finger dish depth
 cap_top_round   = 0.8;    // round-over on the cap's top edge
-stem_shape      = "square";// "square" | "round". SKRHABE010 (Alps STEP): 3.0 mm square stem, r0.3 corners,
-                           // aligned with the body, i.e. at 45 deg on this board
+stem_shape      = "square";// "square" | "round"
+// SKRHABE010 keytop stem (Alps SKRH catalog, Drawing No.2; not in board.yaml): a
+// 1.95 +-0.05 mm square with R0.5 corners, its flats at 45 deg to the switch body.
+// The body is turned 45 deg on this board, so the flats are parallel to the board
+// edges. Only the top 1.7 mm ("keytop fitting area 1.7 max") may go into the cap.
+stem_square     = 1.95;   // across flats
+stem_corner_r   = 0.5;
+stem_angle      = 0;      // flats relative to the board's x axis
+stem_fit_max    = 1.7;    // deepest the cap may reach down the stem
 stem_socket_extra = 0.20; // socket = stem + this (before the crush ribs)
 stem_rib_interference = 0.10; // radial interference of each crush rib on the stem
 stem_rib_count  = 3;      // crush ribs in a round socket (a square socket gets one per face)
-// Round collars between the SKRH body and its stem, [diameter, top above PCB front],
-// from the Alps STEP model (not in board.yaml). The cap clears them by part_clearance.
-joystick_collars = [[5.2, 2.15], [4.0, 2.95]];
+// Round collars below the keytop stem, [diameter, top above PCB front], scaled from
+// the same drawing: a cone on the body to 2.14 mm (base ~3.9) and the dia-3 shoulder
+// with its ring to ~3.12 mm. The cap clears their diameter by part_clearance and
+// sits collar_gap above the top one (it moves with the stem, so a small gap is enough).
+joystick_collars = [[3.9, 2.14], [3.0, 3.12]];
+collar_gap      = 0.18;
 stem_top_gap    = 0.05;   // gap between the stem top and the socket roof
 
 /* [Fasteners] */
@@ -131,7 +148,8 @@ joy_top = joystick_body_height;
 cap_bottom = max(joy_top, joystick_collars[0][1]) + part_clearance;
 cap_top = max(z_top + cap_protrusion,
               joystick_stem_top + stem_top_gap + cap_roof + cap_dish);
-cap_collar_top = joystick_collars[len(joystick_collars) - 1][1] + part_clearance; // socket starts here
+cap_collar_top = max(joystick_collars[len(joystick_collars) - 1][1] + collar_gap,
+                     joystick_stem_top - stem_fit_max);                            // socket starts here
 cap_hole_d = cap_d + 2 * cap_gap;
 
 boss_d  = fastener == "insert" ? boss_d_insert : boss_d_selftap;
@@ -158,6 +176,7 @@ assert(joy_top + part_clearance + 0.6 <= z_top + 1e-6,
 assert(screw_tip > z_cav_bot + 0.6, "screw would break through the back floor");
 assert(cap_bottom < z_top - 0.1, "cap would not reach into the case hole");
 assert(joystick_stem_top - cap_collar_top >= 1.0, "less than 1 mm of stem engages the cap");
+assert(joystick_stem_top - cap_collar_top <= stem_fit_max + 1e-6, "cap reaches further down the stem than Alps allows");
 
 echo(str("IRL2FA case outer size: ", out_W, " x ", out_H, " x ", out_T,
          " mm (W x H x T, without lanyard tab); cap protrusion ", cap_top - z_top, " mm"));
@@ -344,17 +363,16 @@ module joystick_pocket2d() translate(joy) rotate(45)
     square(joystick_body + 2 * part_clearance, center = true);
 
 module glass_frame() {
-    fy = display_glass_y + display_glass_h / 2;      // FPC centre
     translate([0, 0, glass_top - glass_frame_depth]) linear_extrude(z_skin_in - glass_top + glass_frame_depth + eps)
     intersection() {
         cavity2d();
         difference() {
             glass_rect2d(part_clearance + glass_frame_w);
             glass_rect2d(part_clearance);
-            // FPC exit: leave the left rib open over the flex
+            // FPC exit: leave the left rib open over the whole flex, flare included
             if (display_fpc_exit == "left")
-                translate(M(display_glass_x - 5, fy + display_fpc_width / 2 + part_clearance + 0.5))
-                    square([6, display_fpc_width + 2 * part_clearance + 1]);
+                translate(M(display_glass_x - 5, display_glass_y + fpc_flare_y + fpc_flare_w + fpc_tol + part_clearance))
+                    square([6, fpc_flare_w + 2 * (fpc_tol + part_clearance)]);
             offset(delta = 0.3) joystick_pocket2d();
         }
     }
@@ -408,8 +426,9 @@ module front_shell() difference() {
 module cap() {
     dd = cap_d - 2 * cap_top_round + 0.4;              // dish diameter
     rs = (dd * dd / 4 + cap_dish * cap_dish) / (2 * cap_dish);
-    sr = joystick_stem_diameter / 2 + stem_socket_extra / 2;   // socket radius / half-side
+    sr = stem_square / 2 + stem_socket_extra / 2;          // socket half-side (square) / radius (round)
     rib_r = 0.25;
+    h_sock = joystick_stem_top + stem_top_gap - cap_collar_top;
     translate([joy[0], joy[1], 0]) {
         difference() {
             rotate_extrude($fn = 96) polygon(concat(
@@ -417,24 +436,23 @@ module cap() {
                 _arc(cap_d / 2 - cap_top_round, cap_top - cap_top_round, cap_top_round, 0, 90, 12),
                 [[0, cap_top]]));
             translate([0, 0, cap_top - cap_dish + rs]) sphere(r = rs, $fn = 96);
-            // socket
-            translate([0, 0, cap_bottom - 1]) {
-                if (stem_shape == "square") rotate(45) translate([-sr, -sr, 0]) cube([2 * sr, 2 * sr, joystick_stem_top + stem_top_gap - cap_bottom + 1]);
-                else cylinder(r = sr, h = joystick_stem_top + stem_top_gap - cap_bottom + 1, $fn = 48);
+            // socket: only the top stem_fit_max of the stem goes in
+            translate([0, 0, cap_collar_top - eps]) {
+                if (stem_shape == "square")
+                    rotate(stem_angle) linear_extrude(h_sock + eps)
+                        offset(r = stem_corner_r + stem_socket_extra / 2, $fn = 32)
+                            square(stem_square - 2 * stem_corner_r, center = true);
+                else cylinder(r = sr, h = h_sock + eps, $fn = 48);
             }
-            // clear the collars below the stem (the next collar up is the widest one in the cap)
-            cd = joystick_collars[len(joystick_collars) - 1][0] + 2 * part_clearance;
+            // clear the collars below the stem with a flat-roofed bore (a short bridge)
+            cd = max([for (c = joystick_collars) c[0]]) + 2 * part_clearance;
             translate([0, 0, cap_bottom - 1]) cylinder(d = cd, h = cap_collar_top - cap_bottom + 1, $fn = 48);
-            translate([0, 0, cap_collar_top - eps]) cylinder(d1 = cd, d2 = 2 * sr * 0.9, h = (cd - 1.8 * sr) / 2, $fn = 48);
         }
-        // crush ribs
+        // crush ribs, one on each socket face (or stem_rib_count round a round socket)
         n = stem_shape == "square" ? 4 : stem_rib_count;
-        intersection() {
-            for (i = [0 : n - 1]) rotate(i * 360 / n + (stem_shape == "square" ? 45 : 90))
-                translate([sr + rib_r - (stem_socket_extra / 2 + stem_rib_interference), 0, cap_collar_top])
-                    cylinder(r = rib_r, h = joystick_stem_top + stem_top_gap - cap_collar_top, $fn = 12);
-            translate([0, 0, cap_bottom]) cylinder(r = cap_d / 2 - 0.5, h = cap_top - cap_bottom);
-        }
+        for (i = [0 : n - 1]) rotate(i * 360 / n + (stem_shape == "square" ? stem_angle : 90))
+            translate([sr + rib_r - (stem_socket_extra / 2 + stem_rib_interference), 0, cap_collar_top])
+                cylinder(r = rib_r, h = h_sock, $fn = 12);
     }
 }
 
@@ -461,16 +479,16 @@ module board_model() {
         text("1/3", size = 2.3, font = "DejaVu Sans", halign = "right");
     color([0.12, 0.12, 0.12]) translate([a[0] + 2.5, a[1] + display_active_h - 3.2, glass_top]) linear_extrude(0.04)
         square([(display_active_w - 5) * 0.62, 0.9]);
-    // FPC
-    fy = display_glass_y + display_glass_h / 2;
+    // FPC between the glass and the slot: this stretch is the 14.3 mm flare
     color([0.85, 0.55, 0.15]) translate([0, 0, display_adhesive]) linear_extrude(0.15)
-        rect2d(fpc_slot_x + fpc_slot_w / 2, fy - display_fpc_width / 2, display_glass_x - fpc_slot_x, display_fpc_width);
+        rect2d(fpc_slot_x + fpc_slot_w / 2, display_glass_y + fpc_flare_y, display_glass_x - fpc_slot_x - fpc_slot_w / 2,
+               fpc_flare_w);
     // joystick: body, collars, square stem
     color([0.15, 0.15, 0.17]) translate([joy[0], joy[1], 0]) rotate(45)
         translate([-joystick_body / 2, -joystick_body / 2, 0]) cube([joystick_body, joystick_body, joystick_body_height]);
     color([0.55, 0.56, 0.58]) translate([joy[0], joy[1], 0]) for (c = joystick_collars) cylinder(d = c[0], h = c[1]);
-    color([0.92, 0.92, 0.92]) translate([joy[0], joy[1], 0]) rotate(45) linear_extrude(joystick_stem_top)
-        offset(r = 0.3) square(joystick_stem_diameter - 0.6, center = true);
+    color([0.92, 0.92, 0.92]) translate([joy[0], joy[1], 0]) rotate(stem_angle) linear_extrude(joystick_stem_top)
+        offset(r = stem_corner_r) square(stem_square - 2 * stem_corner_r, center = true);
     // battery clip (MYOUNG MY-2450-01: 0.25 mm plate over the cell, legs to two feet) + CR2450
     // lying on the PCB's negative pad. Plate 25.5 x 23.2 with its closed end towards the IR
     // edge (datasheet), not in board.yaml.
@@ -553,7 +571,13 @@ else if (part == "info") {
         "\"board_height\":", H, ",\"z_top\":", z_top, ",\"z_bot\":", z_bot, ",\"z_seam\":", z_seam,
         ",\"z_skin_in\":", z_skin_in, ",\"z_cav_bot\":", z_cav_bot, ",\"glass_top\":", glass_top,
         ",\"cap_bottom\":", cap_bottom, ",\"cap_top\":", cap_top, ",\"cap_d\":", cap_d,
-        ",\"cap_hole_d\":", cap_hole_d, ",\"boss_d\":", boss_d, ",\"wall\":", wall,
+        ",\"cap_hole_d\":", cap_hole_d, ",\"cap_socket_bottom\":", cap_collar_top,
+        ",\"stem_square\":", stem_square, ",\"stem_angle\":", stem_angle,
+        ",\"stem_socket_extra\":", stem_socket_extra, ",\"stem_rib_interference\":", stem_rib_interference,
+        ",\"joystick_collars\":[", joystick_collars[0][0], ",", joystick_collars[0][1], ",",
+        joystick_collars[1][0], ",", joystick_collars[1][1], "]",
+        ",\"fpc_rib_open\":[", display_glass_y + fpc_flare_y - fpc_tol - part_clearance, ",",
+        display_glass_y + fpc_flare_y + fpc_flare_w + fpc_tol + part_clearance, "]", ",\"boss_d\":", boss_d, ",\"wall\":", wall,
         ",\"top_thickness\":", top_thickness, ",\"floor_thickness\":", floor_thickness,
         ",\"pcb_clearance\":", pcb_clearance, ",\"part_clearance\":", part_clearance,
         ",\"fit_clearance\":", fit_clearance, ",\"ir_window\":\"", ir_window, "\"",

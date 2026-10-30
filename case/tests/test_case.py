@@ -124,13 +124,18 @@ def front_parts(c: float) -> dict[str, mf.Manifold]:
     body = mf.CrossSection.square([j["body"], j["body"]], center=True).rotate(45) \
         .offset(c, mf.JoinType.Miter).translate([jx, jy])
     parts["joystick body"] = prism(body, 0, j["body_height"] + c)
-    # collars between body and stem (Alps STEP), mirrors joystick_collars in the .scad
-    for i, (dia, top) in enumerate([(5.2, 2.15), (4.0, 2.95)]):
-        parts[f"joystick collar {i}"] = prism(mf.CrossSection.circle(dia / 2 + c, 48).translate([jx, jy]), 0, top + c)
+    # collars below the keytop stem (Alps drawing), from joystick_collars in the .scad. The top
+    # one is part of the stem and moves with the cap, so it only needs a small gap above it.
+    jc = info()["joystick_collars"]
+    for i, (dia, top) in enumerate([(jc[0], jc[1]), (jc[2], jc[3])]):
+        dz = c if i == 0 else min(c, 0.15)
+        parts[f"joystick collar {i}"] = prism(mf.CrossSection.circle(dia / 2 + c, 48).translate([jx, jy]), 0, top + dz)
+    # The flex between the glass and the slot is its 14.30 mm flare, 6.77 below the top glass
+    # edge (+-0.3 position, +-0.2 width), leaving the glass at the TFT face, ~0.9 mm up
+    # (Good Display drawings, see test_mechanical.py).
     s = board()["fpc_slot"]
-    fy = g["y"] + g["h"] / 2
-    parts["fpc"] = prism(rect_xs(s["x"], fy - d["fpc_width"] / 2, g["x"] - s["x"], d["fpc_width"])
-                         .offset(c, mf.JoinType.Miter), 0, 0.3 + c)
+    parts["fpc"] = prism(rect_xs(s["x"], g["y"] + 6.77 - 0.4, g["x"] - s["x"], 14.30 + 0.8)
+                         .offset(c, mf.JoinType.Miter), 0, 0.95 + c)
     return parts
 
 

@@ -6,11 +6,17 @@ on:
     paths:
       - "case/**"
       - "hardware/board.yaml"
+      - "hardware/irl2fa.kicad_pcb"
+      - "hardware/pins.yaml"
+      - "hardware/fab/irl2fa.glb"
       - ".github/workflows/case.yml"
   pull_request:
     paths:
       - "case/**"
       - "hardware/board.yaml"
+      - "hardware/irl2fa.kicad_pcb"
+      - "hardware/pins.yaml"
+      - "hardware/fab/irl2fa.glb"
       - ".github/workflows/case.yml"
   workflow_dispatch:
 

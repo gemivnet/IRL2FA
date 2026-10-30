@@ -8,7 +8,8 @@
   irl2fa-bom.csv              full BOM with manufacturer part numbers
   irl2fa-ibom.html            interactive BOM for hand assembly
   irl2fa-schematic.pdf        schematic
-  irl2fa.step                 board 3D model (used by the case fit test)
+  irl2fa.step                 board 3D model
+  irl2fa.glb                  the same as a mesh (case/tests/test_mechanical.py checks it against the case)
 
 With --check the outputs are generated into a temporary folder and compared
 with the committed ones (ignoring timestamps); a difference fails CI, so the
@@ -227,6 +228,8 @@ def generate(out):
     run("kicad-cli", "sch", "export", "pdf", "-o", str(out / "irl2fa-schematic.pdf"), str(SCH))
     run("kicad-cli", "pcb", "export", "step", "-o", str(out / "irl2fa.step"), "--subst-models",
         "--no-dnp", "--force", str(PCB))
+    run("kicad-cli", "pcb", "export", "glb", "-o", str(out / "irl2fa.glb"), "--subst-models",
+        "--no-dnp", "--force", str(PCB))
 
     # Interactive BOM (MIT, github.com/openscopeproject/InteractiveHtmlBom)
     ib = shutil.which("generate_interactive_bom")
@@ -243,7 +246,7 @@ def normalise(path):
     if path.suffix in (".zip",):
         with zipfile.ZipFile(path) as z:
             return sorted((n, normalise_text(z.read(n))) for n in z.namelist())
-    if path.suffix in (".pdf", ".step", ".html"):
+    if path.suffix in (".pdf", ".step", ".glb", ".html"):
         return None  # regenerated for releases, not compared byte-for-byte
     return normalise_text(data)
 

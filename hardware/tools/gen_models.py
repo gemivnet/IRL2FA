@@ -62,20 +62,29 @@ def save(name, parts):
 
 # --- a. Alps SKRHABE010 -------------------------------------------------------
 def skrh():
+    """Alps SKRH catalog, Drawing No.2 (and the SKRHABE010 product page drawing):
+    body 7.35 x 7.5 x 1.8 with corners cut so that it is 8.6 across the operating
+    diagonal ("c"); a cone on the body to 2.14 (base ~3.9, scaled); the dia-3
+    shoulder to ~3.12 (scaled; "3" is dimensioned); and the keytop stem, a 1.95 mm
+    square with R0.5 corners whose flats sit at 45 deg to the body, to 5.0. Guide
+    bosses dia 0.65 / 0.95 at y -1.9 / +1.9, ~1.4 long below the body (scaled)."""
     bx, by = 7.35 / 2, 7.5 / 2
-    frame = box(-bx, bx, -by, by, 0, 1.8).edges("|Z").chamfer(0.6)
-    collar = cyl_z(0, 0, 2.6, 1.8, 2.14)
-    shoulder = cyl_z(0, 0, 2.0, 2.14, 3.0)
-    stem = box(-1.5, 1.5, -1.5, 1.5, 3.0, 5.0).edges("|Z").fillet(0.5)   # dia 3 stem (square-ish)
-    parts = [(frame, "metal"), (collar, "dark"), (shoulder, "black"), (stem, "black")]
+    cut = bx + by - 8.6 / math.sqrt(2)                     # corner cut that gives c = 8.6
+    frame = box(-bx, bx, -by, by, 0, 1.8).edges("|Z").chamfer(cut)
+    cone = cq.Solid.makeCone(3.9 / 2, 3.45 / 2, 2.14 - 1.8, pnt=cq.Vector(0, 0, 1.8))
+    shoulder = cyl_z(0, 0, 1.5, 2.14, 3.12)
+    s, r = 1.95, 0.5
+    stem = (cq.Workplane("XY").rect(s, s).extrude(5.0 - 3.12).edges("|Z").fillet(r)
+            .rotate((0, 0, 0), (0, 0, 1), 45).translate((0, 0, 3.12)))
+    parts = [(frame, "metal"), (cq.Workplane("XY").add(cone), "dark"), (shoulder, "black"), (stem, "black")]
     py = (3.85 + 1.85) / 4
     for x in (-1, 1):
         for y in (-py, 0, py):
             parts.append((box(x * bx, x * 4.1, y - 0.3, y + 0.3, 0, 0.15), "metal"))
-    for s in (-1, 1):
-        parts.append((box(-0.8, 0.8, s * by, s * 4.4, 0, 0.15), "metal"))
-    parts.append((cyl_z(0, -1.9, 0.65 / 2, -0.5, 0), "black"))
-    parts.append((cyl_z(0, 1.9, 0.95 / 2, -0.5, 0), "black"))
+    for sg in (-1, 1):
+        parts.append((box(-0.8, 0.8, sg * by, sg * 4.4, 0, 0.15), "metal"))
+    parts.append((cyl_z(0, -1.9, 0.65 / 2, -1.4, 0), "black"))
+    parts.append((cyl_z(0, 1.9, 0.95 / 2, -1.4, 0), "black"))
     save("SW_Nav_Alps_SKRHABE010", parts)
 
 
@@ -137,33 +146,105 @@ def sidelooker(name, body_color, lens_color):
 
 
 # --- e. Good Display GDEY0213B74 + folded FPC ------------------------------------
+# GDEY0213B74 drawing (spec rev 1.0 sec. 4) and its sibling GDEM0213B74WT, which
+# dimensions the same flex: 14.30 long from the glass edge, 12.5 wide with its edge
+# 8.15 below the top glass edge, but 14.30 wide (from 6.77) for its first ~3.9 mm,
+# narrowing to 12.5 by ~4.7 mm (scaled from the drawing). 0.12 thick, 0.30 over the
+# 6.0 mm stiffener at the end. Contacts on the viewing (front) face.
+FPC = dict(L=14.3, w=12.5, y0=8.15, flare_w=14.30, flare_y0=6.77, flare_end=3.9, taper_end=4.7,
+           t=0.12, t_stiff=0.30, stiff=6.0)
+TFT_T = 0.6          # TFT glass under the FPC bond (the 1.0 panel minus front plane laminate; estimate)
+J1_ENTRY_X, J1_ENTRY_Z, J1_DEPTH = 9.45, 0.5, 1.5   # board x of J1's FPC opening, its height, insertion
+
+
+def fpc_path():
+    """Centre line of the folded FPC in board (x, z) as segments (x0, z0, x1, z1, s0).
+    Leaves the glass horizontally at the TFT front face, turns down through the
+    slot (hugging its right wall), drops into a slack loop under the board, comes
+    back up and runs flat (stiffener) into J1. The loop takes up the length the
+    straight path does not need."""
+    t = FPC["t"]
+    pcb_t = BOARD["board"]["thickness"]
+    gl, sl = BOARD["display"]["glass"], BOARD["fpc_slot"]
+    ze = BOARD["display"]["adhesive"] + TFT_T + t / 2
+    xv = sl["x"] + sl["w"] - t / 2 - 0.15
+    R1, Rl, R2 = 0.8, 0.7, 0.5
+    zj = -pcb_t - J1_ENTRY_Z
+    tip = J1_ENTRY_X + J1_DEPTH
+    x_up = xv + 2 * Rl
+    fixed = (gl["x"] - (xv + R1)) + math.pi / 2 * R1 + math.pi * Rl + math.pi / 2 * R2 + (tip - (x_up + R2))
+    # vertical down from ze - R1 to z_low, back up from z_low to zj - R2
+    z_low = ((ze - R1) + (zj - R2) - (FPC["L"] - fixed)) / 2
+    segs, s = [], 0.0
+
+    def line(x0, z0, x1, z1):
+        nonlocal s
+        segs.append((x0, z0, x1, z1, s))
+        s += math.hypot(x1 - x0, z1 - z0)
+
+    def arc(cx, cz, r, a0, a1, n=8):
+        for i in range(n):
+            u0, u1 = a0 + (a1 - a0) * i / n, a0 + (a1 - a0) * (i + 1) / n
+            line(cx + r * math.cos(u0), cz + r * math.sin(u0), cx + r * math.cos(u1), cz + r * math.sin(u1))
+
+    line(gl["x"], ze, xv + R1, ze)
+    arc(xv + R1, ze - R1, R1, math.pi / 2, math.pi)
+    line(xv, ze - R1, xv, z_low)
+    arc(xv + Rl, z_low, Rl, math.pi, 2 * math.pi, 12)
+    line(x_up, z_low, x_up, zj - R2)
+    arc(x_up + R2, zj - R2, R2, math.pi, math.pi / 2)
+    line(x_up + R2, zj, tip, zj)
+    return segs, s, z_low
+
+
+def fpc_edges(s):
+    """Top/bottom edge of the flex (mm below the top glass edge) at arc length s."""
+    f = FPC
+    y0n, y1n = f["y0"], f["y0"] + f["w"]
+    y0f, y1f = f["flare_y0"], f["flare_y0"] + f["flare_w"]
+    if s <= f["flare_end"]:
+        return y0f, y1f
+    if s >= f["taper_end"]:
+        return y0n, y1n
+    u = (s - f["flare_end"]) / (f["taper_end"] - f["flare_end"])
+    return y0f + u * (y0n - y0f), y1f + u * (y1n - y1f)
+
+
 def epd():
     gw, gh, gt, adh = 59.2, 29.2, 1.0, 0.2
     glass = box(-gw / 2, gw / 2, -gh / 2, gh / 2, adh, adh + gt)
     aa_x0, aa_y0 = -gw / 2 + 7.95, -(23.7046 / 2)
     active = box(aa_x0, aa_x0 + 48.55, aa_y0, -aa_y0, adh + gt, adh + gt + 0.01)
-    # FPC: 12.5 wide, 0.3 thick, 14.3 long from the glass edge, centred 8.15+6.25 from the top glass edge
-    w, t, L = 12.5, 0.3, 14.3
-    yc = -gh / 2 + 8.15 + w / 2
-    pcb_t = BOARD["board"]["thickness"]
-    sl, gl = BOARD["fpc_slot"], BOARD["display"]["glass"]
-    xv = sl["x"] + sl["w"] / 2 - (gl["x"] + gw / 2) - 0.15   # vertical run centre, inside the slot
-    R = 0.5                          # bend radius at the FPC centre line
-    zt = adh + t / 2                 # top run centre line (on the PCB front, under the glass level)
-    zb = -pcb_t - t / 2              # bottom run centre line (against the PCB back)
-    x_b = xv + R                     # bend centres x
-    top = box(x_b, -gw / 2, yc - w / 2, yc + w / 2, zt - t / 2, zt + t / 2)
-    vert = box(xv - t / 2, xv + t / 2, yc - w / 2, yc + w / 2, zb + R, zt - R)
-    q1 = ring_y(x_b, zt - R, R - t / 2, R + t / 2, yc, w / 2).intersect(
-        box(xv - 1, x_b, yc - w, yc + w, zt - R, zt + 1))
-    q2 = ring_y(x_b, zb + R, R - t / 2, R + t / 2, yc, w / 2).intersect(
-        box(xv - 1, x_b, yc - w, yc + w, zb - 1, zb + R))
-    used = (-gw / 2 - x_b) + 2 * (math.pi / 2 * R) + ((zt - R) - (zb + R))
-    back_len = L - used
-    bottom = box(x_b, x_b + back_len, yc - w / 2, yc + w / 2, zb - t / 2, zb + t / 2)
-    fpc = top.union(q1).union(vert).union(q2).union(bottom)
-    print(f"  EPD FPC: {back_len:.2f} mm run on the back after the bend, ends at x={x_b + back_len:.2f} "
-          f"(footprint coords) / board x={x_b + back_len + gl["x"] + gw / 2:.2f}")
+    gl = BOARD["display"]["glass"]
+    ox = gl["x"] + gw / 2                       # board x of the footprint origin
+    segs, total, z_low = fpc_path()
+    fpc = None
+    cuts = [FPC["flare_end"], FPC["taper_end"], FPC["L"] - FPC["stiff"]]
+    pieces = []
+    for x0, z0, x1, z1, s0 in segs:             # split straight runs at the width/thickness changes
+        L = math.hypot(x1 - x0, z1 - z0)
+        marks = [0.0] + [c - s0 for c in cuts if s0 < c < s0 + L] + [L]
+        if L > 1.0 and s0 < FPC["taper_end"] and s0 + L > FPC["flare_end"]:
+            marks += [FPC["flare_end"] - s0 + (FPC["taper_end"] - FPC["flare_end"]) * k / 4 for k in (1, 2, 3)]
+        marks = sorted(m for m in set(marks) if 0 <= m <= L)
+        for a, b in zip(marks, marks[1:]):
+            pieces.append((x0 + (x1 - x0) * a / L, z0 + (z1 - z0) * a / L,
+                           x0 + (x1 - x0) * b / L, z0 + (z1 - z0) * b / L, s0 + a, s0 + b))
+    for x0, z0, x1, z1, sa, sb in pieces:
+        L = math.hypot(x1 - x0, z1 - z0)
+        if L < 1e-6:
+            continue
+        sm = (sa + sb) / 2
+        ya, yb = fpc_edges(sm)
+        th = FPC["t_stiff"] if sm > FPC["L"] - FPC["stiff"] else FPC["t"]
+        ang = math.atan2(z1 - z0, x1 - x0)
+        seg = (cq.Workplane("XY").box(L + 0.02, yb - ya, th, centered=(False, False, True))
+               .translate((-0.01, 0, 0))
+               .rotate((0, 0, 0), (0, 1, 0), -math.degrees(ang))
+               .translate((x0 - ox, -(yb - gh / 2), z0)))
+        fpc = seg if fpc is None else fpc.union(seg)
+    print(f"  EPD FPC: {total:.2f} mm modelled, slack loop down to z = {z_low - 0.7:.2f}, "
+          f"tip at board x = {J1_ENTRY_X + J1_DEPTH:.2f}")
     save("EPD_GoodDisplay_GDEY0213B74_Outline", [(glass, "glass"), (active, "epd"), (fpc, "fpc")])
 
 
