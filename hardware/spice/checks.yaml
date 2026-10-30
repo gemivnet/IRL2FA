@@ -8,7 +8,7 @@ epd_boost.cir:
   vgh_end:   {min: 20.5, unit: V, why: "PREVGH must exceed VGH (20 V)"}
   vgl_end:   {max: -20.5, unit: V, why: "PREVGL must be below VGL (-20 V)"}
   t_vgh:     {max: 0.030, unit: s, why: "booster up within the soft-start budget"}
-  il_peak:   {max: 0.45, unit: A, why: "L1 rated 500 mA"}
+  il_peak:   {max: 0.36, unit: A, why: "L1 ANR3015T470M Isat 0.36 A (APV catalogue p.5), not 500 mA"}
   vds_max:   {max: 27.0, unit: V, why: "Si1308EDL and MBR0530 rated 30 V (10 % margin)"}
 load_switch.cir:
   vbat_min:  {min: 2.40, unit: V, why: "panel inrush must not brown out the MCU"}
@@ -19,3 +19,6 @@ reverse_battery.cir:
 ir_led.cir:
   iled_fresh: {max: 0.025, unit: A, why: "IR LED current, fresh cell"}
   iled_flat:  {min: 0.010, unit: A, why: "IR LED current, nearly flat cell (2.5 V)"}
+ir_rx.cir:
+  v1_mid:   {min: 1.75, unit: V, why: "lone 1 bit reaches VIH (0.7 x 2.5 V) at the USART sample point, worst-case parts 2 cm apart"}
+  v0_mid:   {max: 0.75, unit: V, why: "lone 0 bit after five 1s falls below VIL (0.3 x 2.5 V) at the sample point"}
