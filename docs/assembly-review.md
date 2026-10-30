@@ -24,6 +24,7 @@ Contents: [findings](#findings) · [per-part placement](#per-part-placement) ·
 
 Ranked by severity. "Fixed" means fixed on this branch; "layout" means a change to
 `irl2fa.kicad_pcb` that the board owner applies (this review does not edit the board).
+The layout findings were applied in [`2b8301f`](https://github.com/gemivnet/IRL2FA/commit/2b8301f) (re-placed and re-routed board).
 
 | ID | Severity | Finding | Status |
 |-|-|-|-|
@@ -31,16 +32,16 @@ Ranked by severity. "Fixed" means fixed on this branch; "layout" means a change 
 | A-02 | High | J1 (FPC connector) would be placed 1.25 mm off its pads | Fixed in `fab.py` |
 | A-03 | High | JLCPCB's SOT-23, SC-70 and RV-3032 footprints are drawn turned against KiCad's | Fixed in `fab.py` |
 | A-04 | High | The board is too small for two-sided (Standard) PCBA without a panel; the README did not say | Fixed in README |
-| A-08 | High | Both copper pours have no net: floating copper, not the ground pour the docs describe | Layout |
+| A-08 | High | Both copper pours have no net: floating copper, not the ground pour the docs describe | **Fixed** in [`2b8301f`](https://github.com/gemivnet/IRL2FA/commit/2b8301f) |
 | A-05 | Medium | D4 (VSMB2948SL) and L1 (ANR3015) have no JLCPCB library footprint | Mitigated: preview check and remark |
 | A-06 | Medium | RV-3032-C7 shows −144 available at JLCPCB; STM32U083 has 49 | Documented; pre-order |
 | A-09 | Medium | IR lenses are flush with the top edge, where the panel's breakaway tabs go | Remark; optional own panel |
-| A-12 | Medium | The `Power` net class matches no net: VBAT, VEPD and EPD_SW are routed at 0.15 and 0.112 mm | Layout (for the electrical review) |
-| A-07 | Low | Silkscreen text below JLCPCB's 1.0 mm / 0.15 mm minimum | Layout |
-| A-10 | Low | Full paste on the clip's two 6.15 × 6 mm legs | Optional footprint change |
+| A-12 | Medium | The `Power` net class matches no net: VBAT, VEPD and EPD_SW are routed at 0.15 and 0.112 mm | **Fixed** in [`2b8301f`](https://github.com/gemivnet/IRL2FA/commit/2b8301f) |
+| A-07 | Low | Silkscreen text below JLCPCB's 1.0 mm / 0.15 mm minimum | **Fixed** in [`2b8301f`](https://github.com/gemivnet/IRL2FA/commit/2b8301f) |
+| A-10 | Low | Full paste on the clip's two 6.15 × 6 mm legs | **Applied** in [`2b8301f`](https://github.com/gemivnet/IRL2FA/commit/2b8301f) |
 | A-11 | Low | Our clip legs sit 0.3 mm from where JLCPCB's footprint has them | No action |
 | A-13 | Info | No reserved spot for the JLCPCB order number | README says "Remove" |
-| A-14 | Info | 11 Extended parts, about $3 each in feeder fees | Options listed |
+| A-14 | Info | 11 Extended parts (12 after the fixes), about $3 each in feeder fees | Options listed |
 | A-15 | Info | SW1 is rated for 2 reflows; its guide bosses may touch the second-side stencil | Remark |
 | A-16 | Info | Via copper to track is 0.152 mm; JLCPCB lists 0.2 mm "via to track" | No action (hole to track is 0.30 mm) |
 
@@ -127,6 +128,11 @@ on `test_copper_pours_are_ground`. Afterwards, check that BT1 pad 2, the 12 mm c
 connects solid rather than by four spokes. It is a contact, not a joint, so solid is
 better.
 
+**Status: fixed** in [`2b8301f`](https://github.com/gemivnet/IRL2FA/commit/2b8301f). Both pours are on `/GND` (`gen_pcb.py` looked up `GND`, but
+schematic nets carry the sheet path); `test_copper_pours_are_ground` passes without its
+xfail. BT1 pad 2 has a solid zone connection in its footprint; under the cell's negative
+cap it joins the pour through a single bare spoke (mechanical review MECH-04).
+
 ### A-12 Medium: the Power net class is never applied (layout, for the electrical review)
 
 `irl2fa.kicad_pro` assigns the `Power` class (0.3 mm) by the patterns `GND`, `VBAT`,
@@ -137,6 +143,13 @@ JLCPCB's 0.10 mm capability, so fabrication is unaffected; whether the booster's
 switch-node and VEPD current wants wider copper is for the electrical review.
 
 **Fix.** Use `/VBAT` (or `*VBAT`) style patterns and re-route the power nets.
+
+**Status: fixed** in [`2b8301f`](https://github.com/gemivnet/IRL2FA/commit/2b8301f). The patterns carry the sheet path and the board is re-routed:
+VBAT, VBAT_RAW, VEPD, EPD_SW, EPD_RESE and IR_LED_A/K are `Power` (0.3 mm, 0.2 mm
+clearance). GND is in its own `Ground` class, 0.3 mm with the default 0.15 mm clearance:
+with 0.2 mm round every ground pad, Freerouting left 26-38 connections unrouted at the
+QFN and the FPC connector in every attempt, and the two ground pours carry the ground
+current. Tracks neck down only at fine-pitch pads; DRC enforces both classes.
 
 ### A-05 Medium: D4 and L1 have no JLCPCB footprint
 
@@ -188,6 +201,11 @@ present for D1-D3, U1, U2, Q1-Q4, J1, D4 and Q5. `test_silkscreen_meets_jlc_mini
 is a strict xfail. Fix it by raising the board's text to 1.0 mm / 0.15 mm, or by hiding
 the references that do not fit (the iBOM still identifies them).
 
+**Status: fixed** in [`2b8301f`](https://github.com/gemivnet/IRL2FA/commit/2b8301f). All silkscreen text is 1.0 mm high with a 0.153 mm stroke
+(the IRL2FA mark 1.2 mm). References with no free place at that size are hidden:
+C3, C6, C11, C13, C14, C16, C17, D1, D2, D3, L1, Q5, R7 and R10 (and DS1, the display outline). The mounting holes and the test pads carry no reference; the pads are labelled
+with their signals. `test_silkscreen_meets_jlc_minimums` passes without its xfail.
+
 ### A-10 Low: full paste on the clip legs
 
 The legs of BT1 (pad 1, 6.15 × 6.0 mm, ×2) get 100 % paste: 37 mm² each under a
@@ -195,6 +213,8 @@ The legs of BT1 (pad 1, 6.15 × 6.0 mm, ×2) get 100 % paste: 37 mm² each under
 A 70-80 % aperture would do, for example a paste margin of −0.35 mm on those pads in
 `BatteryHolder_MYOUNG_MY-2450-01_CR2450`. It is optional, and JLCPCB's stencil
 engineers often reduce large apertures anyway.
+
+**Status: applied** in [`2b8301f`](https://github.com/gemivnet/IRL2FA/commit/2b8301f): −0.35 mm on both legs, a 5.45 × 5.30 mm aperture (78 %).
 
 ### A-11 Low: clip leg position
 
@@ -209,6 +229,10 @@ number: Yes**. If that costs extra on your order, "No" is harmless: the number
 would be printed somewhere JLCPCB chooses.
 
 ### A-14 Info: Extended parts
+
+After the fixes there are 12: Q3 is the NX3008NBK (C179399), Q5 the VEMT2023SLX01
+(C2843576) and R8 68 Ω (C25131), all Extended (JLCPCB has no Basic 68 Ω 0402), and
+the Si1308EDL and VEMT2523SLX01 are gone. The text below is as reviewed.
 
 11 unique Extended parts: BT1, D1-D3, D4, J1, L1, Q3, Q5, R7, SW1, U1 and U2. Each
 costs about $3 per order in feeder fees. Basic alternatives exist for two of them,
@@ -253,9 +277,9 @@ JLCPCB reads them: seen from the back.
 | L1 | C7427088 ANR3015T470M | none (404) | ✓ 3 × 3 mm | B, 0 | 0 (assumed) | 0 | 180 | – unpolarised | – | Ext, 13776 |
 | Q1 | C15127 AO3401A | SOT-23_L2.9-W1.3-P1.90-LS2.4-BR | ✓ SOT-23 | B, 90 | 180 | 90 | **270** | ✗ turned 180°: G/S on D's pad | EasyEDA pins 1, 2 at +x, 3 at −x; KiCad the reverse | Basic, 1.0 M |
 | Q2 | C15127 AO3401A | (as Q1) | ✓ | B, 0 | 180 | 0 | 0 | ✓ (two errors cancelled) | as Q1 | Basic |
-| Q3 | C469327 Si1308EDL-T1-GE3 | SOT-323_L2.0-W1.3-P1.30-LS2.1-BR | ✓ SC-70-3 = SOT-323 | B, 0 | 180 | 0 | 0 | ✓ (cancelled) | pins 1, 2 at +x | Ext, 43574 |
+| Q3 | C469327 Si1308EDL-T1-GE3 (now C179399 NX3008NBK,215: EasyEDA SOT-23-3_L2.9-W1.3-P1.90-LS2.4-BR, correction 180 like Q4) | SOT-323_L2.0-W1.3-P1.30-LS2.1-BR | ✓ SC-70-3 = SOT-323 | B, 0 | 180 | 0 | 0 | ✓ (cancelled) | pins 1, 2 at +x | Ext, 43574 |
 | Q4 | C20917 AO3400A | SOT-23-3_L2.9-W1.3-P1.90-LS2.4-BR | ✓ SOT-23 | B, 0 | 180 | 0 | 0 | ✓ (cancelled) | pins 1, 2 at +x | Basic, 1.06 M |
-| Q5 | C511451 VEMT2523SLX01 | SENSOR-SMD_VEMT2523SLX01 | ✓ side-view 2.3 × 2.55 | B, 180 | 0 | 180 | **0** | ✗ lens into the board, C/E swapped | pad 1 = C at +x, lens arc at +y in both | Ext, 1874 |
+| Q5 | C511451 VEMT2523SLX01 (now C2843576 VEMT2023SLX01: EasyEDA LED-SMD_VISHAY_VEMT2023SLX01 has pad 1 at −x and the lens at −y, so correction **180**) | SENSOR-SMD_VEMT2523SLX01 | ✓ side-view 2.3 × 2.55 | B, 180 | 0 | 180 | **0** | ✗ lens into the board, C/E swapped | pad 1 = C at +x, lens arc at +y in both | Ext, 1874 |
 | SW1 | C139794 SKRHABE010 | SW-SMD_SKRHABE010 | ✓ 7.5 × 7.5, 6 + 2 pads, 2 bosses | **F**, 45 | 0 | 45 | 45 | ✓ | pads 1-3 at −x (1 top), 4-6 at +x; small boss top in both | Ext, 6785 |
 | U1 | C22459164 STM32U083KCU6 | UFQFPN-32_L5.0-W5.0-P0.50-TL-EP3.5 | ✓ 5 × 5, EP 3.5 | B, 90 | 0 | 90 | 90 | ✓ | pin 1 top of the left column, dot beside it in both; 33 pads fit to 0.053 mm | Ext, **49** |
 | U2 | C5127802 RV-3032-C7 | OSC-SMD_8P-L3.2-W1.5-P0.90-BL | ✓ C7 3.2 × 1.5, 8 pads 0.9 mm | B, 0 | 270 | 0 | **90** | ✗ turned 90°: pins off the pads | EasyEDA landscape, pin 1 bottom-left; KiCad portrait, pin 1 top-left | Ext, 400 (**−144 available**) |
@@ -293,13 +317,13 @@ JLCPCB values are from jlcpcb.com/capabilities/pcb-capabilities (2026-10-30).
 | Hole to hole | ≥ 0.25 mm (DRC) | via 0.20, pad 0.45 mm | ✓ |
 | Copper to board edge | ≥ 0.30 mm (DRC); mounting-hole pads 0.40 mm from the corner arcs | ≥ 0.20 mm routed | ✓ |
 | Hole to board edge | M2 holes 1.5 mm from the corner arcs (they sit at the radius centres) | – | ✓ |
-| FPC slot | 1.4 × 14.0 mm routed in Edge.Cuts with full-round ends; 0.3 mm copper keepout | non-plated slot ≥ 1.0 mm wide; copper ≥ 0.2 mm from a routed edge | ✓ |
+| FPC slot | 1.4 × 17.0 mm (14.0 before MECH-01) routed in Edge.Cuts with full-round ends; 0.3 mm copper keepout | non-plated slot ≥ 1.0 mm wide; copper ≥ 0.2 mm from a routed edge | ✓ |
 | Solder-mask dam, fine pitch | U1 QFN 0.18 mm (corner pair), J1 FPC 0.20 mm, U2 0.25 mm; mask expansion 0 | 0.10 mm (green), 0.13 mm (black/white) | ✓ any colour |
 | Vias | tented (no mask openings at vias in either mask Gerber) | order option "Tented" | ✓ |
 | QFN exposed-pad paste | 4 windows 1.41 × 1.41 mm on 3.5 × 3.5 mm: about 63 % | 50-80 % is usual | ✓ |
 | 12 mm cell-contact pad | mask open, **no paste** (bare ENIG contact, as intended) | – | ✓ (remark tells JLCPCB it is deliberate) |
-| Silkscreen | text 0.65-0.8 mm high, strokes 0.105-0.15 mm | ≥ 1.0 mm high, ≥ 0.15 mm | ✗ A-07 |
-| Thermal reliefs | none: the pours have no net (A-08); zone setting 0.25 mm gap, 0.3 mm spokes | – | after A-08 |
+| Silkscreen | text 1.0 mm high, 0.153 mm strokes (A-07 fixed; 0.65-0.8 mm before) | ≥ 1.0 mm high, ≥ 0.15 mm | ✓ |
+| Thermal reliefs | 0.25 mm gap, 0.3 mm spokes on the `/GND` pours (A-08 fixed); BT1 pad 2 solid | – | ✓ |
 | Board size | 77 × 31 mm | fab ≥ 3 × 3 mm; Standard PCBA ≥ 70 × 70 mm | panel (A-04) |
 | Thickness | 0.8 mm (±0.1) | 0.8 mm standard option; Economic PCBA 0.8-1.6, Standard any | ✓ |
 
@@ -341,7 +365,7 @@ Y = 31 mm) is at the top in both views.
 | Q5 (phototransistor, back, top edge left of centre seen from the front) | lens pointing at the top edge; collector on the pad away from the board centre (front-view X ≈ 18.85 mm) |
 | BT1 (coin-cell clip) | chamfered, closed end towards the top edge; open end towards the bottom edge |
 | D1, D2, D3 (SOD-123) | cathode band on the end with the silkscreen bar |
-| Q1, Q2, Q4 (SOT-23), Q3 (SC-70) | the body's single lead (pin 3, drain) on the single pad. Q1 is the one the old file had wrong |
+| Q1-Q4 (SOT-23; Q3 was SC-70 before the fixes) | the body's single lead (pin 3, drain) on the single pad. Q1 is the one the old file had wrong |
 | U1 (QFN-32) | pin-1 dot at the silkscreen pin-1 mark (triangle) |
 | U2 (RV-3032, 3.2 × 1.5 mm) | long axis matching the 2 × 4 pads; pin-1 corner at the silkscreen mark |
 | J1 (FPC connector) | body centred on the 24 pads and the two nails, not on the pad row; actuator towards the FPC slot |

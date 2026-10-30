@@ -37,15 +37,15 @@ off the drawing at 900 dpi against its own dimensioned features (better than
 
 | ID | Severity | Where | Status |
 |---|---|---|---|
-| MECH-01 | **Critical** | board: FPC slot shorter than the flex flare that passes through it | **board change needed** (test xfail) |
+| MECH-01 | **Critical** | board: FPC slot shorter than the flex flare that passes through it | **fixed** in [`2b8301f`](https://github.com/gemivnet/IRL2FA/commit/2b8301f) |
 | MECH-02 | **High** | case: joystick cap socket for the wrong stem (size and angle) | fixed in the case |
 | MECH-03 | Medium | case: glass-locating rib sat on the flex flare at its glued root | fixed in the case |
-| MECH-04 | Medium | board: the coin cell may rest on mask-covered tracks instead of its negative pad | board change recommended |
-| MECH-05 | Low | board: via in the coin cell's insertion path | board change recommended (test xfail) |
+| MECH-04 | Medium | board: the coin cell may rest on mask-covered tracks instead of its negative pad | **fixed** in [`2b8301f`](https://github.com/gemivnet/IRL2FA/commit/2b8301f) |
+| MECH-05 | Low | board: via in the coin cell's insertion path | **fixed** in [`2b8301f`](https://github.com/gemivnet/IRL2FA/commit/2b8301f) |
 | MECH-06 | Medium | docs: assembly order glued the display before threading its flex | fixed (README, case-design) |
 | MECH-07 | Low | models: joystick and display/flex 3D models did not match the drawings | fixed (`gen_models.py`) |
 | MECH-08 | Low | assembly: glass placement tolerance against the 0.4 mm rib clearance | documented; check on the first build |
-| MECH-09 | Low | `board.yaml` describes the joystick stem by its 3.0 mm shoulder | board.yaml change recommended |
+| MECH-09 | Low | `board.yaml` describes the joystick stem by its 3.0 mm shoulder | **fixed** in [`2b8301f`](https://github.com/gemivnet/IRL2FA/commit/2b8301f) |
 | MECH-10 | Info | flex length: 2-3.5 mm spare, not "0.8 mm to spare" | docs fixed |
 | MECH-11 | Info | J3 (Tag-Connect) only reachable with the board out of the case | documented |
 | MECH-12 | Info | IR windows: beam above the axis is clipped; "thin" window needs an IR-clear filament | documented |
@@ -82,6 +82,10 @@ refresh`, `gen_models.py` (the flex model folds through the slot), `case/build.s
 and `make fab`. Re-pour and re-route around the longer slot. Then remove the xfail
 from `test_fpc_flare_fits_the_slot`. The case needs no change: its rib opening
 already covers y 6.77..22.87.
+
+**Status: fixed** in [`2b8301f`](https://github.com/gemivnet/IRL2FA/commit/2b8301f): the slot above, with the EPD footprint, the board (re-placed
+and re-routed), the case dimensions and the fab outputs regenerated;
+`test_fpc_flare_fits_the_slot` passes without its xfail.
 
 ### MECH-02 (High, case, fixed): the cap socket did not fit the joystick stem
 
@@ -146,6 +150,15 @@ copper under the mask.
 
 The README (ENIG) and footprint description stay valid with either.
 
+**Status: fixed** in [`2b8301f`](https://github.com/gemivnet/IRL2FA/commit/2b8301f) with option 1. A B.Cu rule area, a ring from the pad's edge
+(r 6) to r 10.5, allows no tracks and no pour except in one 1.2 mm corridor straight
+down (+y). The pad's ground connection runs through it as a single spoke (the GND track
+and the pour, solid to the pad), and the solder mask is open over the corridor, so the
+spoke is bare ENIG like the pad: nothing under the negative cap stands higher than the
+contact. The ring stops at the pad's edge because a pad inside a keep-out made
+Freerouting give up on the whole ground net. Option 2 (paste dots) was not needed.
+`test_nothing_on_bcu_under_the_negative_cap_but_the_contact` checks tracks and pour.
+
 ### MECH-05 (Low, board): a via in the coin cell's insertion path
 
 **Evidence.** A via on EPD_PWR_N at **(33.11, 30.06)** is in the strip the cell
@@ -157,6 +170,10 @@ covers only the cell's final position (y 3.55..28.45). No pads are in the strip.
 **Fix (board).** Move the via out of x 25.9..51.1 below y 16, or extend the
 B.Cu `vias not_allowed` rule area to the bottom edge. Then remove the xfail from
 `test_cell_insertion_strip_has_no_vias`.
+
+**Status: fixed** in [`2b8301f`](https://github.com/gemivnet/IRL2FA/commit/2b8301f): a rule area x 25.9..51.1 from the cell centre to the bottom
+edge allows no vias on either layer, and the cell's own via keep-out grew to r 12.6;
+the test passes without its xfail.
 
 ### MECH-06 (Medium, docs, fixed): assembly order
 
@@ -202,7 +219,9 @@ for the rib only, or print a placement jig.
 
 `board.yaml` `joystick.stem_diameter: 3.0` is the shoulder, not the stem a cap
 fits. Until it changes, the keytop data lives in the `.scad` (`stem_square`,
-`stem_corner_r`, `stem_angle`, `stem_fit_max`, `joystick_collars`). Suggested
+`stem_corner_r`, `stem_angle`, `stem_fit_max`, `joystick_collars`). **Status: fixed** in [`2b8301f`](https://github.com/gemivnet/IRL2FA/commit/2b8301f): `board.yaml` has `shoulder_diameter: 3.0` (was
+`stem_diameter`), `stem_square`, `stem_corner_r` and `stem_fit_max`, and the `.scad`
+reads them through `board_dims.scad`. Suggested
 `board.yaml` additions, then `gen_dims.py` and the `.scad` reading them:
 
 ```yaml

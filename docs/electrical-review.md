@@ -107,6 +107,7 @@ MCU alternate function and the EXTI wake lines all match their primary sources.
   1. Replace Q5 with **Vishay VEMT2023SLX01** (VEMT2). It is the same side-view package and the same lead assignment: the VEMT p.5 tape table lists VEMT2023SLX01 next to VEMT2523SLX01, both Lead I = collector. It adds a daylight-blocking filter matched to 830-950 nm emitters. It is a BOM-only change (design.py Q5 `value`/`mpn`/`lcsc`); footprint, symbol and routing stay. Its LCSC code and stock are **unverified**. RS lists it as discontinued; Farnell/element14 stock it.
   2. Keep the part and make the case's IR window from IR-pass (visible-black) material.
 - `test_ir_detector_has_daylight_filter` is xfail until option 1 is applied.
+- **Status: fixed** in [`2b8301f`](https://github.com/gemivnet/IRL2FA/commit/2b8301f) with option 1. Q5 is the VEMT2023SLX01, [LCSC C2843576](https://www.lcsc.com/product-detail/C2843576.html) (on 2026-10-30: LCSC 471, JLCPCB 505 with 455 available, Extended). Its datasheet (doc 84166 rev 1.0) has the same drawing 6.544-5410.01-4 ("VEMT2x23SLX01") and Lead I = collector, so the pads stay (footprint renamed `PhotoTransistor_Vishay_VEMT2023SLX01_SideView`). Ica is the same 1.3 / 2.7 / 4.1 mA at 950 nm and ICEO 100 nA max; the spectral range is 790-970 nm (Fig. 5). JLCPCB's EasyEDA footprint for it is drawn turned 180° from the VEMT2523SLX01's, so `fab.JLC` corrects it by 180, checked by `test_assembly.py`. `ir_rx.cir` uses its Fig. 4 edges. The xfail is gone.
 
 **IR-2: with worst-case parts the IR link reaches about 3 cm, not 5.**
 
@@ -122,6 +123,7 @@ MCU alternate function and the EXTI wake lines all match their primary sources.
   - The documented range is corrected to about 3 cm worst case (pcb-design.md, done).
   - If more range is wanted, set R8 = 68 Ω. That gives about 28 mA fresh and 18 mA flat, √1.45 ≈ +20 % range, and 53 mW in R8, inside the 0402's 62.5 mW. Raise `ir_led.cir`'s `iled_fresh` limit to 0.035 A with it.
 - No test was added: the range is a requirement call, not a datasheet violation.
+- **Status: applied** in [`2b8301f`](https://github.com/gemivnet/IRL2FA/commit/2b8301f). R8 is 68 Ω, UNI-ROYAL 0402WGF680JTCE, [LCSC C25131](https://www.lcsc.com/product-detail/C25131.html) (LCSC 187 k, Extended): JLCPCB has no Basic 68 Ω 0402, so this adds an Extended part (75 Ω C25133 is "Preferred", for ~13 % instead of ~20 % more range). `ir_led.cir`: 28.0 mA at 3.2 V, 18.1 mA at 2.5 V; R8 dissipates 53 mW at 3.2 V and 59 mW at 3.3 V against 62.5 mW, only while transmitting; the LED's limit is 100 mA. `checks.yaml` allows 0.035 A. `ir_rx.cir` with 18.1 mA now checks 3 cm (2.02 V against VIH 1.75 V); 3.5 cm still reads (1.86 V) and 4 cm does not (1.45 V): about 3.5 cm worst case. The new `ir_burst.cir` checks the cell: a 90 % duty burst from a half-used cell (40 Ω) keeps VBAT ≥ 2.34 V and the LED at 15.9 mA at the end of a 9-bit run. The power budget uses 25 / 35 mA.
 
 **PWR-1: refreshing from a weak or cold cell can brown out the panel.**
 
@@ -146,6 +148,7 @@ MCU alternate function and the EXTI wake lines all match their primary sources.
 - **Fix.**
   - First, on a first board, run a full refresh from a bench supply at 2.3 V and confirm PREVGH ≥ 20 V.
   - If it fails, fit **Nexperia NX3008NBK,215** (LCSC C179399, 30 V, Vgs(th) 1.1 V, Solomon's suggested part). It is SOT-23, so Q3's footprint changes from SOT-323_SC-70 to SOT-23 with the same 1 G / 2 S / 3 D pinout, and it needs a re-route.
+- **Status: fixed** in [`2b8301f`](https://github.com/gemivnet/IRL2FA/commit/2b8301f), without waiting for the bench test. Q3 is the NX3008NBK,215 (C179399; on 2026-10-30 LCSC 3490, JLCPCB 3493 with 3301 available, Extended). Nexperia data sheet (5 Nov 2022): Vgs(th) 0.6-1.1 V; VDS 30 V against the booster's 21.7 V; ID 400 mA (IDM 1.6 A) against a 0.19 A peak; Rds(on) 2.1 Ω max at 2.5 V; VGS ±8 V. Pinning 1 G, 2 S, 3 D (Table 2) on the stock KiCad SOT-23 at the old Q3 spot (symbol `Transistor_FET:Q_NMOS_GSD`); JLCPCB's EasyEDA SOT-23 takes the usual 180 correction. `epd_boost.cir` models it as a MOSFET at worst-case threshold and on-resistance, with RESE raising its source: +20.8 / −21.2 V, 20 V in 24.6 ms, 0.19 A peak. The 2.3 V refresh stays a first-board check (`pcb-design.md` item 7): with the bench's fixed on-time even an ideal switch falls short at 2.3 V, so it cannot stand in for the controller's current-mode regulation.
 
 ### Cosmetic
 
@@ -157,11 +160,13 @@ MCU alternate function and the EXTI wake lines all match their primary sources.
 - ANR3015T470M is Isat 0.36 A, Irms 0.36 A and 1.625 Ω max (APV p.5).
 - **Fixed on this branch** in `epd_boost.cir` and `checks.yaml`: the simulated peak is 0.247 A, and the rails still reach +21.7 / −22.2 V in 21 ms.
 - **To apply:** change the design.py description to "47 uH 0.36 A booster inductor". This regenerates the schematic description field.
+- **Status: fixed** in [`2b8301f`](https://github.com/gemivnet/IRL2FA/commit/2b8301f).
 
 **C-2: two datasheet links point at the wrong documents.**
 
 - design.py Q5 links `vishay.com/docs/81596/vemt2500x01.pdf`, which is the VEMT2500X01 series, a different part. **To apply:** use `https://www.vishay.com/docs/84167/vemt2523slx01.pdf`.
 - D4 links doc 84176, but the VSMB2948SL datasheet is doc 83498 (`https://www.vishay.com/docs/83498/vsmb2948sl.pdf`, as footprints.yaml already cites).
+- **Status: fixed** in [`2b8301f`](https://github.com/gemivnet/IRL2FA/commit/2b8301f). D4 links doc 83498; Q5, now the VEMT2023SLX01 (IR-1), links its doc 84166.
 
 **C-3: C11 (the booster's flying capacitor) runs near its rating.**
 
@@ -169,6 +174,7 @@ MCU alternate function and the EXTI wake lines all match their primary sources.
 - That is 93 % of rating, and X5R loses most of its capacitance at that bias.
 - Good Display's reference uses the same 4.7 µF/25 V, and the bench passes with 3 µF effective, so it works.
 - **Optional:** a 50 V X7R 0805 of ≥ 2.2 µF gives margin. Pick one with an LCSC code at re-route time.
+- **Status: not applied.** It is optional: the part is inside its rating and the bench passes with 3 µF effective. Whether a 2.2 µF 50 V 0805 keeps more than that at 23 V needs the DC-bias curves this review could not fetch, so a blind swap could lower the effective capacitance of Good Display's reference value. Left for measurement on the first boards.
 
 **C-4: VDDA/VREF+ decoupling.**
 
@@ -179,12 +185,14 @@ MCU alternate function and the EXTI wake lines all match their primary sources.
 **C-5: the joystick's metal frame tabs (SW1 MP) float.**
 
 - **To apply:** tie them to GND. This gives finger ESD on the frame a path that avoids the contact pins. It is a schematic change: connect SW1 pin MP to GND.
+- **Status: fixed** in [`2b8301f`](https://github.com/gemivnet/IRL2FA/commit/2b8301f).
 
 **C-6: RTC EVI is tied straight to GND.**
 
 - The manual's example uses 10 kΩ to VSS "to keep functional test possible" and notes that EVF is set at power-on (RV p.140, note 6).
 - It works as built, but the firmware should ignore EVF.
 - **Optional:** fit a 10 kΩ from EVI to GND instead of the direct tie.
+- **Status: not applied.** Optional, and only for Micro Crystal's factory test; the manual allows the direct tie.
 
 ## Required design changes (for the re-route)
 
@@ -204,5 +212,5 @@ MCU alternate function and the EXTI wake lines all match their primary sources.
 - **SSD1680 GDR drive level and current-sense threshold.** Neither is published, so EPD-1 is a risk to measure, not a proven failure.
 - **Which face of the GDEY0213B74 FPC carries the contacts.** The drawing does not state it unambiguously. It does not matter with the dual-contact FH34SRJ (see above), but it would matter with any other connector.
 - **Physical direction of the joystick's A/B/C/D contacts.** The Alps drawing names the contacts but does not tie each letter to a direction of travel unambiguously. That is still a first-board check (pcb-design.md item 4), fixed in pins.yaml if wrong.
-- **VEMT2023SLX01 at LCSC.** Its LCSC code and stock were not found: LCSC's search API refused the request.
+- **VEMT2023SLX01 at LCSC.** Its LCSC code and stock were not found: LCSC's search API refused the request. (Since found: C2843576, see IR-1.)
 - **Ambient-light figures in IR-1.** These are engineering estimates. The datasheet gives sensitivity only at 950 nm.
