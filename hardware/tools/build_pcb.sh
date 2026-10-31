@@ -16,7 +16,11 @@ JAR=hardware/build/freerouting-$FR_VERSION.jar
 if [ ! -f "$JAR" ]; then
   curl -sSfL -o "$JAR" "https://github.com/freerouting/freerouting/releases/download/v$FR_VERSION/freerouting-$FR_VERSION.jar"
 fi
-kicad() { docker run --rm -e SKIP_LOCAL -e IRL2FA_PLACE -e IRL2FA_LAYERS -u "$(id -u):$(id -g)" -e HOME=/tmp -v "$PWD":/w -w /w "$KICAD_IMAGE" "$@"; }
+# Every container is memory-capped: uncapped, each Freerouting JVM sized its heap to 25% of the host (11.8 GB on
+# home-server), and six worktrees routing at once froze the whole server on 2026-10-30 14:12.
+KICAD_MEM=${KICAD_MEM:-4g}
+ROUTE_MEM=${ROUTE_MEM:-3g}
+kicad() { docker run --rm --memory "$KICAD_MEM" --memory-swap "$KICAD_MEM" -e SKIP_LOCAL -e IRL2FA_PLACE -e IRL2FA_LAYERS -u "$(id -u):$(id -g)" -e HOME=/tmp -v "$PWD":/w -w /w "$KICAD_IMAGE" "$@"; }
 
 if [ "${SKIP_SCHEMATIC:-0}" != 1 ]; then
   kicad python3 hardware/tools/gen_schematic.py
@@ -24,8 +28,8 @@ fi
 kicad kicad-cli sch export netlist --format kicadsexpr -o hardware/build/irl2fa.net hardware/irl2fa.kicad_sch
 kicad python3 hardware/tools/gen_pcb.py --step place
 route() {
-  docker run --rm -u "$(id -u):$(id -g)" -e HOME=/tmp -v "$PWD":/w -w /w "$JAVA_IMAGE" \
-    java -jar "$JAR" -de hardware/build/irl2fa.dsn -do hardware/build/irl2fa.ses -mp "$PASSES" ${FR_ARGS:-} --gui.enabled=false \
+  docker run --rm --memory "$ROUTE_MEM" --memory-swap "$ROUTE_MEM" -u "$(id -u):$(id -g)" -e HOME=/tmp -v "$PWD":/w -w /w "$JAVA_IMAGE" \
+    java -XX:MaxRAMPercentage=75 -jar "$JAR" -de hardware/build/irl2fa.dsn -do hardware/build/irl2fa.ses -mp "$PASSES" ${FR_ARGS:-} --gui.enabled=false \
     | tee hardware/build/freerouting.log | grep -E "Auto-routing stage completed|optimization stage completed" || true
 }
 kicad python3 hardware/tools/gen_pcb.py --step dsn
