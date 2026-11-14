@@ -1,3 +1,21 @@
+## IRL2FA v0.2.1: new release signing key
+
+**The release signing key was replaced.** The private half of the v0.2.0 key was
+exposed, so anyone holding it could sign firmware that a device built with the
+v0.2.0 bootloader would accept. v0.2.1 embeds a new public key in the
+bootloader (`firmware/keys/irl2fa-release.pub`) and is signed with the new
+private key. Nothing else changed: the board, the case and the application
+are the same as v0.2.0, apart from the version number.
+
+**No board has been built yet, so nothing needs reflashing.** Do not use any
+v0.2.0 factory image or `.irl2fa` update: a device that runs the v0.2.0
+bootloader keeps trusting the old key for good, and changing that takes an SWD
+reflash (on a read-protected chip, a mass erase). The board revision is still
+v0.2 and the gerbers are unchanged, so an order placed from the v0.2.0 gerbers
+is fine; only its firmware must come from v0.2.1 or later.
+
+The notes of v0.2.0 follow; the downloads and the hardware are the same.
+
 ## IRL2FA v0.2.0: reviewed against the datasheets, signed updates, simple mode
 
 The first release whose board files have been checked against every
