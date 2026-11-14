@@ -31,7 +31,7 @@ on a computer with the [adapter](#the-usb-infrared-adapter).
    - from a computer:
 
      ```sh
-     python3 firmware/tools/irl2fa_update.py --port /dev/ttyUSB0 irl2fa-v0.2.0.irl2fa
+     python3 firmware/tools/irl2fa_update.py --port /dev/ttyUSB0 irl2fa-v0.2.1.irl2fa
      ```
 
      (`pip install pyserial` once; on Windows the port is `COM3` or similar.)

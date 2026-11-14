@@ -151,7 +151,7 @@ with a ~$5 USB infrared adapter. Settings → Firmware update → Receive an
 update (with the PIN, if set), then send the release's `.irl2fa` file:
 
 ```sh
-python3 firmware/tools/irl2fa_update.py --port /dev/ttyUSB0 irl2fa-v0.2.0.irl2fa
+python3 firmware/tools/irl2fa_update.py --port /dev/ttyUSB0 irl2fa-v0.2.1.irl2fa
 ```
 
 or, from a device that already runs it, Settings → Firmware update → Send it

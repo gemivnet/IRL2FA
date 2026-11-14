@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Sends a signed firmware update to an IRL2FA over infrared.
 
-    irl2fa_update.py --port /dev/ttyUSB0 irl2fa-v0.2.0.irl2fa
+    irl2fa_update.py --port /dev/ttyUSB0 irl2fa-v0.2.1.irl2fa
 
 On the device: Settings -> Firmware update -> Receive an update (with the
 PIN if one is set). Hold the adapter's LED and phototransistor to the
