@@ -22,7 +22,7 @@ jobs:
   check:
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Build the KiCad + test-tools image
         run: docker build -t irl2fa-hw hardware/ci
@@ -54,7 +54,7 @@ jobs:
             kicad-cli pcb render --side top --quality high -w 1600 -h 900 -o out/pcb-top.png hardware/irl2fa.kicad_pcb &&
             kicad-cli pcb render --side bottom --quality high -w 1600 -h 900 -o out/pcb-bottom.png hardware/irl2fa.kicad_pcb'
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: hardware-outputs
@@ -65,7 +65,7 @@ jobs:
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
       - name: Render before/after
@@ -81,7 +81,7 @@ jobs:
               kicad-cli pcb export svg --mode-single -l F.Cu,F.SilkS,Edge.Cuts -o /o/pcb-front.svg hardware/irl2fa.kicad_pcb
               kicad-cli pcb export svg --mode-single -l B.Cu,B.SilkS,Edge.Cuts --mirror -o /o/pcb-back.svg hardware/irl2fa.kicad_pcb'
           done
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: hardware-visual-diff
           path: diff/
